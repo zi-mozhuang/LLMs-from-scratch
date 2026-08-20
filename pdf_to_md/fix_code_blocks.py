@@ -142,24 +142,126 @@ _CAP_RE = re.compile(r"^Figure\s+(\d+\.\d+)\b\s*(.*)$")
 # ============================================================================
 # ⚠️ DO NOT REMOVE — 对应 PDF报告缺陷 #7（图注格式 / 图注内部硬换行）。
 #    本函数把图注规范化为 blockquote（`> **Figure X.Y** ...`）。
+#    若提供 PDF，则利用图注在 PDF 中的实际 y 坐标范围截断图注文本，防止
+#    pymupdf4llm 合并的后续正文被纳入 blockquote（如 Figure 2.2 图注 646 字符，
+#    其中 385 字符是图注，261 字符是正文）。被截断的正文会移到图注之后。
 #    注意：不得做"全局第 N 图注→第 N 图"配对 —— 封面图、作者肖像等无图注图片
 #    会令序号错位（实测曾把 Figure 1.4 图注挂到作者肖像图下）。转换器输出中
 #    图注本就紧跟其图片（同页相邻），因此原地转 blockquote 即可。
 # ============================================================================
-def pair_figures_captions(text: str) -> str:
+def pair_figures_captions(text: str, pdf=None) -> str:
     """Normalize figure captions to Markdown blockquotes in place. The converter
     emits each `Figure X.Y ...` caption immediately after its figure image on
     the same page, so captions are left where they are — no re-pairing by image
     index (front-matter images have no captions and would shift the pairing).
+    
+    If pdf is provided, use the figure's actual y-coordinate range in the PDF
+    to truncate captions that have body text merged in by pymupdf4llm. The
+    truncated body text is moved to the correct position (after the caption).
     """
+    doc = pymupdf.open(pdf) if pdf else None
     out = []
     for l in text.split("\n"):
         m = _CAP_RE.match(l)
         if m:
-            out.append(f"> **Figure {m.group(1)}** {m.group(2).strip()}")
+            fig_num = m.group(1)
+            caption_text = m.group(2).strip()
+            
+            # If we have PDF access, check if caption contains body text
+            if doc:
+                caption_text, body_text = _truncate_caption_to_figure(doc, fig_num, caption_text)
+            else:
+                body_text = None
+            
+            out.append(f"> **Figure {fig_num}** {caption_text}")
+            
+            # If body text was extracted, add it after the caption
+            if body_text:
+                out.append("")
+                out.append(body_text)
         else:
             out.append(l)
     return "\n".join(out)
+
+
+def _truncate_caption_to_figure(doc, fig_num: str, caption_text: str) -> tuple:
+    """Truncate caption text to only include text within the figure's y-range.
+    
+    pymupdf4llm sometimes merges figure captions with following body text into
+    a single line. This function finds the figure in the PDF, determines the
+    caption's y-coordinate range, and truncates the text at the point where
+    body text begins.
+    
+    Returns (caption_text, body_text) where body_text is the extracted body
+    text that was mixed into the caption, or None if no body text was found.
+    """
+    # Search all pages for this figure
+    for pidx in range(len(doc)):
+        page = doc[pidx]
+        # Find the figure label text "Figure X.Y"
+        fig_label = f"Figure {fig_num}"
+        found_y = None
+        caption_y_max = None
+        
+        d = page.get_text("dict")
+        for b in d["blocks"]:
+            if b["type"] != 0:
+                continue
+            for ln in b["lines"]:
+                for sp in ln["spans"]:
+                    if fig_label in sp["text"]:
+                        # Found the figure label, record its y position
+                        found_y = sp["bbox"][1]
+                        # Caption typically extends ~30-40pt below the label
+                        caption_y_max = found_y + 40
+                        break
+                if found_y:
+                    break
+            if found_y:
+                break
+        
+        if not found_y:
+            continue
+        
+        # Now find where body text starts (text below caption_y_max)
+        # We need to find the point in caption_text where y exceeds caption_y_max
+        # Since we don't have per-character positions, we'll use a heuristic:
+        # Look for sentence boundaries after the caption area
+        
+        # Alternative approach: search for text spans below caption_y_max
+        # and check if their content appears in caption_text
+        body_text_fragments = []
+        for b in d["blocks"]:
+            if b["type"] != 0:
+                continue
+            for ln in b["lines"]:
+                for sp in ln["spans"]:
+                    if sp["bbox"][1] > caption_y_max + 5:  # 5pt tolerance
+                        txt = sp["text"].strip()
+                        if txt and len(txt) > 20:  # Only significant text
+                            body_text_fragments.append(txt)
+        
+        # Check if any body text fragment appears in caption_text
+        for fragment in body_text_fragments:
+            # Find where this fragment starts in caption_text
+            idx = caption_text.find(fragment[:30])  # Use first 30 chars for matching
+            if idx > 0:
+                # Found body text in caption, truncate here
+                # Try to find a sentence boundary before this point
+                truncate_at = idx
+                # Look for sentence end (period + space) before the body text
+                for i in range(idx - 1, max(0, idx - 100), -1):
+                    if caption_text[i] == '.' and (i + 1 >= len(caption_text) or caption_text[i + 1] == ' '):
+                        truncate_at = i + 1
+                        break
+                extracted_body = caption_text[truncate_at:].strip()
+                truncated_caption = caption_text[:truncate_at].rstrip()
+                return truncated_caption, extracted_body
+        
+        # No body text found, return original
+        return caption_text, None
+    
+    return caption_text, None
 
 
 # ============================================================================
@@ -681,13 +783,187 @@ def fix_figure_label_headings(text: str, pdf, img_dir) -> str:
 
 
 # ============================================================================
+# ⚠️ DO NOT REMOVE — 对应 PDF报告缺陷 #8d（caption-only 图未提取）。
+#    pymupdf4llm 对若干纯矢量 Figure（无栅格图片对象）未能输出图片，导致 md 中仅有
+#    `> **Figure X.Y** ...` 图注而无对应的 `![](...)` 图片引用（如 Figure 1.7、2.7、
+#    2.14、3.8、4.9、5.7、7.8 等）。本函数扫描 md，识别图注前面没有对应页号图片引用
+#    的 "孤立" Figure caption；在 PDF 中找到 caption 所在文本块的 bbox，向上扩展到
+#    前一段落的底部（或默认 60pt），用该区域裁剪整页渲染得到图片，命名为
+#    `figure-<页>.png`，并在 caption 前插入 `![Figure X.Y](images/figure-<页>.png)`。
+#    已有图片引用的页面（由 fix_split_figures/fix_figure_label_headings 处理）跳过；
+#    同页已提取过的不重复提取。
+# ============================================================================
+_CAP_IMG_RE = re.compile(r"pdf-(\d{4})-\d+\.png|figure-(\d{4})\.png")
+_CAP_LINE_RE = re.compile(r"^> \*\*Figure (\d+)\.(\d+)\*\*")
+_CAP_PDF_RE = re.compile(r"Figure\s+(\d+)\.(\d+)")
+
+
+def fix_missing_figures(text: str, pdf, img_dir) -> str:
+    """Render caption-only figures from the PDF and insert their image refs."""
+    doc = pymupdf.open(pdf)
+    img_dir = pathlib.Path(img_dir)
+    lines = text.split("\n")
+
+    # map each caption (ch, cf) -> PDF page number (1-based, first occurrence)
+    cap_to_page = {}
+    for pidx in range(len(doc)):
+        for b in doc[pidx].get_text("dict")["blocks"]:
+            if b["type"] != 0:
+                continue
+            txt = "".join(s["text"] for l in b["lines"] for s in l["spans"])
+            m = _CAP_PDF_RE.search(txt)
+            if m:
+                cap_to_page.setdefault((m.group(1), m.group(2)), pidx + 1)
+
+    # scan md: pair each caption line with the page number of its nearest
+    # preceding image reference (any form).
+    paired = []  # [(line_idx, ch, cf, prev_img_page or None)]
+    prev_pg = None
+    for i, l in enumerate(lines):
+        m = _CAP_IMG_RE.search(l)
+        if m:
+            prev_pg = int(m.group(1) or m.group(2))
+        m_cap = _CAP_LINE_RE.match(l)
+        if m_cap:
+            paired.append((i, m_cap.group(1), m_cap.group(2), prev_pg))
+
+    orphans = []  # [(line_idx, ch, cf, pdf_page)]
+    for i, ch, cf, prev_pg in paired:
+        real_pg = cap_to_page.get((ch, cf))
+        if real_pg is None:
+            continue
+        if prev_pg == real_pg:
+            continue  # already has its image reference
+        # skip if the page has raster images — fix_split_figures should handle
+        if doc[real_pg - 1].get_images(full=True):
+            continue
+        orphans.append((i, ch, cf, real_pg))
+
+    if not orphans:
+        return text
+
+    # extract one image per PDF page for all orphans on that page
+    extracted_pages = {}  # page -> out_name
+    insertions = []  # [(line_idx, ch, cf, out_name)]
+    for i, ch, cf, pg in orphans:
+        if pg in extracted_pages:
+            insertions.append((i, ch, cf, extracted_pages[pg]))
+            continue
+        page = doc[pg - 1]
+        # find the caption block (contains "Figure X.Y" in its text)
+        cap_block = None
+        for b in page.get_text("dict")["blocks"]:
+            if b["type"] != 0:
+                continue
+            txt = "".join(s["text"] for l in b["lines"] for s in l["spans"])
+            m = _CAP_PDF_RE.search(txt)
+            if m and m.group(1) == ch and m.group(2) == cf:
+                cap_block = b
+                break
+        if cap_block is None:
+            continue
+        cy0, cy1 = cap_block["bbox"][1], cap_block["bbox"][3]
+        cx0, cx1 = cap_block["bbox"][0], cap_block["bbox"][2]
+
+        # --- Determine the crop region using drawing extent + labels ---
+        drawings = page.get_drawings()
+        all_rects = []  # collect rects to merge into the figure region
+
+        if drawings:
+            # Compute the union bounding box of all vector drawings
+            dy0 = min(d["rect"].y0 for d in drawings)
+            dy1 = max(d["rect"].y1 for d in drawings)
+            dx0 = min(d["rect"].x0 for d in drawings)
+            dx1 = max(d["rect"].x1 for d in drawings)
+            all_rects.append((dx0, dy0, dx1, dy1))
+
+            # Include text labels that overlap the drawing area horizontally
+            # (these are figure annotations like "STAGE 1", "Tokenization..."
+            # etc.). Exclude full-width body paragraphs (width > 300pt) and
+            # section headings (which appear below the figure).
+            for b in page.get_text("dict")["blocks"]:
+                if b["type"] != 0:
+                    continue
+                bx0, by0, bx1, by1 = b["bbox"]
+                bw = bx1 - bx0
+                # skip wide body paragraphs
+                if bw > 300:
+                    continue
+                # must overlap horizontally with the drawing area
+                if bx1 < dx0 - 20 or bx0 > dx1 + 20:
+                    continue
+                # Exclude text clearly below the figure (section headings)
+                # but keep labels between caption and drawing for
+                # "caption above" layouts (cap_y1 < draw_y0).
+                if by0 > max(cy1, dy1):
+                    continue
+                # Exclude text far above the drawing (page headers)
+                if by1 < min(cy0, dy0) - 30:
+                    continue
+                all_rects.append((bx0, by0, bx1, by1))
+        else:
+            # No vector drawings: text-only figure (e.g. Figure 1.7, 4.13).
+            # Include sidebar annotations that are adjacent to the caption.
+            for b in page.get_text("dict")["blocks"]:
+                if b["type"] != 0:
+                    continue
+                bx0, by0, bx1, by1 = b["bbox"]
+                # sidebar: narrower than caption, vertically overlapping
+                if (bx1 - bx0) > 200:
+                    continue
+                if by1 < cy0 - 10 or by0 > cy1 + 10:
+                    continue
+                if bx0 > cx1 + 20 or bx1 < cx0 - 20:
+                    continue
+                all_rects.append((bx0, by0, bx1, by1))
+
+        # Always include the caption itself
+        all_rects.append((cx0, cy0, cx1, cy1))
+
+        # Merge all rects into a single bounding box
+        rx0 = min(r[0] for r in all_rects)
+        ry0 = min(r[1] for r in all_rects)
+        rx1 = max(r[2] for r in all_rects)
+        ry1 = max(r[3] for r in all_rects)
+
+        # Skip if region is unreasonably large (likely multi-part figure
+        # spanning the whole page, e.g. Figure 5.4 or 6.16)
+        if ry1 - ry0 > 550:
+            continue
+
+        pad = 8
+        clip = pymupdf.Rect(
+            max(0, rx0 - pad),
+            max(0, ry0 - pad),
+            min(page.rect.width, rx1 + pad),
+            min(page.rect.height, ry1 + pad),
+        )
+        out_name = f"figure-{pg:04d}.png"
+        page.get_pixmap(clip=clip, matrix=pymupdf.Matrix(2, 2)).save(img_dir / out_name)
+        extracted_pages[pg] = out_name
+        insertions.append((i, ch, cf, out_name))
+
+    # insert image refs in reverse order so earlier indices stay valid
+    insertions.sort(key=lambda t: t[0], reverse=True)
+    for i, ch, cf, out_name in insertions:
+        # insert: blank line + image + blank line, just before the caption line
+        img_ref = f"![Figure {ch}.{cf}](images/{out_name})"
+        lines.insert(i, "")
+        lines.insert(i, img_ref)
+        lines.insert(i, "")
+    return "\n".join(lines)
+
+
+# ============================================================================
 # ⚠️ DO NOT REMOVE — 对应 PDF报告缺陷 #11（概念解释框/侧边栏 callout 未与正文区分）。
 #    书中带浅黄色填充背景(0.969,0.961,0.910)的侧边栏框（如 "This chapter covers"、
 #    "Transformers vs. LLMs"、"Cross entropy loss"、各 "Exercise X.Y"、概念解释等，
 #    全书 60+ 处）被 pymupdf4llm 输出为普通标题+正文，与正文章节无差别。本函数用
 #    PDF 框的首行文本在 md 中定位 callout 标题行，收集其后直到下一个标题行的所有
 #    内容，统一转成 blockquote（标题 `> **Xxx**`、内容逐行加 `>`），与 NOTE/图注
-#    的引用块风格一致。须在 add_toc 之后、fix_faux_headings 之前调用（此时 callout
+#    的引用块风格一致。框内段落间的空行予以删除，换行用行尾两个空格（Markdown
+#    硬换行）实现，使整个概念框成为紧凑的单个引用块；代码围栏行不加尾随空格。
+#    须在 add_toc 之后、fix_faux_headings 之前调用（此时 callout
 #    标题仍是 `#`/`##`/`######` 形态；fix_faux_headings 会把 `_X_` 包裹标题转纯粗体，
 #    在此之前处理才能定位）。
 # ============================================================================
@@ -757,25 +1033,240 @@ def fix_callout_blocks(text: str, pdf) -> str:
             break
         if start is None:
             continue
+        # Use the callout box's bottom y-coordinate to limit collection.
+        # pymupdf4llm outputs text in reading order; content outside the
+        # callout rect (e.g. body text below the box) would otherwise be
+        # absorbed into the blockquote because there is no heading marker
+        # between the callout and the following prose.
+        callout_y1 = r.y1  # bottom of the callout box in PDF coords
         j = start + 1
         while j < len(lines) and not _CALLOUT_HEAD_RE.match(lines[j]):
+            # Stop if this line is clearly outside the callout box:
+            # it's a non-empty, non-list paragraph (not starting with - or *)
+            # and we've passed the callout's vertical extent.
+            stripped = lines[j].strip()
+            if stripped and not stripped.startswith(("-", "*", ">", "```")):
+                # Check if this line's text appears below the callout box
+                # by searching the PDF page for a matching text span.
+                page = doc[pidx]
+                found_below = False
+                for b in page.get_text("dict")["blocks"]:
+                    if b["type"] != 0:
+                        continue
+                    for ln in b["lines"]:
+                        for sp in ln["spans"]:
+                            stxt = sp["text"].strip()
+                            if stxt and stripped[:30] in stxt:
+                                # Text found in PDF; check y position
+                                if sp["bbox"][1] > callout_y1 + 5:  # 5pt tolerance
+                                    found_below = True
+                                    break
+                        if found_below:
+                            break
+                    if found_below:
+                        break
+                if found_below:
+                    break
             j += 1
         spans.append((start, j - 1))
 
     spans.sort()
     out = []
     prev = 0
+    fence_re = re.compile(r"^\s*```")
     for s, e in spans:
         out.extend(lines[prev:s])
         m = _CALLOUT_HEAD_RE.match(lines[s])
         title = lines[s][m.end():].strip()
         title = re.sub(r"^_+|_+$", "", title)  # unwrap _..._ pseudo-italic labels
-        out.append(f"> **{title}**")
+        # Compact the box: drop blank lines between paragraphs; keep the line
+        # breaks via trailing two spaces (Markdown hard break) so the callout
+        # renders as a single tight blockquote. Fence lines get no trailing
+        # spaces so code content stays untouched.
+        body = [(f"> **{title}**", True)]
+        in_code = False
         for k in range(s + 1, e + 1):
             l = lines[k]
-            out.append("" if l.strip() == "" else "> " + l)
+            if fence_re.match(l):
+                in_code = not in_code
+                body.append(("> " + l.rstrip(), False))
+                continue
+            if in_code:
+                body.append(("> " + l if l.strip() else ">", False))
+                continue
+            if l.strip() == "":
+                continue
+            body.append(("> " + l.rstrip(), True))
+        for i, (ln, breakable) in enumerate(body):
+            if breakable and i < len(body) - 1:
+                ln += "  "
+            out.append(ln)
+        # Always add a blank line after the blockquote to visually separate
+        # it from whatever follows (heading, body text, etc.)
+        out.append("")
         prev = e + 1
     out.extend(lines[prev:])
+    return "\n".join(out)
+
+
+# ============================================================================
+# ⚠️ DO NOT REMOVE — 对应 PDF报告缺陷 #12（表格名未与正文区分）。
+#    书中表格上方通常有一行独立标题 "Table X.Y 描述"，pymupdf4llm 把它输出为普通正文，
+#    与正文无差别。本函数把行首为 "Table X.Y " 且为独立标题（非正文引用句、非引用块/围栏
+#    内部）的整行加粗为 `**Table X.Y ...**`，使其与正文区分。只处理短行（≤120 字符）
+#    且不含句子连接词的独立标题；正文中的 "Table 1.1 reports ..." 等引用句不受影响。
+# ============================================================================
+_TABLE_CAP_RE = re.compile(r"^Table\s+\d+\.\d+\s+\S")
+
+
+def fix_table_captions(text: str) -> str:
+    """Bold standalone `Table X.Y ...` caption lines so they stand out from prose."""
+    lines = text.split("\n")
+    out = []
+    in_code = False
+    for l in lines:
+        s = l.strip()
+        if s.startswith("```"):
+            in_code = not in_code
+            out.append(l)
+            continue
+        if in_code:
+            out.append(l)
+            continue
+        # skip blockquotes (figure captions / NOTE / callout bodies)
+        if s.startswith(">"):
+            out.append(l)
+            continue
+        if _TABLE_CAP_RE.match(s) and len(s) <= 120:
+            # distinguish caption (short noun-phrase description) from prose
+            # reference like "Table 1.1 reports ..." which continues a sentence
+            first_word = s.split()[2] if len(s.split()) >= 3 else ""
+            if first_word and first_word[0].isupper() and not any(
+                w in first_word.lower() for w in
+                ("reports", "shows", "displays", "lists", "summarizes",
+                 "summarises", "compares", "illustrates", "describes",
+                 "contains", "presents", "gives")
+            ):
+                out.append(f"**{l.rstrip()}**")
+                continue
+        out.append(l)
+    return "\n".join(out)
+
+
+# ============================================================================
+# ⚠️ DO NOT REMOVE — 对应 PDF报告缺陷（Listing标题未与正文区分）。
+#    书中代码清单上方通常有一行独立标题 "Listing X.Y 描述"，pymupdf4llm 把它输出为
+#    普通正文，与正文无差别。本函数把行首为 "Listing X.Y " 且为独立标题（非已有标题、
+#    非引用块/围栏内部）的整行加粗为 `**Listing X.Y ...**`，使其与正文区分。
+#    若行内混入了 **...** 片段（如边注被合并），先清除再整体加粗，避免嵌套 bold 破坏渲染。
+# ============================================================================
+_LISTING_CAP_RE = re.compile(r"^Listing\s+[\w]+\.[\w]+\s+\S")
+
+
+def fix_listing_captions(text: str) -> str:
+    """Bold standalone ``Listing X.Y ...`` caption lines so they stand out from prose.
+
+    Listing captions are always short natural-language descriptions placed
+    immediately before a code block.  They never appear inside fenced code
+    (they are titles *for* the code, not code themselves), so we skip the
+    fragile in_code fence tracking that can desync on unbalanced fences and
+    instead exclude only headings, blockquotes, and already-bold lines.
+    """
+    lines = text.split("\n")
+    out = []
+    for l in lines:
+        s = l.strip()
+        # skip lines already formatted as headings or inside blockquotes
+        if s.startswith("#") or s.startswith(">") or s.startswith("**"):
+            out.append(l)
+            continue
+        if _LISTING_CAP_RE.match(s):
+            # strip any inner **...** fragments (merged margin notes) before
+            # wrapping the whole line in bold to avoid nested-bold rendering bugs
+            cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", l.rstrip())
+            out.append(f"**{cleaned}**")
+            continue
+        out.append(l)
+    return "\n".join(out)
+
+
+# ============================================================================
+# ⚠️ DO NOT REMOVE — 对应 PDF报告缺陷（图片文字混入图注正文）。
+#    当 PDF 中图片（diagram）与图注文字位于同一水平行时，pymupdf4llm 会把图片内的
+#    文字（通常为 bold 格式）与图注正文合并到同一行，导致图注中出现不属于正文的粗体片段。
+#    本函数扫描 `> **Figure X.Y**` 图注行，解析其中的 bold 片段，移除词数 ≥4 的
+#    bold 片段（这些几乎必然是图片内文字），保留短 bold 引用（变量名、类名、特殊 token
+#    等，均 ≤3 词）。同时正确处理移除后的间距（避免双空格、句号前多余空格）。
+# ============================================================================
+_FIG_CAP_RE = re.compile(r"^>\s+\*\*Figure\s+\d+\.\d+\*\*")
+
+
+def fix_figure_caption_diagram_text(text: str) -> str:
+    """Remove diagram text (long bold segments) mixed into figure caption lines.
+
+    When a PDF figure and its caption share the same horizontal band,
+    pymupdf4llm merges in-image bold text into the caption line.  Diagram text
+    fragments are typically ≥4 words (e.g. ``**The model is simply trained to**``),
+    while legitimate bold references in captions (variable names, class names,
+    special tokens) are ≤3 words.  This function removes the long bold segments
+    and repairs spacing.
+    """
+    lines = text.split("\n")
+    out = []
+    for l in lines:
+        s = l.strip()
+        # Only process figure caption blockquote lines
+        if not _FIG_CAP_RE.match(s):
+            out.append(l)
+            continue
+
+        # Parse the line into (is_bold, text) segments
+        segments = []  # list of (is_bold: bool, text: str)
+        i = 0
+        while i < len(l):
+            if l[i:i+2] == "**":
+                end = l.find("**", i + 2)
+                if end == -1:
+                    segments.append((False, l[i:]))
+                    break
+                segments.append((True, l[i+2:end]))
+                i = end + 2
+            else:
+                j = l.find("**", i)
+                if j == -1:
+                    segments.append((False, l[i:]))
+                    break
+                segments.append((False, l[i:j]))
+                i = j
+
+        # Remove bold segments with >= 4 words (diagram text),
+        # keep the initial **Figure X.Y** label and short bold references
+        new_segments = []
+        for idx, (is_bold, t) in enumerate(segments):
+            if is_bold and idx > 0:  # skip the initial **Figure X.Y** label
+                word_count = len(t.split())
+                if word_count >= 4:
+                    continue  # skip this diagram text segment
+            new_segments.append((is_bold, t))
+
+        if len(new_segments) == len(segments):
+            out.append(l)  # no changes
+            continue
+
+        # Reconstruct the line, handling spacing around removed segments
+        result_parts = []
+        for idx, (is_bold, t) in enumerate(new_segments):
+            if is_bold:
+                result_parts.append(f"**{t}**")
+            else:
+                result_parts.append(t)
+
+        result = "".join(result_parts)
+        # Fix double spaces left by removed segments
+        result = re.sub(r"  +", " ", result)
+        # Fix space before sentence-ending punctuation (artifact of removal)
+        result = re.sub(r"\s+([.!?])", r"\1", result)
+        out.append(result)
     return "\n".join(out)
 
 
@@ -1311,9 +1802,10 @@ def process_pdf_to_markdown(pdf, md_path, img_dir):
     final = clean_annotations(final)       # [6] drop <mark> tags & (continued)
     final = ensure_fences_balanced(final)  # [8] rebalance code fences (append missing close)
     final = strip_page_headers(final)      # [4b] drop running-header words
-    final = pair_figures_captions(final)   # [7] move caption next to its figure
+    final = pair_figures_captions(final, pdf)   # [7] figure captions -> blockquotes (with PDF for truncation)
     final = fix_split_figures(final, pdf, img_dir)  # [8b] reassemble split figures
     final = fix_figure_label_headings(final, pdf, img_dir)  # [8c] restore vector-fig top labels
+    final = fix_missing_figures(final, pdf, img_dir)       # [8d] caption-only figures -> extract image
     final = fix_margin_notes(final)        # [10] NOTE margin notes -> blockquotes
     final = merge_prose_hard_breaks(final) # [4] reflow paragraph hard breaks
     # second, idempotent math pass: re-flowing may expose fragments (e.g. a
@@ -1328,6 +1820,12 @@ def process_pdf_to_markdown(pdf, md_path, img_dir):
     # add_toc, before fix_faux_headings so the callout headings are still
     # `#`/`##`/`######` shaped and locatable)
     final = fix_callout_blocks(final, pdf)   # [11] concept boxes -> blockquotes
+    # bold standalone `Table X.Y ...` caption lines so they stand out from prose
+    final = fix_table_captions(final)        # [12] table captions -> bold
+    # bold standalone `Listing X.Y ...` caption lines so they stand out from prose
+    final = fix_listing_captions(final)      # [12c] listing captions -> bold
+    # remove diagram text (long bold segments) mixed into figure caption lines
+    final = fix_figure_caption_diagram_text(final)  # [13] figure caption diagram text
     # convert bold-italic labels misread as headings back to bold (**_label_**)
     final = fix_faux_headings(final)
     # fix heading levels (###### for sections -> ###/#### by structure)
