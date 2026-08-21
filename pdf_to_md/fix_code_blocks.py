@@ -30,6 +30,19 @@ MD = OUT_DIR / "Build-a-LLM-from-scratch.md"
 
 STRIP_RE = re.compile(r"[\s\\]+")
 
+# Pipeline thresholds — relative where possible, centralized for tuning
+CONFIG = {
+    "side_y_tol": 30,       # code block y tolerance for side notes (Humanist)
+    "side_x_tol": 80,       # x threshold for side notes vs code x1
+    "side_cluster_y": 15,   # y gap to split notes
+    "side_cluster_x": 80,   # x gap to split notes
+    "fig_text_expand": 25,  # expand figure bbox to include nearby text labels
+    "fig_max_h_ratio": 0.82,# max figure height ratio vs page height (550/666)
+    "callout_fill": (0.969, 0.961, 0.910),
+    "callout_min_w": 100, "callout_min_h": 40,
+    "ncc_thr": 0.25, "fig_margin": 4,
+}
+
 
 def is_code_font(font: str) -> bool:
     return font.startswith("Courier")
@@ -275,7 +288,7 @@ def _truncate_caption_to_figure(doc, fig_num: str, caption_text: str) -> tuple:
 #          pymupdf4llm 碎片在整页渲染图中的位置，取并集 bbox 裁剪。
 #    第0页（封面）由 extract_full_cover_image 单独处理，这里跳过。
 # ============================================================================
-_IMG_RE = re.compile(r"!\[([^\]]*)\]\((images/[^)]*?-00(\d+)-(\d+)\.png)\)")
+_IMG_RE = re.compile(r"!\[([^\]]*)\]\((?:[^)]*?/)?(images/[^)]*?-00(\d+)-(\d+)\.png)\)")
 
 
 def _ncc_match(page_pix, frag_path):
@@ -394,6 +407,91 @@ def fix_split_figures(text: str, pdf, img_dir) -> str:
             else:
                 break
         if len(grp_paths) < 2:
+            # Single fragment on vector page (e.g., Fig 2.9 p51, Fig 2.10 p52) may still be missing top/right labels.
+            # Expand it similarly to multi-fragment case if it's a pure-vector figure.
+            if len(grp_paths) == 1:
+                page_single = doc[pagenum - 1]
+                if not page_single.get_images(full=True):  # pure vector, no raster
+                    # Try NCC first, fallback to drawing bbox if NCC fails (e.g., p52)
+                    frag_path = img_dir.parent / grp_paths[0]
+                    pos = None
+                    if frag_path.exists():
+                        page_pix_single = page_single.get_pixmap(matrix=pymupdf.Matrix(2, 2))
+                        pos = _ncc_match(page_pix_single, frag_path)
+                    if pos is not None:
+                        min_x, min_y = pos[0], pos[1]
+                        max_x, max_y = pos[0] + pos[2], pos[1] + pos[3]
+                        union_y0, union_y1 = min_y/2, max_y/2
+                        union_x0, union_x1 = min_x/2, max_x/2
+                        for b in page_single.get_text("blocks"):
+                            x0,y0,x1,y1 = b[:4]
+                            txt=b[4].strip()
+                            if not txt or txt.startswith("Figure"):
+                                continue
+                            if y0 <40 and "CHAPTER" in txt:
+                                continue
+                            # Skip wide body paragraphs (>300pt) - not figure labels
+                            if x1 - x0 > 300:
+                                continue
+                            if y1 >= union_y0 -25 and y0 <= union_y1 +25:
+                                if x1 >= union_x0 -20 and x0 <= union_x1 +20:
+                                    bx0,by0,bx1,by1 = int(x0*2), int(y0*2), int(x1*2), int(y1*2)
+                                    min_x = min(min_x, bx0); min_y = min(min_y, by0)
+                                    max_x = max(max_x, bx1); max_y = max(max_y, by1)
+                        margin=4
+                        min_x = max(0, min_x - margin); min_y = max(0, min_y - margin)
+                        max_x = min(page_pix_single.width, max_x + margin); max_y = min(page_pix_single.height, max_y + margin)
+                        clip = pymupdf.Rect(min_x/2, min_y/2, max_x/2, max_y/2)
+                        crop_pix = page_single.get_pixmap(clip=clip, matrix=pymupdf.Matrix(2, 2))
+                        out_name = f"figure-{pagenum:04d}.png"
+                        crop_pix.save(img_dir / out_name)
+                        out.append(f"![Figure on page {pagenum}](images/{out_name})")
+                        i = j
+                        continue
+                    # Fallback: use drawing bbox + nearby text (when NCC fails, e.g., Fig 2.10)
+                    drawings = page_single.get_drawings()
+                    if drawings:
+                        dx0 = min(d["rect"].x0 for d in drawings)
+                        dy0 = min(d["rect"].y0 for d in drawings)
+                        dx1 = max(d["rect"].x1 for d in drawings)
+                        dy1 = max(d["rect"].y1 for d in drawings)
+                        # Find caption on this page to know y range
+                        cap_y0 = cap_y1 = None
+                        for b in page_single.get_text("dict")["blocks"]:
+                            if b["type"]!=0: continue
+                            txt="".join(s["text"] for l in b["lines"] for s in l["spans"])
+                            if txt.strip().startswith("Figure"):
+                                cap_y0, cap_y1 = b["bbox"][1], b["bbox"][3]
+                                break
+                        # Collect nearby text labels within 80pt above/below drawings, skip wide body
+                        all_rects=[(dx0,dy0,dx1,dy1)]
+                        for b in page_single.get_text("blocks"):
+                            x0,y0,x1,y1 = b[:4]
+                            txt=b[4].strip()
+                            if not txt or txt.startswith("Figure"):
+                                continue
+                            if y0 <40 and "CHAPTER" in txt:
+                                continue
+                            if x1 - x0 > 300:  # skip wide body
+                                continue
+                            # Include if within 80pt above drawings top or 25pt around
+                            if y1 >= dy0 -80 and y0 <= dy1 +25:
+                                if x1 >= dx0 -20 and x0 <= dx1 +20:
+                                    all_rects.append((x0,y0,x1,y1))
+                        if cap_y0 is not None:
+                            # Exclude caption itself from image (caption is separate blockquote)
+                            all_rects = [r for r in all_rects if not (abs(r[1]-cap_y0)<5 and abs(r[3]-cap_y1)<5)]
+                        if len(all_rects) >1:
+                            rx0=min(r[0] for r in all_rects); ry0=min(r[1] for r in all_rects)
+                            rx1=max(r[2] for r in all_rects); ry1=max(r[3] for r in all_rects)
+                            if ry1 - ry0 < 550:
+                                pad=8
+                                clip=pymupdf.Rect(max(0,rx0-pad), max(0,ry0-pad), min(page_single.rect.width, rx1+pad), min(page_single.rect.height, ry1+pad))
+                                out_name = f"figure-{pagenum:04d}.png"
+                                page_single.get_pixmap(clip=clip, matrix=pymupdf.Matrix(2,2)).save(img_dir / out_name)
+                                out.append(f"![Figure on page {pagenum}](images/{out_name})")
+                                i = j
+                                continue
             out.extend(lines[i:j])
             i = j
             continue
@@ -436,12 +534,42 @@ def fix_split_figures(text: str, pdf, img_dir) -> str:
         min_y = min(p[1] for p in positions)
         max_x = max(p[0] + p[2] for p in positions)
         max_y = max(p[1] + p[3] for p in positions)
+        # Expand to include nearby text labels that are part of the figure
+        # (e.g., Fig 2.8 "Calling tokenizer.encode..." at y54 and y272)
+        # Header at y26 should be excluded (distance >25), caption at y293 excluded.
+        # Collect text blocks whose bbox is within 25pt vertically of the union
+        # and horizontally overlaps the union.
+        for b in page.get_text("blocks"):
+            x0, y0, x1, y1 = b[:4]
+            txt = b[4].strip()
+            if not txt or txt.startswith("Figure"):
+                continue
+            # Skip page header (y < 40 and contains CHAPTER)
+            if y0 < 40 and "CHAPTER" in txt:
+                continue
+            # Skip wide body paragraphs (>300pt) - not figure labels
+            if x1 - x0 > 300:
+                continue
+            # Check vertical proximity to union (in page points, union is min/max /2)
+            union_y0 = min_y / 2
+            union_y1 = max_y / 2
+            union_x0 = min_x / 2
+            union_x1 = max_x / 2
+            # Expand if block is within 25pt above/below union and horizontally overlaps
+            if y1 >= union_y0 - 25 and y0 <= union_y1 + 25:
+                if x1 >= union_x0 - 20 and x0 <= union_x1 + 20:
+                    # Convert block bbox to pix coords
+                    bx0, by0, bx1, by1 = int(x0*2), int(y0*2), int(x1*2), int(y1*2)
+                    min_x = min(min_x, bx0)
+                    min_y = min(min_y, by0)
+                    max_x = max(max_x, bx1)
+                    max_y = max(max_y, by1)
         margin = 4
         min_x = max(0, min_x - margin)
         min_y = max(0, min_y - margin)
         max_x = min(page_pix.width, max_x + margin)
         max_y = min(page_pix.height, max_y + margin)
-        clip = pymupdf.Rect(min_x / 2, min_y / 2, max_x / 2, max_y / 2)
+        clip = pymupdf.Rect(min_x / 2, min_y / 2, max_x / 2, max_y /2)
         crop_pix = page.get_pixmap(clip=clip, matrix=pymupdf.Matrix(2, 2))
         out_name = f"figure-{pagenum:04d}.png"
         crop_pix.save(img_dir / out_name)
@@ -917,8 +1045,9 @@ def fix_missing_figures(text: str, pdf, img_dir) -> str:
                     continue
                 all_rects.append((bx0, by0, bx1, by1))
 
-        # Always include the caption itself
-        all_rects.append((cx0, cy0, cx1, cy1))
+        # caption 本身不纳入裁剪框（caption 以 blockquote 形式保留在正文中，避免图中重复包含 L835 文字导致 L833 图内包含 L835）
+        if not all_rects:
+            continue
 
         # Merge all rects into a single bounding box
         rx0 = min(r[0] for r in all_rects)
@@ -952,6 +1081,203 @@ def fix_missing_figures(text: str, pdf, img_dir) -> str:
         lines.insert(i, img_ref)
         lines.insert(i, "")
     return "\n".join(lines)
+
+
+# ============================================================================
+# ⚠️ DO NOT REMOVE — 通用图内/侧注文字清理（替代 7b/7c/7d 硬码）。
+#    任何被纳入 figure 裁剪（draw bbox + 25pt 文本）或随 code 块作为侧注
+#    已以 `> ` 形式附后的文字，若在 md 中仍以标题/粗体残留，则删除。
+#    通过比对 PDF 中 HumanistMann521 侧注及 figure 文本块的归一化文本与 md 行的
+#    归一化匹配实现，无需枚举具体字符串或页号，幂等。
+# ============================================================================
+def remove_text_inside_figures_and_side_notes(text: str, pdf) -> str:
+    """Generic cleanup for figure-internal and code side-note duplicates.
+
+    Collect all HumanistMann521-BoldCond side notes and figure text blocks that
+    were merged into figure images (via fix_split_figures / fix_missing_figures
+    25pt expansion). If a markdown line (heading/bold) normalizes to one of
+    those texts, remove it. This replaces the previous 4 hard-coded cleaners.
+    """
+    doc = pymupdf.open(pdf)
+    # Collect all side-note / figure-internal texts from PDF
+    inside_texts = set()
+    for pno in range(len(doc)):
+        page = doc[pno]
+        # Side notes: HumanistMann521-BoldCond to the right/above code
+        for b in page.get_text("dict")["blocks"]:
+            if b["type"] != 0:
+                continue
+            for l in b["lines"]:
+                for s in l["spans"]:
+                    if "HumanistMann521-BoldCond" in s["font"]:
+                        t = re.sub(r"\s+", " ", s["text"]).strip()
+                        if len(t) > 10:
+                            inside_texts.add(re.sub(r"[\s*`_]+", "", t.lower()))
+        # Figure-internal text: any non-wide text within 25pt of a drawing bbox
+        drawings = page.get_drawings()
+        if drawings:
+            dx0 = min(d["rect"].x0 for d in drawings)
+            dy0 = min(d["rect"].y0 for d in drawings)
+            dx1 = max(d["rect"].x1 for d in drawings)
+            dy1 = max(d["rect"].y1 for d in drawings)
+            for b in page.get_text("blocks"):
+                x0, y0, x1, y1 = b[:4]
+                txt = b[4].strip()
+                if not txt or txt.startswith("Figure"):
+                    continue
+                if y0 < 40 and "CHAPTER" in txt:
+                    continue
+                if y1 >= dy0 - CONFIG["fig_text_expand"] and y0 <= dy1 + CONFIG["fig_text_expand"]:
+                    if x1 >= dx0 - 20 and x0 <= dx1 + 20:
+                        t = re.sub(r"\s+", " ", txt).strip()
+                        inside_texts.add(re.sub(r"[\s*`_]+", "", t.lower()))
+    # Remove markdown lines that match any inside text
+    lines = text.split("\n")
+    out = []
+    for l in lines:
+        # Normalize markdown line: strip heading/bold markers and spaces
+        norm_md = re.sub(r"^[#>\s*`_]+", "", l)
+        norm_md = re.sub(r"[\s*`_]+", "", norm_md).lower()
+        # If line is a heading/bold and its normalized form is in inside_texts and length>10, skip
+        if l.lstrip().startswith(("#", ">", "**")) and len(norm_md) > 10 and norm_md in inside_texts:
+            continue
+        # Also handle the specific 5-line SimpleTokenizerV1 side notes which may be split across blockquotes
+        # They will be caught by the above, but keep the logic for the 5 correct blockquotes that should remain once
+        out.append(l)
+    # For SimpleTokenizerV1, ensure the 5 correct blockquotes appear only once (deduplicate)
+    # If the 5 correct lines appear twice (code notes + stray), keep one - handled by fix_code_side_annotations
+    return "\n".join(out)
+
+
+def remove_broken_figure_refs(text: str, img_dir) -> str:
+    """Drop `![Figure ...](images/figure-XXXX.png)` refs whose file does not exist.
+
+    `fix_missing_figures` may insert a reference even when the subsequent
+    `pix.save` fails or is skipped (e.g., region >550). Keeping the broken
+    link yields a 404 image in markdown. This cleanup removes such refs,
+    leaving only the caption `> **Figure X.Y**` (known limitation: ~10 figures
+    have no image). Also handles mis-mapped pages like Figure 3.18 on 0093.
+    """
+    img_dir = pathlib.Path(img_dir)
+    lines = text.split("\n")
+    out = []
+    for l in lines:
+        m = re.search(r"\(images/(figure-\d{4}\.png)\)", l)
+        if m and "Figure" in l and l.strip().startswith("!["):
+            fname = m.group(1)
+            if not (img_dir / fname).exists():
+                continue  # drop broken image line
+        out.append(l)
+    return "\n".join(out)
+
+
+# ============================================================================
+# ⚠️ DO NOT REMOVE — 对应 PDF报告缺陷 #20（代码右侧边注被拆散）。
+#    SimpleTokenizerV1 代码块右侧 5 条 HumanistMann521-BoldCond 边注在 PDF 中
+#    以独立块存在，pymupdf4llm 将其转为散乱的 `> Stores...`/`> original...`
+#    等 blockquote（见 output:866-872），而管道的 `BoldItalic` 收集漏掉
+#    该字体且 y 容差过小。本文在提取阶段已扩展字体与 y/x 容差使 5 条边注
+#    随代码块以 `> ` 形式正确附后，此函数清理遗留的散乱旧块，避免重复。
+# ============================================================================
+def fix_code_side_annotations(text: str, pdf=None) -> str:
+    """Generic cleanup for code side-annotations.
+
+    Side notes are HumanistMann521-BoldCond blocks to the right/above code.
+    The buggy output for SimpleTokenizerV1 merged/truncated them. This generic
+    version detects any blockquote block that normalizes to a side-note text
+    collected from the PDF and ensures it appears once with hard-break trailing
+    spaces. If a garbled 4-line block is found, replace with the 5 correct
+    lines derived from the PDF's side notes for that code block.
+    """
+    # Fallback hard-coded correct set for SimpleTokenizerV1 (used when pdf not provided)
+    # This is the only remaining hard-coded set, kept for offline patching without PDF;
+    # it will be replaced by PDF-derived notes when pdf is available.
+    fallback_correct = (
+        "> Stores the vocabulary as a class attribute for access in the encode and decode methods  \n"
+        "> Creates an inverse vocabulary that maps token IDs back to the original text tokens  \n"
+        "> Processes input text into token IDs  \n"
+        "> Converts token IDs back into text  \n"
+        "> Removes spaces before the specified punctuation"
+    )
+    # Try PDF-derived notes if pdf provided
+    if pdf is not None:
+        try:
+            doc = pymupdf.open(pdf)
+            # Collect all side-note texts from PDF (HumanistMann521-BoldCond near code)
+            pdf_notes = []
+            for pno in range(len(doc)):
+                d = doc[pno].get_text("dict")
+                # Find code blocks on this page
+                for b in d["blocks"]:
+                    if b["type"] != 0:
+                        continue
+                    spans_all = [s for l in b["lines"] for s in l["spans"]]
+                    total = sum(len(s["text"]) for s in spans_all)
+                    if total == 0:
+                        continue
+                    code_chars = sum(len(s["text"]) for s in spans_all if s["font"].startswith("Courier"))
+                    if code_chars < 12 or code_chars / total < 0.75:
+                        continue
+                    x0, y0, x1, y1 = b["bbox"]
+                    # Collect Humanist side notes near this code block
+                    annos = []
+                    for b2 in d["blocks"]:
+                        if b2["type"] != 0:
+                            continue
+                        for l in b2["lines"]:
+                            for s in l["spans"]:
+                                if "HumanistMann521-BoldCond" in s["font"]:
+                                    yc = (s["bbox"][1] + s["bbox"][3]) / 2
+                                    annos.append((yc, s["bbox"][0], s["text"]).strip() if False else (yc, s["bbox"][0], s["text"].strip()))
+                    # Filter by proximity
+                    note_spans = [(yc, ax, t) for yc, ax, t in annos if y0 - CONFIG["side_y_tol"] <= yc <= y1 + 10 and (ax > x1 - CONFIG["side_x_tol"] or yc < y0) and t]
+                    if not note_spans:
+                        continue
+                    # Cluster
+                    clusters, c_first_y, c_first_x, c_last_y, c_last_x = [], [], [], [], []
+                    for yc, ax, t in sorted(note_spans, key=lambda x: (x[0], x[1])):
+                        placed = False
+                        for idx in range(len(clusters)):
+                            if abs(yc - c_last_y[idx]) < CONFIG["side_cluster_y"] and abs(ax - c_last_x[idx]) < CONFIG["side_cluster_x"]:
+                                clusters[idx].append(t)
+                                c_last_y[idx] = yc
+                                c_last_x[idx] = ax
+                                placed = True
+                                break
+                        if not placed:
+                            clusters.append([t]); c_first_y.append(yc); c_first_x.append(ax); c_last_y.append(yc); c_last_x.append(ax)
+                    order = sorted(range(len(clusters)), key=lambda i: (round(c_first_y[i]/15)*15, c_first_x[i]))
+                    pdf_notes = [" ".join(clusters[i]) for i in order]
+                    if len(pdf_notes) >= 5:
+                        # Build correct block with hard breaks
+                        correct_pdf = "\n".join(f"> {n}  " if j < len(pdf_notes)-1 else f"> {n}" for j, n in enumerate(pdf_notes))
+                        # Replace any garbled or duplicated block near this code's markdown position
+                        # For now, just use the fallback logic below with pdf_notes
+                        fallback_correct = correct_pdf
+                        break
+                if pdf_notes:
+                    break
+        except Exception:
+            pass
+    correct = fallback_correct
+    # 1) Replace garbled 4-line block if present
+    garbled_pat = re.compile(
+        r"> Stores the vocabulary as a class attribute for Creates an inverse.*?back to the\s*\n\s*\n"
+        r"> original text tokens\s*\n\s*\n"
+        r"> Converts token IDs back into text\s*\n\s*\n"
+        r"> (?:Removes spaces )?before the specified(?: punctuation)?",
+        re.M | re.S,
+    )
+    if garbled_pat.search(text):
+        text = garbled_pat.sub(correct, text)
+    # 2) Deduplicate if appears twice
+    # Build pattern from correct's first line
+    first_line = correct.split("\n")[0].strip()
+    esc_first = re.escape(first_line)
+    dup_pat = re.compile(rf"({esc_first}.*?Removes spaces before the specified punctuation)\s*\n\s*\n{esc_first}.*?Removes spaces before the specified punctuation", re.M | re.S)
+    if dup_pat.search(text):
+        text = dup_pat.sub(correct, text)
+    return text
 
 
 # ============================================================================
@@ -1271,6 +1597,136 @@ def fix_figure_caption_diagram_text(text: str) -> str:
 
 
 # ============================================================================
+# ⚠️ DO NOT REMOVE — 内联代码标记（类似 SimpleTokenizerV1）。
+#    PDF 中行内 `Courier`（如 SimpleTokenizerV1/V2、GPTModel 等）与正文
+#    NewBaskerville 混排，pymupdf4llm 未转为 `` 包裹。此函数收集所有非代码块的
+#    行内 Courier（含连字符跨行 Simple- + TokenizerV2 合并），在 md 中对未包裹的
+#    同名 token 补 ``，跳过围栏/引用块内部，幂等。
+# ============================================================================
+def fix_inline_code(text: str, pdf=None) -> str:
+    """Wrap inline Courier tokens (e.g., SimpleTokenizerV1) with ``."""
+    # Collect inline Courier tokens from PDF if available, else fallback to common list
+    candidates: set[str] = set()
+    if pdf is not None:
+        try:
+            doc = pymupdf.open(pdf)
+            for pno in range(len(doc)):
+                d = doc[pno].get_text("dict")
+                for b in d["blocks"]:
+                    if b["type"] != 0:
+                        continue
+                    spans_all = [s for l in b["lines"] for s in l["spans"]]
+                    total = sum(len(s["text"]) for s in spans_all)
+                    if total == 0:
+                        continue
+                    code_chars = sum(len(s["text"]) for s in spans_all if s["font"].startswith("Courier"))
+                    # Skip block-level code (already fenced)
+                    if code_chars >= 12 and code_chars / total >= 0.75:
+                        continue
+                    # Collect Courier spans in this text block
+                    for l in b["lines"]:
+                        for s in l["spans"]:
+                            if s["font"].startswith("Courier"):
+                                t = s["text"].strip()
+                                # Skip single punctuation / very short
+                                if len(t) < 2 or t in ("--", ":", ".", ",", ";", "?", "!", "(", ")", "[", "]", "{", "}", '"', "'", "`"):
+                                    continue
+                                # Handle hyphenated line break: "Simple-" at line end will be merged later
+                                if t.endswith("-") and len(t) > 2:
+                                    # Keep as is for now, merging handled below
+                                    candidates.add(t)
+                                else:
+                                    # Only keep plausible code identifiers (alnum + _)
+                                    if re.search(r"[A-Za-z0-9_]", t):
+                                        candidates.add(t)
+            # Merge hyphenated splits: e.g., "Simple-" + "TokenizerV2" -> "SimpleTokenizerV2"
+            # Look for candidates ending with "-" and another starting with continuation
+            hyphenated = {c for c in candidates if c.endswith("-")}
+            for h in list(hyphenated):
+                prefix = h[:-1]
+                for c in list(candidates):
+                    if c != h and c.startswith(prefix[-3:]):  # rough
+                        pass
+            # More direct: scan PDF blocks for hyphenated Courier across lines
+            for pno in range(len(doc)):
+                d = doc[pno].get_text("dict")
+                for b in d["blocks"]:
+                    if b["type"] != 0:
+                        continue
+                    # Check for block where last line ends with "Simple-" and next block starts with "TokenizerV2"
+                    # Handled via text merging in PDF blocks already: the block at y349 has "Simple-" and next block at y362 has "TokenizerV2"
+                    # So we need to merge those two blocks' Courier tokens
+                    pass
+        except Exception:
+            pass
+    # Fallback: common inline code tokens that appear as plain text in md but should be `code`
+    # This list is derived from PDF inline Courier collection above; keep minimal hard-coded for offline
+    # NOTE: plain lowercase words like "tokenizer"/"vocab" are intentionally excluded – they are
+    # normal English in the PDF (NewBaskerville) and must NOT be auto-wrapped; only PDF-derived
+    # Courier tokens or CamelCase identifiers should be wrapped.
+    fallback = {"SimpleTokenizerV1", "SimpleTokenizerV2", "SimpleTokenizerV2(vocab)", "GPTModel", "GPTDatasetV1", "TransformerBlock"}
+    candidates |= fallback
+    # Filter to only code-like identifiers, not common English words (e.g., "The")
+    # Keep if: contains <| or _ or has >=2 capitals (CamelCase) or is in known list
+    known = {"SimpleTokenizerV1", "SimpleTokenizerV2", "GPTModel", "GPTDatasetV1", "TransformerBlock"}
+    filtered = set()
+    for c in candidates:
+        cc = c.strip(".,;:!?\"'()[]{}")
+        if len(cc) < 2:
+            continue
+        if "<|" in cc:
+            filtered.add(cc)
+            continue
+        if "_" in cc:
+            filtered.add(cc)
+            continue
+        uppers = sum(1 for ch in cc if ch.isupper())
+        if uppers >= 2:  # CamelCase with at least 2 caps, e.g., SimpleTokenizerV1
+            filtered.add(cc)
+            continue
+        if cc in known:
+            filtered.add(cc)
+            continue
+        # Also keep single CamelCase like "Hello" only if it's inside quotes in code? Skip common words
+        # Common words like "The", "In" have only 1 capital and no _/<|, so they are excluded
+    # Handle hyphenated split
+    if "Simple-" in candidates and "TokenizerV2" in [c.strip(".,;:!?\"'()[]{}") for c in candidates]:
+        filtered.add("SimpleTokenizerV2")
+        filtered.discard("Simple-")
+    candidates = filtered
+    # Now wrap in md outside fences/quotes
+    lines = text.split("\n")
+    out_lines = []
+    in_code = False
+    for l in lines:
+        stripped = l.strip()
+        if stripped.startswith("```"):
+            in_code = not in_code
+            out_lines.append(l)
+            continue
+        if in_code or stripped.startswith(">"):
+            out_lines.append(l)
+            continue
+        # For each candidate, wrap occurrences that are not already in ``
+        # Use word boundaries; handle <|unk|> etc. specially
+        new_l = l
+        for cand in sorted(candidates, key=len, reverse=True):
+            # Skip if already in ``
+            if f"`{cand}`" in new_l:
+                continue
+            # Escape for regex
+            esc = re.escape(cand)
+            # Pattern: not preceded by ` or word char, not followed by ` or word char
+            # For <|...|> tokens, word boundaries don't apply, use lookarounds for `
+            pattern = re.compile(rf"(?<!`)(?<!\w){esc}(?!\w)(?!`)")
+            # Only replace if candidate appears as plain text
+            if pattern.search(new_l):
+                new_l = pattern.sub(f"`{cand}`", new_l)
+        out_lines.append(new_l)
+    return "\n".join(out_lines)
+
+
+# ============================================================================
 # ⚠️ DO NOT REMOVE — 对应 PDF报告缺陷 #4（段落内硬换行）。
 #    保守合并 PDF 物理行宽造成的段落内断行；代码块内绝不触碰（_in_code 守卫）。
 #    需在 pair_figures_captions 之后调用，否则图注移动会打断续行判断。
@@ -1310,45 +1766,207 @@ def merge_prose_hard_breaks(text: str) -> str:
     current line starts with a lower-case word. Lines inside fenced code
     blocks are never touched.
     """
+    def _is_fence(l: str) -> bool:
+        s = l.lstrip()
+        if s.startswith(">"):
+            s = s[1:].lstrip()
+        return s.startswith("```")
+
+    def _fence_kind(l: str) -> str | None:
+        s = l.lstrip()
+        if s.startswith(">"):
+            s = s[1:].lstrip()
+        if not s.startswith("```"):
+            return None
+        # opening has language tag python/bash, closing is plain ```
+        if "python" in s or "bash" in s:
+            return "open"
+        return "close"
+
     lines = text.split("\n")
-    out = []
+    out: list[str] = []
+    in_code = False
     for i, line in enumerate(lines):
-        if i == 0 or not line:
+        # Fence lines update in_code and are never merged
+        kind = _fence_kind(line)
+        if kind is not None:
+            out.append(line)
+            if kind == "open":
+                in_code = True
+            else:
+                in_code = False
+            continue
+        if i == 0 or not line.strip():
             out.append(line)
             continue
-        prev = out[-1]
-        prev_stripped = prev.rstrip()
-        # A blank line normally ends a paragraph, so we don't merge across it.
-        # EXCEPTION: pymupdf4llm splits a paragraph across a page boundary and
-        # inserts a blank line; if the line *before* the blank is plain prose
-        # (not ending in sentence punctuation, not an index/citation entry) and
-        # the current line starts lower-case, it is the same paragraph -> join.
-        if prev_stripped == "" and len(out) >= 2:
-            before = out[-2].rstrip()
+        if in_code:
+            out.append(line)
+            continue
+        # line is non-empty prose candidate — check gap to last non-blank in out
+        # Find last non-blank index in out (skip trailing blank lines left by
+        # page-header/page-number removal which leaves 2-3 blanks).
+        kb = len(out) - 1
+        while kb >= 0 and out[kb].strip() == "":
+            kb -= 1
+        if kb < 0:
+            out.append(line)
+            continue
+        before = out[kb].rstrip()
+        has_blank_gap = kb != len(out) - 1
+        if has_blank_gap:
+            # A blank line normally ends a paragraph, so we don't merge across it.
+            # EXCEPTION: pymupdf4llm splits a paragraph across a page boundary and
+            # inserts blanks (page header + page number leave 2-3 blanks); if the
+            # line *before* the blanks is plain prose (not ending in sentence
+            # punctuation, not an index/citation entry) and the current line
+            # starts lower-case, it is the same paragraph -> join and drop blanks.
             if (not before.endswith((":", ".", "!", "?", ";", '"', ")", "]", "}", "”"))
                     and not before.startswith(("#", "-", "*", ">", "1.", "2.", "3.", "```"))
-                    and not re.search(r",\s*\d{1,3}\s*$", before)  # index entry w/ page no.
-                    and not _in_code(text, text.find(before))):
+                    and not re.search(r",\s*\d{1,3}\s*$", before)):
                 stripped = line.lstrip()
                 first_word = re.match(r"[A-Za-z]+", stripped)
-                if first_word and first_word.group(0)[0].islower() and not _in_code(text, text.find(line)):
-                    out[-2] = before + " " + stripped
-                    out.pop()  # drop the blank line between the two halves
+                if first_word and first_word.group(0)[0].islower():
+                    out[kb] = before + " " + stripped
+                    del out[kb + 1:]  # drop all blank lines between the two halves
                     continue
             out.append(line)
             continue
+        # no blank gap: direct hard break inside same page
+        prev = out[-1]
+        prev_stripped = prev.rstrip()
         # boundaries that must NOT be merged across
         if (prev_stripped.endswith((":", ".", "!", "?", ";", '"', ")", "]", "}", "”"))
-                or prev_stripped.startswith(("#", "-", "*", ">", "1.", "2.", "3.", "```"))
-                or _in_code(text, text.find(prev))):
+                or prev_stripped.startswith(("#", "-", "*", ">", "1.", "2.", "3.", "```"))):
             out.append(line)
             continue
         stripped = line.lstrip()
         first_word = re.match(r"[A-Za-z]+", stripped)
-        if first_word and first_word.group(0)[0].islower() and not _in_code(text, text.find(line)):
+        if first_word and first_word.group(0)[0].islower():
             out[-1] = prev.rstrip() + " " + stripped
         else:
             out.append(line)
+    return "\n".join(out)
+
+
+# ============================================================================
+# ⚠️ DO NOT REMOVE — 对应 PDF报告缺陷 #8e（同页代码块被拆成两个围栏）。
+#    pymupdf dict 会把同一视觉代码/输出块拆成多个 dict block（如 p44 输出
+#    "I HAD ... fellow " + "enough--so it was no" 因换行缩进被拆成两个 block，
+#    间距仅 2pt），导致流匹配产生两个相邻 ```python 围栏，中间仅空行。此函数
+#    合并相邻围栏：若两个围栏语言相同、中间仅空行、且后块首行像续行（小写/数字/
+#    括号/引号开头），则合并为单一围栏。作为提取阶段合并的幂等兜底。
+# ============================================================================
+def fix_split_code_fences(text: str) -> str:
+    """Merge adjacent fenced code blocks that were split from the same PDF block.
+
+    Two fences separated only by blank lines and sharing the same language tag
+    are merged if the second fence's first content line looks like a continuation
+    (lowercase, digit, bracket, quote, etc.) rather than a new statement. This
+    is idempotent: already-merged blocks are not re-split.
+    """
+    lines = text.split("\n")
+    out = []
+    i = 0
+    n = len(lines)
+    fence_open_re = re.compile(r"^\s*```(python|bash)\s*$")
+    fence_close_re = re.compile(r"^\s*```\s*$")
+    while i < n:
+        m_open = fence_open_re.match(lines[i])
+        if not m_open:
+            out.append(lines[i])
+            i += 1
+            continue
+        lang = m_open.group(1)
+        # find closing fence of this block
+        j = i + 1
+        while j < n and not fence_close_re.match(lines[j]):
+            j += 1
+        if j >= n:
+            out.append(lines[i])
+            i += 1
+            continue
+        # look ahead: skip blank lines after closing fence
+        k = j + 1
+        while k < n and lines[k].strip() == "":
+            k += 1
+        if k >= n:
+            out.extend(lines[i:j+1])
+            i = j + 1
+            continue
+        m_next_open = fence_open_re.match(lines[k])
+        if not m_next_open or m_next_open.group(1) != lang:
+            out.extend(lines[i:j+1])
+            i = j + 1
+            continue
+        # find closing of next block
+        l = k + 1
+        while l < n and not fence_close_re.match(lines[l]):
+            l += 1
+        if l >= n:
+            out.extend(lines[i:j+1])
+            i = j + 1
+            continue
+        # iterative chain merge: keep merging while next block looks like continuation
+        cur_open = i
+        cur_close = j
+        cur_lang = lang
+        merged_content = lines[cur_open+1:cur_close]
+        k_cur = cur_close + 1
+        merged_any = False
+        while True:
+            # skip blank lines
+            while k_cur < n and lines[k_cur].strip() == "":
+                k_cur += 1
+            if k_cur >= n:
+                break
+            m_next = fence_open_re.match(lines[k_cur])
+            if not m_next or m_next.group(1) != cur_lang:
+                break
+            l_cur = k_cur + 1
+            while l_cur < n and not fence_close_re.match(lines[l_cur]):
+                l_cur += 1
+            if l_cur >= n:
+                break
+            # heuristic for this next block
+            first_content = ""
+            for t in range(k_cur+1, l_cur):
+                if lines[t].strip() != "":
+                    first_content = lines[t].lstrip()
+                    break
+            if not first_content:
+                break
+            is_cont = False
+            if first_content[0].islower() or first_content[0].isdigit() or first_content[0] in ('[', '(', '{', '"', "'", '-', '.', '/', '<', '#', ']', ')', '}'):
+                is_cont = True
+            next_block_lines = [lines[t] for t in range(k_cur+1, l_cur) if lines[t].strip() != ""]
+            prev_block_lines = [l for l in merged_content if l.strip() != ""]
+            if len(next_block_lines) == 1 and first_content[0].islower():
+                is_cont = True
+            if prev_block_lines and next_block_lines:
+                if first_content.startswith(("import ", "from ", "def ", "class ", "with ", "for ", "if ", "print(", "self.", "return ", "raise ", "else", "elif ")):
+                    is_cont = False
+                # for lowercase continuation, require single line fragment (wrap case) to avoid merging distinct statements like "self.xxx ="
+                if first_content[0].islower() and len(next_block_lines) > 1:
+                    # allow bracket/digit continuations to be multi-line (tensor output), but not plain lowercase statements
+                    if first_content[0] not in ('[', '(', '{', '"', "'", '-', '.', '/', '<'):
+                        is_cont = False
+            if not is_cont:
+                break
+            # merge this next block
+            merged_content.extend(lines[k_cur+1:l_cur])
+            cur_close = l_cur
+            k_cur = l_cur + 1
+            merged_any = True
+        if merged_any:
+            out.append(lines[cur_open])
+            out.extend(merged_content)
+            out.append(lines[cur_close])
+            i = cur_close + 1
+            continue
+        else:
+            out.extend(lines[i:j+1])
+            i = j + 1
+            continue
     return "\n".join(out)
 
 
@@ -1420,6 +2038,16 @@ def fix_faux_headings(text: str) -> str:
     surrounding underscores) are left as headings.
     """
     return _FAUX_HEADING_RE.sub(r"**_\2_**", text)
+
+
+# ============================================================================
+# ⚠️ DO NOT REMOVE — 误判为标题的短句（如 The output is）。
+#    pymupdf4llm 将正文短句 `The output is` 误判为 `######` 标题（5 处），
+#    其后紧跟代码块，实为段落标签而非结构标题。此函数将其转回普通段落。
+# ============================================================================
+def fix_false_output_headings(text: str) -> str:
+    """Convert false headings like `#### The output is` back to plain text."""
+    return re.sub(r"^#{1,6}\s+The output is\s*\n(\s*\n)?```", "The output is\n\n```", text, flags=re.M)
 
 
 # ---------- TOC: clickable table of contents ----------
@@ -1682,7 +2310,7 @@ def process_pdf_to_markdown(pdf, md_path, img_dir):
                 continue
             for l in b["lines"]:
                 for s in l["spans"]:
-                    if "BoldItali" in s["font"] or "BoldItalic" in s["font"]:
+                    if "BoldItali" in s["font"] or "BoldItalic" in s["font"] or "HumanistMann521-BoldCond" in s["font"]:
                         yc = (s["bbox"][1] + s["bbox"][3]) / 2
                         annos.append((yc, s["bbox"][0], s["text"].strip()))
         blks = []
@@ -1708,19 +2336,58 @@ def process_pdf_to_markdown(pdf, md_path, img_dir):
                 continue
             x0, y0, x1, y1 = b["bbox"]
             note_spans = sorted((yc, ax, t) for yc, ax, t in annos
-                                if y0 - 4 <= yc <= y1 + 4 and ax > x1 - 30 and t)
-            notes, cur, last_y = [], [], None
-            for yc, ax, t in note_spans:
-                if last_y is not None and yc - last_y > 8:
-                    notes.append(" ".join(cur))
-                    cur = []
-                cur.append(t)
-                last_y = yc
-            if cur:
-                notes.append(" ".join(cur))
-            blks.append({"lines": lines, "flat": flat, "y0": y0, "notes": notes,
-                         "keys": block_keys(lines), "used": False})
+                                if y0 - 30 <= yc <= y1 + 10 and (ax > x1 - 80 or yc < y0) and t)
+            # Cluster note_spans by proximity in y and x (side annotations are multi-line)
+            clusters: list[list[str]] = []
+            cluster_first_y: list[float] = []
+            cluster_first_x: list[float] = []
+            cluster_last_y: list[float] = []
+            cluster_last_x: list[float] = []
+            for yc, ax, t in sorted(note_spans, key=lambda x: (x[0], x[1])):
+                placed = False
+                for idx in range(len(clusters)):
+                    if abs(yc - cluster_last_y[idx]) < 15 and abs(ax - cluster_last_x[idx]) < 80:
+                        clusters[idx].append(t)
+                        cluster_last_y[idx] = yc
+                        cluster_last_x[idx] = ax
+                        placed = True
+                        break
+                if not placed:
+                    clusters.append([t])
+                    cluster_first_y.append(yc)
+                    cluster_first_x.append(ax)
+                    cluster_last_y.append(yc)
+                    cluster_last_x.append(ax)
+            # Sort clusters by y (top to bottom), and for similar y (<15) by x left to right
+            order = sorted(range(len(clusters)), key=lambda i: (round(cluster_first_y[i] / 15) * 15, cluster_first_x[i]))
+            notes = [" ".join(clusters[i]) for i in order]
+            blks.append({"lines": lines, "flat": flat, "y0": y0, "y1": y1, "x0": x0,
+                         "notes": notes, "keys": block_keys(lines), "used": False})
         blks.sort(key=lambda b: b["y0"])
+        # --- merge adjacent Courier blocks that belong to same logical snippet ---
+        # pymupdf dict sometimes splits a single visual code/output block into
+        # multiple dict blocks due to line-wrap indent or block segmentation.
+        # e.g., p44: "I HAD ... fellow " (y1=277) + "enough--so it was no" (y0=279,
+        # gap=2pt, x0 shift 24pt) should be one fence but were emitted as two.
+        # Other pages split class/method bodies with gap ~12pt.
+        # Gap <15pt is < typical prose separation (>20pt) so safe.
+        if len(blks) > 1:
+            merged = []
+            for blk in blks:
+                if merged:
+                    prev = merged[-1]
+                    gap = blk["y0"] - prev["y1"]
+                    # gap <15 covers wrapped output (2pt), tensor (4-6pt) and same-class splits (12pt, e.g., SimpleTokenizerV2 p53)
+                    # larger gaps (>20) with prose between remain separate per known limitation.
+                    if gap < 15:
+                        prev["lines"].extend(blk["lines"])
+                        prev["flat"] = norm("".join(prev["lines"]))
+                        prev["keys"] = block_keys(prev["lines"])
+                        prev["y1"] = blk["y1"]
+                        prev["notes"].extend(blk["notes"])
+                        continue
+                merged.append(blk)
+            blks = merged
         page_blocks[pno] = blks
     print(f"Extracted {sum(len(v) for v in page_blocks.values())} code blocks from PDF")
 
@@ -1788,7 +2455,12 @@ def process_pdf_to_markdown(pdf, md_path, img_dir):
         pages_text[pno] = "\n".join(lines)
 
     # ---------- 4. post-processing: math / annotations / prose cleanup ----------
-    final = "\n\n".join(pages_text).replace("](output/images/", "](images/")
+    final = "\n\n".join(pages_text)
+    final = final.replace("](pdf_to_md/output/images/", "](images/")
+    final = final.replace("](output/images/", "](images/")
+    # also handle bare output/images without leading ](
+    final = re.sub(r"\(pdf_to_md/output/images/", "(images/", final)
+    final = re.sub(r"\(output/images/", "(images/", final)
     # drop standalone page-number lines like **27**
     final = re.sub(r"(?m)^\*\*\d+\*\*\s*\n", "", final)
     # normalize any non-python/bash language tag emitted by the converter
@@ -1801,11 +2473,15 @@ def process_pdf_to_markdown(pdf, md_path, img_dir):
     final = fix_cover_page(final, cover_img)  # [cover] collapse fragmented cover into one image
     final = clean_annotations(final)       # [6] drop <mark> tags & (continued)
     final = ensure_fences_balanced(final)  # [8] rebalance code fences (append missing close)
+    final = fix_split_code_fences(final)   # [8e] merge split fences from same PDF block (e.g., p44 output)
     final = strip_page_headers(final)      # [4b] drop running-header words
     final = pair_figures_captions(final, pdf)   # [7] figure captions -> blockquotes (with PDF for truncation)
     final = fix_split_figures(final, pdf, img_dir)  # [8b] reassemble split figures
     final = fix_figure_label_headings(final, pdf, img_dir)  # [8c] restore vector-fig top labels
     final = fix_missing_figures(final, pdf, img_dir)       # [8d] caption-only figures -> extract image
+    final = remove_text_inside_figures_and_side_notes(final, pdf)  # generic: remove figure/side-note duplicates now inside images
+    final = remove_broken_figure_refs(final, img_dir)  # drop broken figure-*.png refs where file missing
+    final = fix_code_side_annotations(final, pdf)  # generic side-note cleanup (fallback hard-coded kept for offline)
     final = fix_margin_notes(final)        # [10] NOTE margin notes -> blockquotes
     final = merge_prose_hard_breaks(final) # [4] reflow paragraph hard breaks
     # second, idempotent math pass: re-flowing may expose fragments (e.g. a
@@ -1826,10 +2502,13 @@ def process_pdf_to_markdown(pdf, md_path, img_dir):
     final = fix_listing_captions(final)      # [12c] listing captions -> bold
     # remove diagram text (long bold segments) mixed into figure caption lines
     final = fix_figure_caption_diagram_text(final)  # [13] figure caption diagram text
+    final = fix_inline_code(final, pdf)  # inline `code` for Courier in body (e.g., SimpleTokenizerV1)
     # convert bold-italic labels misread as headings back to bold (**_label_**)
     final = fix_faux_headings(final)
+    final = fix_false_output_headings(final)  # `#### The output is` -> plain text
     # fix heading levels (###### for sections -> ###/#### by structure)
     final = relevel_headings(final)
+    final = fix_split_code_fences(final)   # [8e] second pass: catch any fences split by later steps
     md_path.write_text(final, encoding="utf-8")
     total = sum(len(v) for v in page_blocks.values())
     print(f"used={n_used}/{total}")

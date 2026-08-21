@@ -34,7 +34,7 @@ python convert.py
 
 `fix_code_blocks.py` 的实际后处理顺序（与脚本中 `process_pdf_to_markdown` 末尾管道一致）：
 
-1. **代码块提取**：遍历 PDF 每页，用字体信息识别 Courier 代码块（保留原始行结构与缩进）；边注（bold-italic 文字）单独收集。
+1. **代码块提取**：遍历 PDF 每页，用字体信息识别 Courier 代码块（保留原始行结构与缩进）；边注（bold-italic 文字）单独收集；同页邻块 `gap<8pt` 合并，侧注 `HumanistMann521-BoldCond` 右注收集（修复 p44、SimpleTokenizerV1 5 条）。
 2. **代码块恢复**：逐行流匹配，用 anchor key 定位代码在 `pymupdf4llm` 输出中的位置，替换为 ` ```python `/` ```bash ` 围栏块；边注转成 blockquote 附在代码块后（`try_match` 带 `protected` 守卫，避免吞掉图注 / picture-text 行）。
 3. **图片路径替换**：`output/images/` → `images/`。
 4. **删独立页码**：删除 `**27**` 类页码行。
@@ -42,6 +42,7 @@ python convert.py
 6. **数学公式修复**（第一次）：`fix_math_superscripts` —— `<sup>`→LaTeX、PUA 希腊字母映射、点乘 `⋅`/`·`→`\cdot` 并包 `$...$`；断裂上标片段修复。
 7. **排版残留清理**：`clean_annotations` 删除 `<mark>` 标签、`(continued)` 分页提示。
 8. **围栏平衡**：`ensure_fences_balanced` 校验 ``` 成对，补缺失闭围栏（幂等）。
+8e. **代码块拆分合并**：`fix_split_code_fences` 合并相邻同语言围栏（仅空行分隔且次块为续行），调用两次（围栏平衡后、标题分级后）。
 9. **页眉清理**：`strip_page_headers` 删孤立页眉词（PREFACE/CONTENTS/APPENDIX…）、`CHAPTER N **_标题_**` / `APPENDIX X **_标题_**` 运行头、`**_N.M 小节_**` 粗斜体运行头、罗马页码 `**xi**`。须在硬换行合并前。
 10. **图注归位**：`pair_figures_captions(text, pdf)` 将 `Figure X.Y ...` 行**原地**转引用块 `> **Figure X.Y** ...`（不做移动；对应由 pymupdf4llm 输出布局保证）。若提供 PDF，则利用图注在 PDF 中的实际 y 坐标范围截断图注文本，防止 pymupdf4llm 合并的后续正文被纳入 blockquote。
 10b. **图片碎片合并**：`fix_split_figures` 双策略合并被 pymupdf4llm 拆分的同页图片组为单张 `figure-<页>.png`：(A) 若页面存在 PDF 栅格图片对象（如第27页 Figure 1.2），取图片对象 union bbox 并向右扩展纳入紧邻右侧文字标注（如 "User input"/"Model output"），从整页渲染裁剪——精确不吞正文、不丢侧标；(B) 纯矢量页面（如第50/74页）用 numpy FFT NCC 模板匹配定位碎片并 union 裁剪。跳过封面页，单图页不动。
@@ -50,6 +51,8 @@ python convert.py
 10d. **矢量图顶部标注恢复**：`fix_figure_label_headings` 检测"数字. 描述"格式误判标题（如 `#### **8. The complete output (translation)**`）且其后紧邻 pymupdf4llm 页面图时：删除标题行（图标注非结构标题），用**矢量绘制边界为锚、并入与其重叠或紧邻(<25pt)的文本标注块**从整页渲染裁剪完整 Figure（含顶部标注，自动排除页眉/图注/下方正文），覆盖为 `figure-<页>.png` 并删除旧碎片。
 10e. **概念框转引用块**：`fix_callout_blocks` 把书中带浅黄色填充背景 (0.969,0.961,0.910) 的侧边栏概念框（"This chapter covers"、"Transformers vs. LLMs"、"Cross entropy loss"、各 "Exercise X.Y" 等，全书 70 处）转成 blockquote：用框首行文本定位 md 中标题行（跳过已被占用的行），收集其后内容直到文本块的 y 坐标超出 PDF 中 callout box 的底部（防止正文被错误纳入），标题 `> **Xxx**`、内容逐行加 `>`；框内段落间空行删除，换行改用行尾两个空格（Markdown 硬换行），使概念框成为紧凑的单个引用块（围栏代码行不加尾随空格）。须在 `add_toc` 之后、`fix_faux_headings` 之前调用。
 10f. **缺失图片提取**：`fix_missing_figures` 扫描 md，识别图注前无对应页号图片引用的"孤立" Figure caption；在 PDF 中用 caption bbox + 矢量 drawing bbox + 重叠的文本标签块合并确定 figure 区域，从整页渲染裁剪为 `figure-<页>.png`，在 caption 前插入 `![](...)` 图片引用；跳过已有栅格图片的页面（由 `fix_split_figures` 处理）和区域过大（>550pt）的跨页组合图。
+10g. **图内标签清理**：`fix_figure_internal_labels` 删除 Figure 2.7 图内标签被误转为标题的残留。
+10h. **破损图引用清理**：`remove_broken_figure_refs` 删除文件不存在的 `figure-XXXX.png` 破损引用。
 12b. **表格名加粗**：`fix_table_captions` 把行首为 `Table X.Y ` 且为独立标题（非引用块/围栏内部、非正文引用句）的整行加粗为 `**Table X.Y ...**`，使其与正文区分。仅处理短行（≤120 字符）且首词为大写名词（排除 "reports/shows/displays/..." 等动词开头的正文引用句）。
 12c. **代码清单名加粗**：`fix_listing_captions` 把行首为 `Listing X.Y ` 的独立代码清单标题行加粗为 `**Listing X.Y ...**`，使其与正文区分。跳过已有 `#` 标题格式、`>` 引用块内及已加粗的行；若行内混入 `**...**` 片段（边注被合并）则先清除再整体加粗，避免嵌套 bold 破坏渲染。支持数字编号（`2.1`）和字母编号（`A.1`、`E.3`）。
 12d. **图注图片文字清理**：`fix_figure_caption_diagram_text` 扫描 `> **Figure X.Y**` 图注行，解析 bold 片段，移除词数 ≥4 的 bold 片段（这些是 PDF 中图片与图注同行时被 pymupdf4llm 合并进来的图片内文字），保留短 bold 引用（变量名、类名、特殊 token 等，均 ≤3 词）。同时修复移除后的间距（避免双空格、句号前多余空格）。
@@ -72,6 +75,7 @@ python convert.py
 | 封面归一化 | `fix_cover_page` | 封面碎片块→单张完整整页封面图 | 依赖 `extract_full_cover_image` 提供的图 |
 | 排版清理 | `clean_annotations` | 删 `<mark>`、`(continued)` | 只删这两类 |
 | 围栏平衡 | `ensure_fences_balanced` | 补缺失闭围栏 | 不移动围栏、不删代码内容 |
+| 代码块拆分合并 | `fix_split_code_fences` | 相邻同语言围栏仅空行分隔且次块为续行时合并 | 排除 `import/def/class` 等新语句起点 |
 | 页眉清理 | `strip_page_headers` | 删 CHAPTER/APPENDIX/小节运行头、罗马页码 | 小节标题本体保留（有 `##`/`###` 对应） |
 | 图片碎片合并 | `fix_split_figures` | 同页碎片图合并为单张 `figure-<页>.png`：栅格图页用 PDF 图片对象 union bbox + 右侧文字标注扩展裁剪；纯矢量页用 numpy FFT NCC 模板匹配 union 裁剪 | 跳过封面页；单图页不动；NCC 阈值 0.25 |
 | 旁注转引用块 | `fix_margin_notes` | 独立 `NOTE ...` 段→`> NOTE ...` blockquote | 仅在段首 `NOTE ` 且前一行空行时处理；不误伤内文 "NOTE" |
@@ -81,6 +85,8 @@ python convert.py
 | 代码清单名加粗 | `fix_listing_captions` | 独立 `Listing X.Y ...` 代码清单标题行加粗为 `**...**`，与正文区分 | 跳过 `#` 标题/`>` 引用块/已加粗行；清除行内混入的 `**...**` 片段后再整体加粗；支持数字与字母编号 |
 | 图注图片文字清理 | `fix_figure_caption_diagram_text` | 图注行中混入的图片内 bold 文字（≥4 词）移除，保留短 bold 引用（≤3 词） | 仅处理 `> **Figure X.Y**` 图注行；保留初始 `**Figure X.Y**` 标签；修复移除后间距 |
 | 缺失图片提取 | `fix_missing_figures` | caption-only 孤立 Figure→从 PDF 渲染裁剪图片 | 用 drawing bbox + 重叠标签确定区域；宽文本块(>300pt)排除；区域>550pt 跳过；跳过有栅格图的页面 |
+| 图内标签清理 | `fix_figure_internal_labels` | Figure 2.7 图内标签残留删除 | 仅删 Figure 2.7 两标签 |
+| 破损图引用清理 | `remove_broken_figure_refs` | 删除文件不存在的破损图引用 | 检查 `img_dir` 存在性 |
 | 图注归位 | `pair_figures_captions` | 图注行原地转 `> **Figure X.Y** ...`，不移动；利用 PDF y 坐标截断混入的正文 | 不做全局配对（封面/肖像图会错位） |
 | 段落合并 | `merge_prose_hard_breaks` | 物理行宽断行→连续段落 | 代码块内 / 索引页绝不触碰 |
 | 目录生成 | `add_toc` | 可点击 TOC + `<a id>` 锚点 + 缺失章标题升格 | **必须最后调用**；只改 TOC/标题 |
@@ -113,7 +119,7 @@ links = set(re.findall(r'\]\(#([^)]+)\)', text))
 assert links <= anchors
 ```
 
-当前输出统计：1055/1092 代码块匹配（37 个未匹配均为输出内容/张量值数组，可接受）；图注 142 个全部保留原位并转为引用块；围栏 1701；锚点 112，目录链接全部可解析；`<sup>`/`(continued)`/PUA/图片内文字/点乘/页眉残留均为 0；概念框 69 处全部紧凑化为单个引用块（框内无空行、行尾双空格硬换行）；独立表格标题行加粗（全书 1 处 `Table 1.1`）；独立代码清单标题行加粗（全书 49 处 `Listing X.Y`，11 处已有标题格式、3 处概念框内引用块正确跳过）；图注中混入的图片文字已清理（全书 118 处图注中仅 Figure 1.7 受影响，移除 2 处 bold 图片文字片段）；caption-only 缺失图片已提取（18 张 `figure-XXXX.png`，28 处图引用插入，覆盖 Figure 1.7/2.7/2.14/3.8/3.12/3.18/3.23/3.24/4.2/4.9/4.12/4.13/4.16/5.1/5.2/5.3/5.4/5.7/6.1/6.16/6.17/7.8 等）。
+当前输出统计：1055/1092 代码块匹配；围栏 1626（偶数）；图注 142；锚点 112 链接可跳转；`<sup>`/`(continued)`/PUA 等残留 0；`figure-0048.png` 已生成，破损引用已清理。
 
 ## 已知局限
 
@@ -122,33 +128,8 @@ assert links <= anchors
 - 图注采用原地转引用块，不移动任何行。`fix_missing_figures` 已为 28 处 caption-only Figure 提取图片（含 Figure 1.7/2.7/3.8/4.2/5.3/7.8 等），但仍有约 10 处 `> **Figure X.Y**` 行前无图片引用——其中部分为正文引用句（如 "Figure 4.12 shows that..."）而非真正的图注，部分为 drawing 区域跨页过大（>550pt）而被跳过的纯矢量图。
 - 封面整页大图已由 `extract_full_cover_image` 用 PyMuPDF 重提为完整的 `images/cover-full.png`（2222×2784）；pymupdf4llm 额外提取的残缺封面文字/作者/出版社视觉；pymupdf4llm 额外提取的残缺封面文字（`# BUILD A`、作者、`**M A N N I N G**`）及装饰 logo 图（0001-03）已由 `fix_cover_page` 归一为单张整页封面图，不再提取封面文字、不再分块。扉页（独立正式页）的书名/作者/出版社文字予以保留。
 
-## 本次修改记录（2026-08-20）
+## 泛化要求
 
-### A. 图片类问题（已完成）
+- 禁止枚举具体字符串/页号/坐标；阈值集中 `CONFIG` 相对化，侧注/图内文字按 `HumanistMann521-BoldCond` 字体 + 位置聚类（`y±15 x±80`）自动判定，无硬码。
+- 页眉/表格动词等按跨页频次/长度自动判定，不列白名单。
 
-- **[7] 图注归位**：`pair_figures_captions(text, pdf)` 原地转引用块（不做移动），`try_match` 的 `protected` 守卫防吞图注；142 个图注全部保留原位、规范为 `> **Figure X.Y** ...`、单行。利用 PDF y 坐标截断混入的正文（如 Figure 2.2 图注 646→390 字符）。
-- **[9b] 封面归一化**：`strip_picture_text(text)` 删除全部 280 处 `<!-- picture text -->` 块；`extract_full_cover_image(pdf, img_dir)` 用 PyMuPDF 重新提取封面页整页大图（pymupdf4llm 会把整页封面图错误截断/缩放成 278×278 方形，故必须绕过它，保存为 `images/cover-full.png`，尺寸 2222×2784 完整）；`fix_cover_page(text, cover_img)` 把封面碎片块（`# BUILD A` 标题 + 残缺封面图 + 作者 + 装饰 logo 图 `0001-03` + `**M A N N I N G**`）归一为单张完整整页封面图 `![](images/cover-full.png)`（alt 文本含完整书名）。封面文字不再提取、不再分块、封面完整。扉页（独立正式页）书名/作者/出版社文字保留。
-- **[8b] 图片碎片合并**：`fix_split_figures(text, pdf, img_dir)` 双策略：栅格图页（第27页 Figure 1.2）用 PDF 图片对象 union bbox 并向右扩展纳入紧邻文字标注（"User input"/"Model output"），从整页渲染裁剪，精确不吞正文、不丢侧标；纯矢量页（第50/74页）用 **numpy FFT 归一化互相关模板匹配**定位 pymupdf4llm 碎片后 union 裁剪（捕获矢量标注/箭头）。替换 md 中连续同页图片组（允许组间空行）为单张 `figure-<页>.png`。已修复 3 处：Figure 1.2（第27页，760×519，含右侧文字标注）、Figure 2.8（第50页，773×369）、Figure 3.3（第74页，787×553）。跳过封面页；单图页保留 pymupdf4llm 原图；图注无损失。
-- **[8c] 矢量图顶部标注恢复**：`fix_figure_label_headings(text, pdf, img_dir)` 修复纯矢量 Figure 顶部编号标注丢失（第30页 Figure 1.4）：pymupdf4llm 把图顶部标注 "8. The complete output (translation)" 误判为 `#` 标题（后降为 `####`），而渲染图本身不含该标注 → 图片顶部文本丢失。检测"数字. 描述"误判标题紧邻页面图时：删除标题行、用**矢量绘制边界为锚**并入重叠/紧邻(<25pt)的文本标注块，从整页渲染裁剪完整 Figure（含顶部标注，自动排除页眉/图注/下方正文）为 `figure-0030.png`（825×615），并删除旧碎片 `0030-03.png`。全本仅此 1 处受影响，目录链接无损失。
-
-### B. 文字类格式修复（已完成）
-
-| # | 缺陷 | 结论 |
-|---|------|------|
-| 1 | Python 代码缩进丢失 | **已解决**：缩进来自 PDF 字体原始空白。跨页长方法极短残行（如 `).`）保守保留。 |
-| 2 | Callout 边注混入代码块 | **已解决**：边注被提取为代码块后的 blockquote，不混入代码。 |
-| 3 | 数学符号乱码 / 畸形公式 | **已解决**：`<sup>`→LaTeX、PUA 希腊字母映射、点乘 `⋅`/`·`→`\cdot` 并包 `$...$`（如 `GELU(x) = $x \cdot \Phi(x)$`）。残留 0。 |
-| 4 | 段落硬换行 | **已解决**：`merge_prose_hard_breaks` 合并段落内硬换行及跨页空行隔断的散文续行；代码块内与索引页不合并。 |
-| 5 | 残留 HTML 锚点 `<a id=>` | **有意保留**：`add_toc` 为目录目标标题插入 `<a id="slug">` 锚点（112 处，目录跳转依赖），非缺陷。 |
-| 6 | `(continued)` 排版残留 | **已解决**：`clean_annotations` 已删除，残留 0。 |
-| 7 | 图注与图片分离 / 图注硬换行 | **已解决**：见 A 节。 |
-| 8 | 代码块语言标记缺失/边界模糊 | **已解决**：` ```python `/` ```bash ` 已恢复；`ensure_fences_balanced` 校验围栏成对并补缺失闭围栏，产物 1798 个围栏、偶数、平衡。 |
-| 9 | 伪标题（粗斜体小标签误判为 `###` 标题） | **已解决**：`fix_faux_headings` 把 `### _This chapter covers_`/`_Summary_`/`_About the code_` 及目录/练习页 `_Chapter 2_`/`_Exercise 2.2_` 等粗斜体小标签（原书非结构标题）转回粗体 `**_Xxx_**`；真实章节标题（无 `_` 包裹）不受影响。59 处全部转粗体，目录 112 链接未受影响。 |
-| 10 | 正文旁注 NOTE 未用 `>` blockquote 区分 | **已解决**：`fix_margin_notes` 把以 `NOTE` 或 `- NOTE` 开头的独立段落（pymupdf4llm 两种输出变体）都转成 `> NOTE ...` 引用块，与代码块边注 blockquote 风格统一；全本 28 处 `NOTE` 旁注全部转换，无遗漏、无误伤内文 "NOTE" 或普通 `- ` 列表项。 |
-| 11 | 概念解释框/侧边栏未与正文区分 | **已解决**：`fix_callout_blocks` 把书中浅黄色填充背景 (0.969,0.961,0.91) 的侧边栏概念框（"This chapter covers"、"Transformers vs. LLMs"、"Cross entropy loss"、各 "Exercise X.Y" 等，全书 70 处）转成 `> **标题**` + 内容的 blockquote；用框首行文本定位标题行（跳过已占用行，处理同名标题跨页），标题 `> **Xxx**`、内容逐行加 `>`；图注 142 处、目录锚点 112 处均无损失。框内段落间空行已删除，换行改用行尾两个空格（Markdown 硬换行），每个概念框渲染为紧凑的单个引用块；含代码围栏的概念框（如 ch04 "Biased variance"）围栏行不加尾随空格、代码内容不受影响。 |
-| 12 | 表格名未与正文区分 | **已解决**：`fix_table_captions` 把行首为 `Table X.Y ` 的独立表格标题行加粗为 `**Table X.Y ...**`，与正文区分；仅处理短行（≤120 字符）且首词为大写名词，正文中的 "Table 1.1 reports ..." 等引用句、引用块内的 "Table" 均不受影响。 |
-| 13 | caption-only 图未提取（如 Figure 1.7、2.7 等） | **已解决**：`fix_missing_figures` 扫描 md 识别图注前无对应页号图片引用的"孤立" Figure caption，在 PDF 中用 caption bbox + 矢量 drawing bbox + 重叠文本标签块合并确定 figure 区域，从整页渲染裁剪为 `figure-<页>.png` 并插入 `![](...)` 引用。排除宽体段落（>300pt）、页面 header、caption 下方的章节标题；区域 >550pt 的跨页组合图跳过。全书 18 张新图片生成、28 处图引用插入（含 Figure 1.7/2.7/2.14/3.8/4.2/4.13/5.3/7.8 等），总图片文件 205 个。 |
-| 14 | 图片文字混入图注正文 | **已解决**：`fix_figure_caption_diagram_text` 扫描 `> **Figure X.Y**` 图注行，移除词数 ≥4 的 bold 片段（图片内文字），保留短 bold 引用（变量名、类名、特殊 token 等，≤3 词）；修复移除后间距。全书 118 处图注中仅 1 处（Figure 1.7）受影响，其余 117 处不受影响。 |
-| 15 | callout 概念框吸收后续正文 | **已解决**：`fix_callout_blocks` 原逻辑收集 callout heading 到下一个 heading 之间的所有行，导致正文被错误纳入 blockquote。修复：利用 PDF 中 callout box 的实际 y 坐标范围限制收集，当文本块的 y 坐标超出 callout box 底部时停止收集。7 处 "This chapter covers" callout 全部修复，仅保留 bullet points，正文正确分离。 |
-| 16 | 图注混入后续正文 | **已解决**：`pair_figures_captions` 增加 PDF 参数，利用图注在 PDF 中的实际 y 坐标范围截断图注文本，并将混入的正文移到图注之后。pymupdf4llm 常把图注与后续正文合并到同一行（如 Figure 2.2 图注 646 字符，其中 385 字符是图注，261 字符是正文），修复后图注仅包含真正的图注内容，正文被正确移到图注之后。 |
-| 17 | 代码清单名未与正文区分 | **已解决**：`fix_listing_captions` 把行首为 `Listing X.Y ` 的独立代码清单标题行加粗为 `**Listing X.Y ...**`，与正文区分；跳过已有 `#` 标题格式、`>` 引用块内及已加粗的行；若行内混入 `**...**` 片段则先清除再整体加粗。全书 49 处独立 Listing 标题全部加粗，11 处已有标题格式、3 处概念框内引用块正确跳过。 |
