@@ -58,29 +58,7 @@
   - [7.8 Evaluating the fine-tuned LLM](#7-8-evaluating-the-fine-tuned-llm)
   - [7.9 Conclusions](#7-9-conclusions)
 
-FROM SCRATCH
-
-BUILD A
-
 Sebastian Raschka
-
-Fine-tunes the pretrained LLM to create a classiﬁcation model
-
-Dataset with class labels
-
-Classiﬁer
-
-Building an LLM
-
-Foundation model
-
-Personal assistant
-
-Pretrains the LLM on unlabeled data to obtain a foundation model for further ﬁne-tuning
-
-Instruction dataset
-
-Fine-tunes the pretrained LLM to create a personal assistant or chat model
 
 The three main stages of coding a large language model (LLM) are implementing the LLM architecture and data preparation process (stage 1), pretraining an LLM to create a foundation model (stage 2), and fine-tuning the foundation model to become a personal assistant or text classifier (stage 3). Each of these stages is explored and implemented in this book.
 
@@ -120,92 +98,7 @@ Typesetter: Dennis Dalinnik Cover designer: Marija Tudor
 
 ISBN: 9781633437166 Printed in the United States of America
 
-brief contents
-
-1 ■ Understanding large language models 1
-
-2 ■ Working with text data 17
-
-3 ■ Coding attention mechanisms 50
-
-4 ■ Implementing a GPT model from scratch to generate text 92
-
-5 ■ Pretraining on unlabeled data 128
-
-6 ■ Fine-tuning for classification 169
-
-7 ■ Fine-tuning to follow instructions 204
-
-A ■ Introduction to PyTorch 251
-
-B ■ References and further reading 289
-
-C ■ Exercise solutions 300
-
-D ■ Adding bells and whistles to the training loop 313
-
-E ■ Parameter-efficient fine-tuning with LoRA 322
-
-contents
-
-preface xi acknowledgments xiii about this book xv about the author xix about the cover illustration xx 1 Understanding large language models 1
-
-1.1 What is an LLM? 2 1.2 Applications of LLMs 4 1.3 Stages of building and using LLMs 5 1.4 Introducing the transformer architecture 7 1.5 Utilizing large datasets 10 1.6 A closer look at the GPT architecture 12 1.7 Building a large language model 14 2 Working with text data 17
-
-2.1 Understanding word embeddings 18 2.2 Tokenizing text 21 2.3 Converting tokens into token IDs 24 2.4 Adding special context tokens 29
-
-2.5 Byte pair encoding 33 2.6 Data sampling with a sliding window 35 2.7 Creating token embeddings 41 2.8 Encoding word positions 43 3 Coding attention mechanisms 50
-
-3.1 The problem with modeling long sequences 52 3.2 Capturing data dependencies with attention
-
-mechanisms 54 3.3 Attending to different parts of the input with
-
-self-attention 55 A simple self-attention mechanism without trainable weights 56 Computing attention weights for all input tokens 61
-
-3.4 Implementing self-attention with trainable weights 64
-
-Computing the attention weights step by step 65 ■Implementing a compact self-attention Python class 70
-
-3.5 Hiding future words with causal attention 74
-
-Applying a causal attention mask 75 ■Masking additional attention weights with dropout 78 ■Implementing a compact causal attention class 80
-
-<a id="3-6-extending-single-head-attention-to-multi-head"></a>
-### 3.6 Extending single-head attention to multi-head
-
-attention 82 Stacking multiple single-head attention layers 82 ■Implementing multi-head attention with weight splits 86 4 Implementing a GPT model from scratch to generate text 92
-
-4.1 Coding an LLM architecture 93 4.2 Normalizing activations with layer normalization 99 4.3 Implementing a feed forward network with GELU
-
-activations 105 4.4 Adding shortcut connections 109 4.5 Connecting attention and linear layers in a transformer
-
-block 113 4.6 Coding the GPT model 117 4.7 Generating text 122
-
-5 Pretraining on unlabeled data 128
-
-5.1 Evaluating generative text models 129
-
-Using GPT to generate text 130 ■Calculating the text generation loss 132 ■Calculating the training and validation set losses 140
-
-5.2 Training an LLM 146 5.3 Decoding strategies to control randomness 151
-
-Temperature scaling 152 ■Top-k sampling 155 Modifying the text generation function 157
-
-5.4 Loading and saving model weights in PyTorch 159 5.5 Loading pretrained weights from OpenAI 160 6 Fine-tuning for classification 169
-
-6.1 Different categories of fine-tuning 170 6.2 Preparing the dataset 172 6.3 Creating data loaders 175 6.4 Initializing a model with pretrained weights 181 6.5 Adding a classification head 183 6.6 Calculating the classification loss and accuracy 190 6.7 Fine-tuning the model on supervised data 195 6.8 Using the LLM as a spam classifier 200 7 Fine-tuning to follow instructions 204
-
-7.1 Introduction to instruction fine-tuning 205 7.2 Preparing a dataset for supervised instruction
-
-fine-tuning 207 7.3 Organizing data into training batches 211 7.4 Creating data loaders for an instruction dataset 223 7.5 Loading a pretrained LLM 226 7.6 Fine-tuning the LLM on instruction data 229 7.7 Extracting and saving responses 233 7.8 Evaluating the fine-tuned LLM 238 7.9 Conclusions 247
-
-What’s next? 247 ■Staying up to date in a fast-moving field 248 ■Final words 248
-
-appendix A Introduction to PyTorch 251 appendix B References and further reading 289 appendix C Exercise solutions 300 appendix D Adding bells and whistles to the training loop 313 appendix E Parameter-efficient fine-tuning with LoRA 322
-
-index 337
-
-preface
+## Preface
 
 I’ve always been fascinated with language models. More than a decade ago, my journey into AI began with a statistical pattern classification class, which led to my first independent project: developing a model and web application to detect the mood of a song based on its lyrics.
 
@@ -213,9 +106,7 @@ Fast forward to 2022, with the release of ChatGPT, large language models (LLMs) 
 
 As their name implies, a hallmark of LLMs is that they are “large”—very large— encompassing millions to billions of parameters. (For comparison, using more traditional machine learning or statistical methods, the Iris flower dataset can be classified with more than 90% accuracy using a small model with only two parameters.) However, despite the large size of LLMs compared to more traditional methods, LLMs don’t have to be a black box.
 
-In this book, you will learn how to build an LLM one step at a time. By the end, you will have a solid understanding of how an LLM, like the ones used in ChatGPT, works on a fundamental level. I believe that developing confidence with each part of the fundamental concepts and underlying code is crucial for success. This not only
-
-helps in fixing bugs and improving performance but also enables experimentation with new ideas.
+In this book, you will learn how to build an LLM one step at a time. By the end, you will have a solid understanding of how an LLM, like the ones used in ChatGPT, works on a fundamental level. I believe that developing confidence with each part of the fundamental concepts and underlying code is crucial for success. This not only helps in fixing bugs and improving performance but also enables experimentation with new ideas.
 
 Several years ago, when I started working with LLMs, I had to learn how to implement them the hard way, sifting through many research papers and incomplete code repositories to develop a general understanding. With this book, I hope to make LLMs more accessible by developing and sharing a step-by-step implementation tutorial detailing all the major components and development phases of an LLM.
 
@@ -223,7 +114,7 @@ I strongly believe that the best way to understand LLMs is to code one from scra
 
 Happy reading and coding!
 
-acknowledgments
+## Acknowledgments
 
 Writing a book is a significant undertaking, and I would like to express my sincere gratitude to my wife, Liza, for her patience and support throughout this process. Her unconditional love and constant encouragement have been absolutely essential.
 
@@ -239,17 +130,15 @@ Pal, Vahid Mirjalili, Vaijanath Rao, and Walter Reade for their thorough feedbac
 
 To everyone who has contributed to this journey, I am sincerely grateful. Your support, expertise, and dedication have been instrumental in bringing this book to fruition. Thank you!
 
-about this book
+## About this book
 
 Build a Large Language Model (From Scratch) was written to help you understand and create your own GPT-like large language models (LLMs) from the ground up. It begins by focusing on the fundamentals of working with text data and coding attention mechanisms and then guides you through implementing a complete GPT model from scratch. The book then covers the pretraining mechanism as well as fine-tuning for specific tasks such as text classification and following instructions. By the end of this book, you’ll have a deep understanding of how LLMs work and the skills to build your own models. While the models you’ll create are smaller in scale compared to the large foundational models, they use the same concepts and serve as powerful educational tools to grasp the core mechanisms and techniques used in building state-of-the-art LLMs.
 
-Who should read this book
+### Who should read this book
 
 Build a Large Language Model (From Scratch) is for machine learning enthusiasts, engineers, researchers, students, and practitioners who want to gain a deep understanding of how LLMs work and learn to build their own models from scratch. Both beginners and experienced developers will be able to use their existing skills and knowledge to grasp the concepts and techniques used in creating LLMs.
 
-What sets this book apart is its comprehensive coverage of the entire process of building LLMs, from working with datasets to implementing the model architecture, pretraining on unlabeled data, and fine-tuning for specific tasks. As of this writing, no
-
-other resource provides such a complete and hands-on approach to building LLMs from the ground up.
+What sets this book apart is its comprehensive coverage of the entire process of building LLMs, from working with datasets to implementing the model architecture, pretraining on unlabeled data, and fine-tuning for specific tasks. As of this writing, no other resource provides such a complete and hands-on approach to building LLMs from the ground up.
 
 To understand the code examples in this book, you should have a solid grasp of Python programming. While some familiarity with machine learning, deep learning, and artificial intelligence can be beneficial, an extensive background in these areas is not required. LLMs are a unique subset of AI, so even if you’re relatively new to the field, you’ll be able to follow along.
 
@@ -259,7 +148,7 @@ A high school–level understanding of mathematics, particularly working with ve
 
 The most important prerequisite is a strong foundation in Python programming. With this knowledge, you’ll be well prepared to explore the fascinating world of LLMs and understand the concepts and code examples presented in this book.
 
-How this book is organized: A roadmap
+### How this book is organized: A roadmap
 
 This book is designed to be read sequentially, as each chapter builds upon the concepts and techniques introduced in the previous ones. The book is divided into seven chapters that cover the essential aspects of LLMs and their implementation.
 
@@ -269,9 +158,7 @@ Chapter 2 lays out a plan for building an LLM from scratch. It covers the proces
 
 Chapter 3 focuses on the attention mechanisms used in LLMs. It introduces a basic self-attention framework and progresses to an enhanced self-attention mechanism. The chapter also covers the implementation of a causal attention module that enables LLMs to generate one token at a time, masking randomly selected attention weights with dropout to reduce overfitting and stacking multiple causal attention modules into a multihead attention module.
 
-Chapter 4 focuses on coding a GPT-like LLM that can be trained to generate human-like text. It covers techniques such as normalizing layer activations to stabilize neural network training, adding shortcut connections in deep neural networks to train models more effectively, implementing transformer blocks to create GPT models
-
-of various sizes, and computing the number of parameters and storage requirements of GPT models.
+Chapter 4 focuses on coding a GPT-like LLM that can be trained to generate human-like text. It covers techniques such as normalizing layer activations to stabilize neural network training, adding shortcut connections in deep neural networks to train models more effectively, implementing transformer blocks to create GPT models of various sizes, and computing the number of parameters and storage requirements of GPT models.
 
 Chapter 5 implements the pretraining process of LLMs. It covers computing the training and validation set losses to assess the quality of LLM-generated text, implementing a training function and pretraining the LLM, saving and loading model weights to continue training an LLM, and loading pretrained weights from OpenAI.
 
@@ -279,13 +166,11 @@ Chapter 6 introduces different LLM fine-tuning approaches. It covers preparing a
 
 Chapter 7 explores the instruction fine-tuning process of LLMs. It covers preparing a dataset for supervised instruction fine-tuning, organizing instruction data in training batches, loading a pretrained LLM and fine-tuning it to follow human instructions, extracting LLM-generated instruction responses for evaluation, and evaluating an instruction-fine-tuned LLM.
 
-About the code
+### About the code
 
 To make it as easy as possible to follow along, all code examples in this book are conveniently available on the Manning website at https://www.manning.com/books/ build-a-large-language-model-from-scratch, as well as in Jupyter notebook format on GitHub at https://github.com/rasbt/LLMs-from-scratch. And don’t worry about getting stuck—solutions to all the code exercises can be found in appendix C.
 
-This book contains many examples of source code both in numbered listings and in line with normal text. In both cases, source code is formatted in a `fixed-width`
-
-`font` `like` `this` to separate it from ordinary text.
+This book contains many examples of source code both in numbered listings and in line with normal text. In both cases, source code is formatted in a `fixed-width` `font` `like` `this` to separate it from ordinary text.
 
 In many cases, the original source code has been reformatted; we’ve added line breaks and reworked indentation to accommodate the available page space in the book. In rare cases, even this was not enough, and listings include line-continuation markers (➥). Additionally, comments in the source code have often been removed from the listings when the code is described in the text. Code annotations accompany many of the listings, highlighting important concepts.
 
@@ -293,52 +178,42 @@ One of the key goals of this book is accessibility, so the code examples have be
 
 Throughout the book, we’ll be using PyTorch as our go-to tensor and a deep learning library to implement LLMs from the ground up. If PyTorch is new to you, I recommend you start with appendix A, which provides an in-depth introduction, complete with setup recommendations.
 
-liveBook discussion forum
+### liveBook discussion forum
 
 Purchase of Build a Large Language Model (From Scratch) includes free access to live- Book, Manning’s online reading platform. Using liveBook’s exclusive discussion features, you can attach comments to the book globally or to specific sections or paragraphs. It’s a snap to make notes for yourself, ask and answer technical questions, and receive help from the author and other users. To access the forum, go to https:// livebook.manning.com/book/build-a-large-language-model-from-scratch/discussion. You can also learn more about Manning’s forums and the rules of conduct at https:// livebook.manning.com/discussion.
 
 Manning’s commitment to readers is to provide a venue where a meaningful dialogue between individual readers and between readers and the author can take place. It is not a commitment to any specific amount of participation on the part of the author, whose contribution to the forum remains voluntary (and unpaid). We suggest you try asking the author some challenging questions lest his interest stray! The forum and the archives of previous discussions will be accessible from the publisher’s website as long as the book is in print.
 
-Other online resources
+### Other online resources
 
 Interested in the latest AI and LLM research trends?
 
-> Check out my blog at https://magazine.sebastianraschka.com, where I regularly
-
-
-discusses the latest AI research with a focus on LLMs.
+> Check out my blog at https://magazine.sebastianraschka.com, where I regularly discusses the latest AI research with a focus on LLMs.
 
 Need help getting up to speed with deep learning and PyTorch?
 
-> I offer several free courses on my website at https://sebastianraschka.com/
-
-
-teaching. These resources can help you quickly get up to speed with the latest techniques.
+> I offer several free courses on my website at https://sebastianraschka.com/ teaching. These resources can help you quickly get up to speed with the latest techniques.
 
 Looking for bonus materials related to the book?
 
-> Visit the book’s GitHub repository at https://github.com/rasbt/LLMs-from
+> Visit the book’s GitHub repository at https://github.com/rasbt/LLMs-from-scratch to find additional resources and examples to supplement your learning.
 
-
--scratch to find additional resources and examples to supplement your learning.
-
-about the author
+## About the author
 
 SEBASTIAN RASCHKA, PhD, has been working in machine learning and AI for more than a decade. In addition to being a researcher, Sebastian has a strong passion for education. He is known for his bestselling books on machine learning with Python and his contributions to open source. Sebastian is a staff research engineer at Lightning AI, focusing on implementing and training LLMs. Before his industry experience, Sebastian was an assistant professor in the Department of Statistics at the University of Wisconsin-Madison, where he focused on deep learning research. You can learn more about Sebastian at https:// sebastianraschka.com.
 
-about the cover illustration
+## About the cover illustration
 
 The figure on the cover of Build a Large Language Model (From Scratch), titled “Le duchesse,” or “The duchess,” is taken from a book by Louis Curmer published in 1841. Each illustration is finely drawn and colored by hand.
 
 In those days, it was easy to identify where people lived and what their trade or station in life was just by their dress. Manning celebrates the inventiveness and initiative of the computer business with book covers based on the rich diversity of regional culture centuries ago, brought back to life by pictures from collections such as this one.
 
-Understanding large
+## 1 Understanding large language models
 
-language models
-
-This chapter covers
-
-which LLMs are derived
+This chapter covers:
+- High-level explanations of the fundamental concepts behind large language models (LLMs)
+- Insights into the transformer architecture from which LLMs are derived
+- A plan for building an LLM from scratch
 
 Large language models (LLMs), such as those offered in OpenAI’s ChatGPT, are deep neural network models that have been developed over the past few years. They ushered in a new era for natural language processing (NLP). Before the advent of LLMs, traditional methods excelled at categorization tasks such as email spam classification and straightforward pattern recognition that could be captured with handcrafted rules or simpler models. However, they typically underperformed in language tasks that demanded complex understanding and generation abilities, such as parsing detailed instructions, conducting contextual analysis, and creating coherent and contextually appropriate original text. For example, previous generations of language models could not write an email from a list of keywords—a task that is trivial for contemporary LLMs.
 
@@ -365,25 +240,8 @@ LLMs utilize an architecture called the transformer, which allows them to pay se
 
 Since LLMs are capable of generating text, LLMs are also often referred to as a form of generative artificial intelligence, often abbreviated as generative AI or GenAI. As illustrated in figure 1.1, AI encompasses the broader field of creating machines that can perform tasks requiring human-like intelligence, including understanding language, recognizing patterns, and making decisions, and includes subfields like machine learning and deep learning.
 
-Deep neural network for parsing and generating human-like text
-
-GenAI involves the use of deep neural networks to create new content, such as text, images, or various forms of media
-
-Large language models
-
-GenAI
-
-Deep learning
-
-Algorithms that learn rules automatically from data
-
-Machine learning
-
-Systems with human-like intelligence
-
-Artiﬁcial intelligence
-
 ![Fig 1.1](extracted_images/figures/Fig1.1_p025.png)
+
 **Figure 1.1** As this hierarchical depiction of the relationship between the different fields suggests, LLMs represent a specific application of deep learning techniques, using their ability to process and generate humanlike text. Deep learning is a specialized branch of machine learning that focuses on using multilayer neural networks. Machine learning and deep learning are fields aimed at implementing algorithms that enable computers to learn from data and perform tasks that typically require human intelligence.
 
 The algorithms used to implement AI are the focus of the field of machine learning. Specifically, machine learning involves the development of algorithms that can learn from and make predictions or decisions based on data without being explicitly programmed. To illustrate this, imagine a spam filter as a practical application of machine learning. Instead of manually writing rules to identify spam emails, a machine learning algorithm is fed examples of emails labeled as spam and legitimate emails. By minimizing the error in its predictions on a training dataset, the model then learns to recognize patterns and characteristics indicative of spam, enabling it to classify new emails as either spam or not spam.
@@ -409,11 +267,8 @@ In short, LLMs are invaluable for automating almost any task that involves parsi
 
 We will focus on understanding how LLMs work from the ground up, coding an LLM that can generate texts. You will also learn about techniques that allow LLMs to carry out queries, ranging from answering questions to summarizing text, translating text into different languages, and more. In other words, you will learn how complex LLM assistants such as ChatGPT work by building one step by step.
 
-User input (instructions)
-
-Model output
-
 ![Fig 1.2](extracted_images/figures/Fig1.2_p027.png)
+
 **Figure 1.2** LLM interfaces enable natural language communication between users and AI systems. This screenshot shows ChatGPT writing a poem according to a user’s specifications.
 
 <a id="1-3-stages-of-building-and-using-llms"></a>
@@ -431,23 +286,10 @@ This local implementation can significantly decrease latency and reduce server-r
 
 The general process of creating an LLM includes pretraining and fine-tuning. The “pre” in “pretraining” refers to the initial phase where a model like an LLM is trained on a large, diverse dataset to develop a broad understanding of language. This pre- trained model then serves as a foundational resource that can be further refined through fine-tuning, a process where the model is specifically trained on a narrower dataset that is more specific to particular tasks or domains. This two-stage training approach consisting of pretraining and fine-tuning is depicted in figure 1.3.
 
-The LLM has a few basic capabilities after pretraining.
-
 An LLM is pretrained on unlabeled text data.
 
-Train
-
-Train
-
-(trillions of words)
-
-Fine-tuned LLM
-
-A pretrained LLM can be further trained on a labeled dataset to obtain a ﬁne-tuned LLM for speciﬁc tasks.
-
-Labeled dataset
-
 ![Fig 1.3](extracted_images/figures/Fig1.3_p028.png)
+
 **Figure 1.3** Pretraining an LLM involves next-word prediction on large text datasets. A pretrained LLM can then be fine-tuned using a smaller labeled dataset.
 
 The first step in creating an LLM is to train it on a large corpus of text data, sometimes referred to as raw text. Here, “raw” refers to the fact that this data is just regular text without any labeling information. (Filtering may be applied, such as removing formatting characters or documents in unknown languages.)
@@ -473,89 +315,28 @@ A key component of transformers and LLMs is the self-attention mechanism (not sh
 
 8. The complete output (translation)
 
-4. The encoder returns embedding vectors as input to the decoder.
-
-Output layers
-
-Embeddings
-
-3. The encoder has access to the complete input text to produce text encodings used by the decoder.
-
-7. The decoder generates the translated text one word at a time.
-
-Encoder
-
-Decoder
-
-Preprocessing steps 2. The input text is prepared for the encoder.
-
-6. The input text is prepared for the decoder.
-
-Preprocessing steps
-
-Input text
-
-Input text
-
 5. A partial output text: the model completes the translation one word at a time.
 
-1. The input text to be translated.
-
 ![Fig 1.4](extracted_images/figures/Fig1.4_p030.png)
+
 **Figure 1.4** A simplified depiction of the original transformer architecture, which is a deep learning model for language translation. The transformer consists of two parts: (a) an encoder that processes the input text and produces an embedding representation (a numerical representation that captures many different factors in different dimensions) of the text that the (b) decoder can use to generate the translated text one word at a time. This figure shows the final stage of the translation process where the decoder has to generate only the final word (“Beispiel”), given the original input text (“This is an example”) and a partially translated sentence (“Das ist ein”), to complete the translation.
 
 its complexity, we will defer further explanation to chapter 3, where we will discuss and implement it step by step.
 
 Later variants of the transformer architecture, such as BERT (short for bidirectional encoder representations from transformers) and the various GPT models (short for generative pretrained transformers), built on this concept to adapt this architecture for different tasks. If interested, refer to appendix B for further reading suggestions.
 
-BERT, which is built upon the original transformer’s encoder submodule, differs in its training approach from GPT. While GPT is designed for generative tasks, BERT and its variants specialize in masked word prediction, where the model predicts masked
-
-or hidden words in a given sentence, as shown in figure 1.5. This unique training strategy equips BERT with strengths in text classification tasks, including sentiment prediction and document categorization. As an application of its capabilities, as of this writing, X (formerly Twitter) uses BERT to detect toxic content.
-
-BERT GPT
-
-Encoder Decoder
-
-Fills in the missing words to generate the original sentence
-
-Learns to generate one word at a time
-
-Preprocessing steps
-
-Preprocessing steps
-
-Input text
-
-Input text
-
-Receives inputs where words are randomly masked during training
-
-Receives incomplete texts
+BERT, which is built upon the original transformer’s encoder submodule, differs in its training approach from GPT. While GPT is designed for generative tasks, BERT and its variants specialize in masked word prediction, where the model predicts masked or hidden words in a given sentence, as shown in figure 1.5. This unique training strategy equips BERT with strengths in text classification tasks, including sentiment prediction and document categorization. As an application of its capabilities, as of this writing, X (formerly Twitter) uses BERT to detect toxic content.
 
 ![Fig 1.5](extracted_images/figures/Fig1.5_p031.png)
+
 **Figure 1.5** A visual representation of the transformer’s encoder and decoder submodules. On the left, the encoder segment exemplifies BERT-like LLMs, which focus on masked word prediction and are primarily used for tasks like text classification. On the right, the decoder segment showcases GPT-like LLMs, designed for generative tasks and producing coherent text sequences.
 
 GPT, on the other hand, focuses on the decoder portion of the original transformer architecture and is designed for tasks that require generating texts. This includes machine translation, text summarization, fiction writing, writing computer code, and more.
 
 GPT models, primarily designed and trained to perform text completion tasks, also show remarkable versatility in their capabilities. These models are adept at executing both zero-shot and few-shot learning tasks. Zero-shot learning refers to the ability to generalize to completely unseen tasks without any prior specific examples. On the other hand, few-shot learning involves learning from a minimal number of examples the user provides as input, as shown in figure 1.6.
 
-Creates plausible text given a partial input text
-
-Input Output
-
-Breakfast is the
-
-ZERO-SHOT
-
-Completes a task without an explicit example
-
-FEW-SHOT
-
-phone
-
-Completes a task given a few examples of the task
-
 ![Fig 1.6](extracted_images/figures/Fig1.6_p032.png)
+
 **Figure 1.6** In addition to text completion, GPT-like LLMs can solve various tasks based on their inputs without needing retraining, fine-tuning, or task-specific model architecture changes. Sometimes it is helpful to provide examples of the target within the input, which is known as a few-shot setting. However, GPT-like LLMs are also capable of carrying out tasks without a specific example, which is called zero-shot setting.
 
 <a id="1-5-utilizing-large-datasets"></a>
@@ -581,55 +362,29 @@ The good news is that many pretrained LLMs, available as open source models, can
 
 We will implement the code for pretraining and use it to pretrain an LLM for educational purposes. All computations are executable on consumer hardware. After implementing the pretraining code, we will learn how to reuse openly available model weights and load them into the architecture we will implement, allowing us to skip the expensive pretraining stage when we fine-tune our LLM.
 
-1.6 A closer look at the GPT architecture
+### 1.6 A closer look at the GPT architecture
 
 GPT was originally introduced in the paper “Improving Language Understanding by Generative Pre-Training” (https://mng.bz/x2qg) by Radford et al. from OpenAI. GPT-3 is a scaled-up version of this model that has more parameters and was trained on a larger dataset. In addition, the original model offered in ChatGPT was created by fine-tuning GPT-3 on a large instruction dataset using a method from OpenAI’s InstructGPT paper (https://arxiv.org/abs/2203.02155). As figure 1.6 shows, these models are competent text completion models and can carry out other tasks such as spelling correction, classification, or language translation. This is actually very remarkable given that GPT models are pretrained on a relatively simple next-word prediction task, as depicted in figure 1.7.
 
 ![Fig 1.7](extracted_images/figures/Fig1.7_p034.png)
+
 **Figure 1.7** In the next-word prediction pretraining task for GPT models, the system learns to predict the upcoming word in a sentence by looking at the words that have come before it. This approach helps the model understand how words and phrases typically fit together in language, forming a foundation that can be applied to various other tasks.
 
 The next-word prediction task is a form of self-supervised learning, which is a form of self-labeling. This means that we don’t need to collect labels for the training data explicitly but can use the structure of the data itself: we can use the next word in a sentence or document as the label that the model is supposed to predict. Since this nextword prediction task allows us to create labels “on the fly,” it is possible to use massive unlabeled text datasets to train LLMs.
 
-Compared to the original transformer architecture we covered in section 1.4, the general GPT architecture is relatively simple. Essentially, it’s just the decoder part without the encoder (figure 1.8). Since decoder-style models like GPT generate text by predicting text one word at a time, they are considered a type of autoregressive model. Autoregressive models incorporate their previous outputs as inputs for future
-
-predictions. Consequently, in GPT, each new word is chosen based on the sequence that precedes it, which improves the coherence of the resulting text.
+Compared to the original transformer architecture we covered in section 1.4, the general GPT architecture is relatively simple. Essentially, it’s just the decoder part without the encoder (figure 1.8). Since decoder-style models like GPT generate text by predicting text one word at a time, they are considered a type of autoregressive model. Autoregressive models incorporate their previous outputs as inputs for future predictions. Consequently, in GPT, each new word is chosen based on the sequence that precedes it, which improves the coherence of the resulting text.
 
 Architectures such as GPT-3 are also significantly larger than the original transformer model. For instance, the original transformer repeated the encoder and decoder blocks six times. GPT-3 has 96 transformer layers and 175 billion parameters in total.
-
-Output layers
-
-Output layers
-
-Output layers
-
-Decoder
-
-Decoder
-
-Decoder
-
-Preprocessing steps
-
-Preprocessing steps
-
-Preprocessing steps
-
-Input text
-
-Input text
-
-Input text
 
 The output of the previous round serves as input to the next round.
 
 ![Fig 1.8](extracted_images/figures/Fig1.8_p035.png)
+
 **Figure 1.8** The GPT architecture employs only the decoder portion of the original transformer. It is designed for unidirectional, left-to-right processing, making it well suited for text generation and next-word prediction tasks to generate text in an iterative fashion, one word at a time.
 
 GPT-3 was introduced in 2020, which, by the standards of deep learning and large language model development, is considered a long time ago. However, more recent architectures, such as Meta’s Llama models, are still based on the same underlying concepts, introducing only minor modifications. Hence, understanding GPT remains as relevant as ever, so I focus on implementing the prominent architecture behind GPT while providing pointers to specific tweaks employed by alternative LLMs.
 
-Although the original transformer model, consisting of encoder and decoder blocks, was explicitly designed for language translation, GPT models—despite their larger yet
-
-simpler decoder-only architecture aimed at next-word prediction—are also capable of performing translation tasks. This capability was initially unexpected to researchers, as it emerged from a model primarily trained on a next-word prediction task, which is a task that did not specifically target translation.
+Although the original transformer model, consisting of encoder and decoder blocks, was explicitly designed for language translation, GPT models—despite their larger yet simpler decoder-only architecture aimed at next-word prediction—are also capable of performing translation tasks. This capability was initially unexpected to researchers, as it emerged from a model primarily trained on a next-word prediction task, which is a task that did not specifically target translation.
 
 The ability to perform tasks that the model wasn’t explicitly trained to perform is called an emergent behavior. This capability isn’t explicitly taught during training but emerges as a natural consequence of the model’s exposure to vast quantities of multi- lingual data in diverse contexts. The fact that GPT models can “learn” the translation patterns between languages and perform translation tasks even though they weren’t specifically trained for it demonstrates the benefits and capabilities of these largescale, generative language models. We can perform diverse tasks without using diverse models for each.
 
@@ -638,27 +393,8 @@ The ability to perform tasks that the model wasn’t explicitly trained to perfo
 
 Now that we’ve laid the groundwork for understanding LLMs, let’s code one from scratch. We will take the fundamental idea behind GPT as a blueprint and tackle this in three stages, as outlined in figure 1.9.
 
-Fine-tunes the pretrained LLM to create a classiﬁcation model
-
-Dataset with class labels
-
-Classiﬁer
-
-Building an LLM
-
-Foundation model
-
-Personal assistant
-
-Implements the data sampling and understand the basic mechanism
-
-Pretrains the LLM on unlabeled data to obtain a foundation model for further ﬁne-tuning
-
-Instruction dataset
-
-Fine-tunes the pretrained LLM to create a personal assistant or chat model
-
 ![Fig 1.9](extracted_images/figures/Fig1.9_p036.png)
+
 **Figure 1.9** The three main stages of coding an LLM are implementing the LLM architecture and data preparation process (stage 1), pretraining an LLM to create a foundation model (stage 2), and fine-tuning the foundation model to become a personal assistant or text classifier (stage 3).
 
 In stage 1, we will learn about the fundamental data preprocessing steps and code the attention mechanism at the heart of every LLM. Next, in stage 2, we will learn how to code and pretrain a GPT-like LLM capable of generating new texts. We will also go over the fundamentals of evaluating LLMs, which is essential for developing capable NLP systems.
@@ -669,94 +405,43 @@ Finally, in stage 3, we will take a pretrained LLM and fine-tune it to follow in
 
 I hope you are looking forward to embarking on this exciting journey!
 
-Summary
+### Summary
 
-> LLMs have transformed the field of natural language processing, which previ-
-
-
-ously mostly relied on explicit rule-based systems and simpler statistical methods. The advent of LLMs introduced new deep learning-driven approaches that led to advancements in understanding, generating, and translating human language.
+> LLMs have transformed the field of natural language processing, which previ- ously mostly relied on explicit rule-based systems and simpler statistical methods. The advent of LLMs introduced new deep learning-driven approaches that led to advancements in understanding, generating, and translating human language.
 
 > Modern LLMs are trained in two main steps:
 
+– First, they are pretrained on a large corpus of unlabeled text by using the prediction of the next word in a sentence as a label. – Then, they are fine-tuned on a smaller, labeled target dataset to follow instructions or perform classification tasks.
 
-– First, they are pretrained on a large corpus of unlabeled text by using the
+> LLMs are based on the transformer architecture. The key idea of the trans- former architecture is an attention mechanism that gives the LLM selective access to the whole input sequence when generating the output one word at a time.
 
-prediction of the next word in a sentence as a label. – Then, they are fine-tuned on a smaller, labeled target dataset to follow
+> The original transformer architecture consists of an encoder for parsing text and a decoder for generating text.
 
-instructions or perform classification tasks.
+> LLMs for generating text and following instructions, such as GPT-3 and ChatGPT, only implement decoder modules, simplifying the architecture.
 
-> LLMs are based on the transformer architecture. The key idea of the trans-
+> Large datasets consisting of billions of words are essential for pretraining LLMs.
 
+> While the general pretraining task for GPT-like models is to predict the next word in a sentence, these LLMs exhibit emergent properties, such as capabilities to classify, translate, or summarize texts.
 
-former architecture is an attention mechanism that gives the LLM selective access to the whole input sequence when generating the output one word at a time.
+> Once an LLM is pretrained, the resulting foundation model can be fine-tuned more efficiently for various downstream tasks.
 
-> The original transformer architecture consists of an encoder for parsing text
+> LLMs fine-tuned on custom datasets can outperform general LLMs on specific tasks.
 
+## 2 Working with text data
 
-and a decoder for generating text.
-
-> LLMs for generating text and following instructions, such as GPT-3 and
-
-
-ChatGPT, only implement decoder modules, simplifying the architecture.
-
-> Large datasets consisting of billions of words are essential for pretraining
-
-
-LLMs.
-
-> While the general pretraining task for GPT-like models is to predict the next
-
-
-word in a sentence, these LLMs exhibit emergent properties, such as capabilities to classify, translate, or summarize texts.
-
-> Once an LLM is pretrained, the resulting foundation model can be fine-tuned
-
-
-more efficiently for various downstream tasks.
-
-> LLMs fine-tuned on custom datasets can outperform general LLMs on specific
-
-
-tasks.
-
-Working with text data
-
-This chapter covers
-
-tokenizing text
-
-approach
-
-large language model
+This chapter covers:
+- Preparing text for large language model training
+- Splitting text into word and subword tokens
+- Byte pair encoding as a more advanced way of tokenizing text
+- Sampling training examples with a sliding window approach
+- Converting tokens into vectors that feed into a large language model
 
 So far, we’ve covered the general structure of large language models (LLMs) and learned that they are pretrained on vast amounts of text. Specifically, our focus was on decoder-only LLMs based on the transformer architecture, which underlies the models used in ChatGPT and other popular GPT-like LLMs.
 
 During the pretraining stage, LLMs process text one word at a time. Training LLMs with millions to billions of parameters using a next-word prediction task yields models with impressive capabilities. These models can then be further finetuned to follow general instructions or perform specific target tasks. But before we can implement and train LLMs, we need to prepare the training dataset, as illustrated in figure 2.1.
 
-Implements the data sampling pipeline
-
-Fine-tunes the pretrained LLM to create a classiﬁcation model
-
-Dataset with class labels
-
-Classiﬁer
-
-Building an LLM
-
-Foundation model
-
-Personal assistant
-
-Implements the data sampling and understand the basic mechanism
-
-Pretrains the LLM on unlabeled data to obtain a foundation model for further ﬁnetuning
-
-Instruction dataset
-
-Fine-tunes the pretrained LLM to create a personal assistant or chat model
-
 ![Fig 2.1](extracted_images/figures/Fig2.1_p040.png)
+
 **Figure 2.1** The three main stages of coding an LLM. This chapter focuses on step 1 of stage 1: implementing the data sample pipeline.
 
 You’ll learn how to prepare input text for training LLMs. This involves splitting text into individual word and subword tokens, which can then be encoded into vector representations for the LLM. You’ll also learn about advanced tokenization schemes like byte pair encoding, which is utilized in popular LLMs like GPT. Lastly, we’ll implement a sampling and data-loading strategy to produce the input-output pairs necessary for training LLMs.
@@ -770,31 +455,8 @@ NOTE Readers unfamiliar with vectors and tensors in a computational context can 
 
 The concept of converting data into a vector format is often referred to as embedding. Using a specific neural network layer or another pretrained neural network model, we can embed different data types—for example, video, audio, and text, as illustrated in figure 2.2. However, it’s important to note that different data formats require distinct embedding models. For example, an embedding model designed for text would not be suitable for embedding audio or video data.
 
-Video embedding model
-
-Video embedding vector
-
-Video sample
-
-Audio embedding model
-
-Audio embedding vector
-
-Audio sample
-
-Unlabeled input data
-
-Text embedding model
-
-Text embedding vector
-
-Text sample
-
-Vector representation of the input
-
-Embedding model converts raw input into a vector representation
-
 ![Fig 2.2](extracted_images/figures/Fig2.2_p041.png)
+
 **Figure 2.2** Deep learning models cannot process data formats like video, audio, and text in their raw form. Thus, we use an embedding model to transform this raw data into a dense vector representation that deep learning architectures can easily understand and process. Specifically, this figure illustrates the process of converting raw data into a three-dimensional numerical vector.
 
 At its core, an embedding is a mapping from discrete objects, such as words, images, or even entire documents, to points in a continuous vector space—the primary purpose of embeddings is to convert nonnumeric data into a format that neural networks can process.
@@ -805,33 +467,8 @@ Several algorithms and frameworks have been developed to generate word embedding
 
 Word embeddings can have varying dimensions, from one to thousands. A higher dimensionality might capture more nuanced relationships but at the cost of computational efficiency.
 
-Vector embeddings of different types of birds
-
-Vector embedding of the word squirrel
-
-duck
-
-eagle
-
-squirrel
-
-goose
-
-Second dimension
-
-Germany Berlin
-
-longer
-
-long
-
-longest
-
-England London
-
-First dimension
-
 ![Fig 2.3](extracted_images/figures/Fig2.3_p042.png)
+
 **Figure 2.3** If word embeddings are two-dimensional, we can plot them in a twodimensional scatterplot for visualization purposes as shown here. When using word embedding techniques, such as Word2Vec, words corresponding to similar concepts often appear close to each other in the embedding space. For instance, different types of birds appear closer to each other in the embedding space than in countries and cities.
 
 While we can use pretrained models such as Word2Vec to generate embeddings for machine learning models, LLMs commonly produce their own embeddings that are part of the input layer and are updated during training. The advantage of optimizing the embeddings as part of the LLM training instead of using Word2Vec is that the embeddings are optimized to the specific task and data at hand. We will implement such embedding layers later in this chapter. (LLMs can also create contextualized output embeddings, as we discuss in chapter 3.)
@@ -845,23 +482,8 @@ Next, we will walk through the required steps for preparing the embeddings used 
 
 Let’s discuss how we split input text into individual tokens, a required preprocessing step for creating embeddings for an LLM. These tokens are either individual words or special characters, including punctuation characters, as shown in figure 2.4.
 
-Output text
-
-Postprocessing steps
-
-GPT-like decoder-only
-
-transformer
-
-Token embeddings:
-
-.
-
-Input text:
-
-This is an example.
-
 ![Fig 2.4](extracted_images/figures/Fig2.4_p043.png)
+
 **Figure 2.4** A view of the text processing steps in the context of an LLM. Here, we split an input text into individual tokens, which are either words or special characters, such as punctuation characters.
 
 The text we will tokenize for LLM training is “The Verdict,” a short story by Edith Wharton, which has been released into the public domain and is thus permitted to be used for LLM training tasks. The text is available on Wikisource at https://en.wikisource .org/wiki/The_Verdict, and you can copy and paste it into a text file, which I copied into a text file `"the-verdict.txt".`
@@ -964,9 +586,8 @@ The resulting output is:
 
 As we can see based on the results summarized in figure 2.5, our tokenization scheme can now handle the various special characters in the text successfully.
 
-Input text Hello, world. Is this-- a test?
-
 ![Fig 2.5](extracted_images/figures/Fig2.5_p046.png)
+
 **Figure 2.5** The tokenization scheme we implemented so far splits text into individual words and punctuation characters. In this specific example, the sample text gets split into 10 individual tokens.
 
 Now that we have a basic tokenizer working, let’s apply it to Edith Wharton’s entire short story:
@@ -1009,31 +630,14 @@ Tokenized training dataset
 
 Vocabulary
 
-Input text
-
-brown
-
-The quick brown
-
-dog
-
 The vocabulary contains all unique tokens in the training set and is usually sorted alphabetically.
-
-fox
-
-jumps
 
 The training set consists of only one sentence for illustration purposes.
 
-lazy
-
-over
-
 Each unique token is mapped to a unique integer called token ID.
 
-Unique tokens Token IDs
-
 ![Fig 2.6](extracted_images/figures/Fig2.6_p047.png)
+
 **Figure 2.6** We build a vocabulary by tokenizing the entire text in a training dataset into individual tokens. These individual tokens are then sorted alphabetically, and duplicate tokens are removed. The unique tokens are then aggregated into a vocabulary that defines a mapping from each unique token to a unique integer value. The depicted vocabulary is purposefully small and contains no punctuation or special characters for simplicity.
 
 Now that we have tokenized Edith Wharton’s short story and assigned it to a Python variable called `preprocessed`, let’s create a list of all unique tokens and sort them alphabetically to determine the vocabulary size:
@@ -1069,11 +673,8 @@ As we can see, the dictionary contains individual tokens associated with unique 
 
 Tokenization breaks down the training set into individual tokens.
 
-New tokenized sample
-
-text is mapped to token IDs using an existing vocabulary.
-
 ![Fig 2.7](extracted_images/figures/Fig2.7_p048.png)
+
 **Figure 2.7** Starting with a new text sample, we tokenize the text and use the vocabulary to convert the text tokens into token IDs. The vocabulary is built from the entire training set and can be applied to the training set itself and any new text samples. The depicted vocabulary contains no punctuation or special characters for simplicity.
 
 When we want to convert the outputs of an LLM from numbers back into text, we need a way to turn token IDs into text. For this, we can create an inverse version of the vocabulary that maps token IDs back to the corresponding text tokens.
@@ -1113,21 +714,8 @@ Next, let’s see whether we can turn these token IDs back into text using the d
 print(tokenizer.decode(ids))
 ```
 
-Token IDs
-
-The brown dog
-
-Vocabulary
-
-Token IDs
-
-The brown dog
-
-Inverse vocabulary
-
-Calling`tokenizer.decode(ids)` on token IDs
-
 ![Fig 2.8](extracted_images/figures/Fig2.8_p050.png)
+
 **Figure 2.8** Tokenizer implementations share two common methods: an encode method and a decode method. The encode method takes in the sample text, splits it into individual tokens, and converts the tokens into token IDs via the vocabulary. The decode method takes in token IDs, converts them back into text tokens, and concatenates the text tokens into natural text.
 
 This outputs:
@@ -1161,28 +749,14 @@ Next, we will test the tokenizer further on text that contains unknown words and
 
 We need to modify the tokenizer to handle unknown words. We also need to address the usage and addition of special context tokens that can enhance a model’s understanding of context or other relevant information in the text. These special tokens can include markers for unknown words and document boundaries, for example. In particular, we will modify the vocabulary and tokenizer, `SimpleTokenizerV2`, to support two new tokens, `<|unk|>` and `<|endoftext|>`, as illustrated in figure 2.9.
 
-Sample text Tokenized sample text
-
-The brown dog
-
-playfully
-
-Existing vocabulary
-
-Token IDs
-
-dog
-
-fox
-
 ![Fig 2.9](extracted_images/figures/Fig2.9_p051.png)
+
 **Figure 2.9** We add special tokens to a vocabulary to deal with certain contexts. For instance, we add an `<|unk|>` token to represent new and unknown words that were not part of the training data and thus not part of the existing vocabulary. Furthermore, we add an `<|endoftext|>` token that we can use to separate two unrelated text sources.
 
 We can modify the tokenizer to use an `<|unk|>` token if it encounters a word that is not part of the vocabulary. Furthermore, we add a token between unrelated texts. For example, when training GPT-like LLMs on multiple independent documents or books, it is common to insert a token before each document or book that follows a previous text source, as illustrated in figure 2.10. This helps the LLM understand that although these text sources are concatenated for training, they are, in fact, unrelated.
 
-Text concatenated from all independent sources
-
 ![Fig 2.10](extracted_images/figures/Fig2.10_p052.png)
+
 **Figure 2.10** When working with multiple independent text source, we add `<|endoftext|>` tokens between these texts. These `<|endoftext|>` tokens act as markers, signaling the start or end of a particular segment, allowing for more effective processing and understanding by the LLM.
 
 Let’s now modify the vocabulary to include these two special tokens, `<unk>` and
@@ -1249,9 +823,7 @@ tokens
 
 Replaces spaces before the specified punctuations
 
-Compared to the `SimpleTokenizerV1` we implemented in listing 2.3, the new `Simple-`
-
-`TokenizerV2` replaces unknown words with `<|unk|>` tokens.
+Compared to the `SimpleTokenizerV1` we implemented in listing 2.3, the new `SimpleTokenizerV2` replaces unknown words with `<|unk|>` tokens.
 
 Let’s now try this new tokenizer out in practice. For this, we will use a simple text sample that we concatenate from two independent and unrelated sentences:
 
@@ -1303,14 +875,9 @@ Depending on the LLM, some researchers also consider additional special tokens s
 
 > `[BOS]` (beginning of sequence)—This token marks the start of a text. It signifies to the LLM where a piece of content begins.
 
-
-> `[EOS]` (end of sequence)—This token is positioned at the end of a text and is especially useful when concatenating multiple unrelated texts, similar to
-
-
-`<|endoftext|>`. For instance, when combining two different Wikipedia articles or books, the `[EOS]` token indicates where one ends and the next begins.
+> `[EOS]` (end of sequence)—This token is positioned at the end of a text and is especially useful when concatenating multiple unrelated texts, similar to `<|endoftext|>`. For instance, when combining two different Wikipedia articles or books, the `[EOS]` token indicates where one ends and the next begins.
 
 > `[PAD]` (padding)—When training LLMs with batch sizes larger than one, the batch might contain texts of varying lengths. To ensure all texts have the same length, the shorter texts are extended or “padded” using the `[PAD]` token, up to the length of the longest text in the batch.
-
 
 The tokenizer used for GPT models does not need any of these tokens; it only uses an
 
@@ -1387,31 +954,23 @@ Second, the BPE tokenizer encodes and decodes unknown words, such as
 
 The algorithm underlying BPE breaks down words that aren’t in its predefined vocabulary into smaller subword units or even individual characters, enabling it to handle out-of-vocabulary words. So, thanks to the BPE algorithm, if the tokenizer encounters an unfamiliar word during tokenization, it can represent it as a sequence of subword tokens or characters, as illustrated in figure 2.11.
 
-Unknown words are tokenized into individual characters or subwords.
-
 ![Fig 2.11](extracted_images/figures/Fig2.11_p056.png)
+
 **Figure 2.11** BPE tokenizers break down unknown words into subwords and individual characters. This way, a BPE tokenizer can parse any word and doesn’t need to replace unknown words with special tokens, such as `<|unk|>`.
 
 Token IDs:
 
 The ability to break down unknown words into individual characters ensures that the tokenizer and, consequently, the LLM that is trained with it can process any text, even if it contains words that were not present in its training data.
 
-A detailed discussion and implementation of BPE is out of the scope of this book, but in short, it builds its vocabulary by iteratively merging frequent characters into sub- words and frequent subwords into words. For example, BPE starts with adding all individual single characters to its vocabulary (“a,” “b,” etc.). In the next stage, it merges character combinations that frequently occur together into subwords. For example, “d” and “e” may be merged into the subword “de,” which is common in many English
-
-words like “define,” “depend,” “made,” and “hidden.” The merges are determined by a frequency cutoff.
+A detailed discussion and implementation of BPE is out of the scope of this book, but in short, it builds its vocabulary by iteratively merging frequent characters into sub- words and frequent subwords into words. For example, BPE starts with adding all individual single characters to its vocabulary (“a,” “b,” etc.). In the next stage, it merges character combinations that frequently occur together into subwords. For example, “d” and “e” may be merged into the subword “de,” which is common in many English words like “define,” “depend,” “made,” and “hidden.” The merges are determined by a frequency cutoff.
 
 <a id="2-6-data-sampling-with-a-sliding-window"></a>
 ### 2.6 Data sampling with a sliding window
 
 The next step in creating the embeddings for the LLM is to generate the input–target pairs required for training an LLM. What do these input–target pairs look like? As we already learned, LLMs are pretrained by predicting the next word in a text, as depicted in figure 2.12.
 
-The LLM can’t access words past the target.
-
-Input the LLM receives
-
-Target to predict
-
 ![Fig 2.12](extracted_images/figures/Fig2.12_p057.png)
+
 **Figure 2.12** Given a text sample, extract input blocks as subsamples that serve as input to the LLM, and the LLM’s prediction task during training is to predict the next word that follows the input block. During training, we mask out all words that are past the target. Note that the text shown in this figure must undergo tokenization before the LLM can process it; however, this figure omits the tokenization step for clarity.
 
 Let’s implement a data loader that fetches the input–target pairs in figure 2.12 from the training dataset using a sliding window approach. To get started, we will tokenize the whole “The Verdict” short story using the BPE tokenizer:
@@ -1481,11 +1040,7 @@ The following outputs show how the input and outputs look in text format:
 
 We’ve now created the input–target pairs that we can use for LLM training.
 
-There’s only one more task before we can turn the tokens into embeddings: implementing an efficient data loader that iterates over the input dataset and returns the
-
-inputs and targets as PyTorch tensors, which can be thought of as multidimensional arrays. In particular, we are interested in returning two tensors: an input tensor containing the text that the LLM sees and a target tensor that includes the targets for the LLM to predict, as depicted in figure 2.13. While the figure shows the tokens in string format for illustration purposes, the code implementation will operate on token IDs directly since the `encode` method of the BPE tokenizer performs both tokenization and conversion into token IDs as a single step.
-
-Sample text
+There’s only one more task before we can turn the tokens into embeddings: implementing an efficient data loader that iterates over the input dataset and returns the inputs and targets as PyTorch tensors, which can be thought of as multidimensional arrays. In particular, we are interested in returning two tensors: an input tensor containing the text that the LLM sees and a target tensor that includes the targets for the LLM to predict, as depicted in figure 2.13. While the figure shows the tokens in string format for illustration purposes, the code implementation will operate on token IDs directly since the `encode` method of the BPE tokenizer performs both tokenization and conversion into token IDs as a single step.
 
 Tensor containing the inputs
 
@@ -1501,6 +1056,7 @@ Tensor containing the targets
 ```
 
 ![Fig 2.13](extracted_images/figures/Fig2.13_p059.png)
+
 **Figure 2.13** To implement efficient data loaders, we collect the inputs in a tensor, `x`, where each row represents one input context. A second tensor, `y`, contains the corresponding prediction targets (next words), which are created by shifting the input by one position.
 
 NOTE For the efficient data loader implementation, we will use PyTorch’s built-in `Dataset` and `DataLoader` classes. For additional information and guidance on installing PyTorch, please see section A.2.1.3 in appendix A.
@@ -1528,9 +1084,7 @@ the book into overlapping
 
 sequences of max_length Returns the total number of rows in the dataset
 
-The `GPTDatasetV1` class is based on the PyTorch `Dataset` class and defines how individual rows are fetched from the dataset, where each row consists of a number of token IDs (based on a `max_length`) assigned to an `input_chunk` tensor. The `target_`
-
-`chunk` tensor contains the corresponding targets. I recommend reading on to see what the data returned from this dataset looks like when we combine the dataset with a PyTorch `DataLoader`—this will bring additional intuition and clarity.
+The `GPTDatasetV1` class is based on the PyTorch `Dataset` class and defines how individual rows are fetched from the dataset, where each row consists of a number of token IDs (based on a `max_length`) assigned to an `input_chunk` tensor. The `targetchunk` tensor contains the corresponding targets. I recommend reading on to see what the data returned from this dataset looks like when we combine the dataset with a PyTorch `DataLoader`—this will bring additional intuition and clarity.
 
 NOTE If you are new to the structure of PyTorch `Dataset` classes, such as shown in listing 2.5, refer to section A.6 in appendix A, which explains the general structure and usage of PyTorch `Dataset` and `DataLoader` classes.
 
@@ -1550,9 +1104,7 @@ drop_last=True drops the last batch if it is shorter than the specified batch_si
 
 The number of CPU processes to use for preprocessing
 
-Let’s test the `dataloader` with a batch size of 1 for an LLM with a context size of 4 to develop an intuition of how the `GPTDatasetV1` class from listing 2.5 and the `create_`
-
-`dataloader_v1` function from listing 2.6 work together:
+Let’s test the `dataloader` with a batch size of 1 for an LLM with a context size of 4 to develop an intuition of how the `GPTDatasetV1` class from listing 2.5 and the `createdataloader_v1` function from listing 2.6 work together:
 
 ```text
 with open("the-verdict.txt", "r", encoding="utf-8") as f:
@@ -1582,27 +1134,8 @@ Exercise 2.2 Data loaders with different strides and context sizes To develop mo
 
 Batch sizes of 1, such as we have sampled from the data loader so far, are useful for illustration purposes. If you have previous experience with deep learning, you may know that small batch sizes require less memory during training but lead to more
 
-Sample text
-
-Inputs of batch 1:
-
-"In the heart of"
-
-Inputs of batch 2:
-
-"the heart of the"
-
-A stride of 4 moves the input ﬁeld by 4 positions
-
-Inputs of batch 1:
-
-"In the heart of"
-
-“the city stood the"
-
-Inputs of batch 2:
-
 ![Fig 2.14](extracted_images/figures/Fig2.14_p062.png)
+
 **Figure 2.14** When creating multiple batches from the input dataset, we slide an input window across the text. If the stride is set to 1, we shift the input window by one position when creating the next batch. If we set the stride equal to the input window size, we can prevent overlaps between the batches.
 
 noisy model updates. Just like in regular deep learning, the batch size is a tradeoff and a hyperparameter to experiment with when training LLMs.
@@ -1653,27 +1186,8 @@ Note that we increase the stride to 4 to utilize the data set fully (we don’t 
 
 The last step in preparing the input text for LLM training is to convert the token IDs into embedding vectors, as shown in figure 2.15. As a preliminary step, we must initialize
 
-Output text
-
-Postprocessing steps
-
-GPT-like decoder-only
-
-transformer
-
-Creating input token embeddings
-
-Token IDs:
-
-This is an example .
-
-Tokenized text:
-
-Input text:
-
-This is an example.
-
 ![Fig 2.15](extracted_images/figures/Fig2.15_p063.png)
+
 **Figure 2.15** Preparation involves tokenizing text, converting text tokens to token IDs, and converting token IDs into embedding vectors. Here, we consider the previously created token
 
 these embedding weights with random values. This initialization serves as the starting point for the LLM’s learning process. In chapter 5, we will optimize the embedding weights as part of the LLM training.
@@ -1757,49 +1271,20 @@ Having now created embedding vectors from token IDs, next we’ll add a small mo
 
 In principle, token embeddings are a suitable input for an LLM. However, a minor shortcoming of LLMs is that their self-attention mechanism (see chapter 3) doesn’t have a notion of position or order for the tokens within a sequence. The way the pre- viously introduced embedding layer works is that the same token ID always gets mapped to the same vector representation, regardless of where the token ID is positioned in the input sequence, as shown in figure 2.17.
 
-Token IDs to embed
-
-Input text
-
-over
-
-dog
-
-Embedded token IDs
-
-Embedding vector of the third token ID
-
 ![Fig 2.16](extracted_images/figures/Fig2.16_p066.png)
+
 **Figure 2.16** Embedding layers perform a lookup operation, retrieving the embedding vector corresponding to the token ID from the embedding layer’s weight matrix. For instance, the embedding vector of the token ID 5 is the sixth row of the embedding layer weight matrix (it is the sixth instead of the fifth row because Python starts counting at 0). We assume that the token IDs were produced by the small vocabulary from section 2.3.
 
-Weight matrix of the embedding layer
-
-Token IDs to embed
-
-over
-
-fox
-
-The same token IDs result in the same embedding vectors
-
 ![Fig 2.17](extracted_images/figures/Fig2.17_p066.png)
+
 **Figure 2.17** The embedding layer converts a token ID into the same vector representation regardless of where it is located in the input sequence. For example, the token ID 5, whether it’s in the first or fourth position in the token ID input vector, will result in the same embedding vector.
 
 In principle, the deterministic, position-independent embedding of the token ID is good for reproducibility purposes. However, since the self-attention mechanism of LLMs itself is also position-agnostic, it is helpful to inject additional position information into the LLM.
 
 To achieve this, we can use two broad categories of position-aware embeddings: relative positional embeddings and absolute positional embeddings. Absolute positional embeddings are directly associated with specific positions in a sequence. For each position in the input sequence, a unique embedding is added to the token’s embedding to convey its exact location. For instance, the first token will have a specific positional embedding, the second token another distinct embedding, and so on, as illustrated in figure 2.18.
 
-Input embeddings:
-
-Positional embeddings:
-
-+ + + +
-
-Token embeddings:
-
-Embedding of the ﬁrst token Embedding of the third token
-
 ![Fig 2.18](extracted_images/figures/Fig2.18_p067.png)
+
 **Figure 2.18** Positional embeddings are added to the token embedding vector to create the input embeddings for an LLM. The positional vectors have the same dimension as the original token embeddings. The token embeddings are shown with value 1 for simplicity.
 
 Instead of focusing on the absolute position of a token, the emphasis of relative positional embeddings is on the relative position or distance between tokens. This means the model learns the relationships in terms of “how far apart” rather than “at which exact position.” The advantage here is that the model can generalize better to sequences of varying lengths, even if it hasn’t seen such lengths during training.
@@ -1866,9 +1351,7 @@ torch.Size([8, 4, 256])
 
 The 8 × 4 × 256–dimensional tensor output shows that each token ID is now embedded as a 256-dimensional vector.
 
-For a GPT model’s absolute embedding approach, we just need to create another embedding layer that has the same embedding dimension as the `token_embedding_`
-
-`layer`:
+For a GPT model’s absolute embedding approach, we just need to create another embedding layer that has the same embedding dimension as the `token_embeddinglayer`:
 
 ```python
 context_length = max_length
@@ -1877,9 +1360,7 @@ pos_embeddings = pos_embedding_layer(torch.arange(context_length))
 print(pos_embeddings.shape)
 ```
 
-The input to the `pos_embeddings` is usually a placeholder vector `torch.arange(con-`
-
-`text_length)`, which contains a sequence of numbers 0, 1, ..., up to the maximum input length –1. The `context_length` is a variable that represents the supported input size of the LLM. Here, we choose it similar to the maximum length of the input text. In practice, input text can be longer than the supported context length, in which case we have to truncate the text.
+The input to the `pos_embeddings` is usually a placeholder vector `torch.arange(context_length)`, which contains a sequence of numbers 0, 1, ..., up to the maximum input length –1. The `context_length` is a variable that represents the supported input size of the LLM. Here, we choose it similar to the maximum length of the input text. In practice, input text can be longer than the supported context length, in which case we have to truncate the text.
 
 The output of the print statement is
 
@@ -1902,71 +1383,36 @@ torch.Size([8, 4, 256])
 
 The `input_embeddings` we created, as summarized in figure 2.19, are the embedded input examples that can now be processed by the main LLM modules, which we will begin implementing in the next chapter.
 
-Output text
-
-Postprocessing steps
-
-GPT-like decoder-only
-
-The input embedding pipeline
-
-transformer
-
-.
-
-This is an example.
-
 ![Fig 2.19](extracted_images/figures/Fig2.19_p070.png)
+
 **Figure 2.19** As part of the input processing pipeline, input text is first broken up into individual tokens. These tokens are then converted into token IDs using a vocabulary. The token IDs are converted into embedding vectors to which positional embeddings of a similar size are added, resulting in input embeddings that are used as input for the main LLM layers.
 
-Summary
+### Summary
 
-> LLMs require textual data to be converted into numerical vectors, known as
-
-
-embeddings, since they can’t process raw text. Embeddings transform discrete data (like words or images) into continuous vector spaces, making them compatible with neural network operations.
+> LLMs require textual data to be converted into numerical vectors, known as embeddings, since they can’t process raw text. Embeddings transform discrete data (like words or images) into continuous vector spaces, making them compatible with neural network operations.
 
 > As the first step, raw text is broken into tokens, which can be words or characters.
 
-
 Then, the tokens are converted into integer representations, termed token IDs.
 
-> Special tokens, such as `<|unk|>` and `<|endoftext|>`, can be added to enhance
+> Special tokens, such as `<|unk|>` and `<|endoftext|>`, can be added to enhance the model’s understanding and handle various contexts, such as unknown words or marking the boundary between unrelated texts.
 
+> The byte pair encoding (BPE) tokenizer used for LLMs like GPT-2 and GPT-3 can efficiently handle unknown words by breaking them down into subword units or individual characters.
 
-the model’s understanding and handle various contexts, such as unknown words or marking the boundary between unrelated texts.
+> We use a sliding window approach on tokenized data to generate input–target pairs for LLM training.
 
-> The byte pair encoding (BPE) tokenizer used for LLMs like GPT-2 and GPT-3
+> Embedding layers in PyTorch function as a lookup operation, retrieving vectors corresponding to token IDs. The resulting embedding vectors provide continuous representations of tokens, which is crucial for training deep learning models like LLMs.
 
+> While token embeddings provide consistent vector representations for each token, they lack a sense of the token’s position in a sequence. To rectify this, two main types of positional embeddings exist: absolute and relative. OpenAI’s GPT models utilize absolute positional embeddings, which are added to the token embedding vectors and are optimized during the model training.
 
-can efficiently handle unknown words by breaking them down into subword units or individual characters.
+## 3 Coding attention mechanisms
 
-> We use a sliding window approach on tokenized data to generate input–target
-
-
-pairs for LLM training.
-
-> Embedding layers in PyTorch function as a lookup operation, retrieving vectors
-
-
-corresponding to token IDs. The resulting embedding vectors provide continuous representations of tokens, which is crucial for training deep learning models like LLMs.
-
-> While token embeddings provide consistent vector representations for each
-
-
-token, they lack a sense of the token’s position in a sequence. To rectify this, two main types of positional embeddings exist: absolute and relative. OpenAI’s GPT models utilize absolute positional embeddings, which are added to the token embedding vectors and are optimized during the model training.
-
-Coding attention
-
-mechanisms
-
-This chapter covers
-
-neural networks
-
-dropout to reduce overfitting
-
-multi-head attention module
+This chapter covers:
+- The reasons for using attention mechanisms in neural networks
+- A basic self-attention framework, progressing to an enhanced self-attention mechanism
+- A causal attention module that allows LLMs to generate one token at a time
+- Masking randomly selected attention weights with dropout to reduce overfitting
+- Stacking multiple causal attention modules into a multi-head attention module
 
 At this point, you know how to prepare the input text for training LLMs by splitting text into individual word and subword tokens, which can be encoded into vector representations, embeddings, for the LLM.
 
@@ -1974,19 +1420,8 @@ Now, we will look at an integral part of the LLM architecture itself, attention 
 
 This chapter implements the attention mechanism, an important building block of GPT-like LLMs
 
-Dataset with class labels
-
-Classiﬁer
-
-Building an LLM
-
-Foundation model
-
-Personal assistant
-
-Instruction dataset
-
 ![Fig 3.1](extracted_images/figures/Fig3.1_p073.png)
+
 **Figure 3.1** The three main stages of coding an LLM. This chapter focuses on step 2 of stage 1: implementing attention mechanisms, which are an integral part of the LLM architecture.
 
 parts of the LLM surrounding the self-attention mechanism to see it in action and to create a model to generate text.
@@ -1995,13 +1430,8 @@ We will implement four different variants of attention mechanisms, as illustrate
 
 A type of self-attention used in LLMs that allows a model to consider only previous and current inputs in a sequence, ensuring temporal order during the text generation
 
-A simpliﬁed self-attention technique to introduce the broader idea
-
-Self-attention with trainable weights that forms the basis of the mechanism used in LLMs
-
-An extension of self-attention and causal attention that enables the model to simultaneously attend to information from different representation subspaces
-
 ![Fig 3.2](extracted_images/figures/Fig3.2_p073.png)
+
 **Figure 3.2** The figure depicts different attention mechanisms we will code in this chapter, starting with a simplified version of self-attention before adding the trainable weights. The causal attention mechanism adds a mask to self-attention that allows the LLM to generate one word at a time. Finally, multi-head attention organizes the attention mechanism into multiple heads, allowing the model to capture various aspects of the input data in parallel.
 
 arrive at a compact and efficient implementation of multi-head attention that we can then plug into the LLM architecture we will code in the next chapter.
@@ -2013,44 +1443,22 @@ Before we dive into the self-attention mechanism at the heart of LLMs, let’s c
 
 German input sentence to translate
 
-The word-by-word translation results in a grammatically incorrect sentence
-
 The correct translation
 
 Certain words in the generated translation require access to words that appear earlier or later in the original sentence.
 
 ![Fig 3.3](extracted_images/figures/Fig3.3_p074.png)
+
 **Figure 3.3** When translating text from one language to another, such as German to English, it’s not possible to merely translate word by word. Instead, the translation process requires contextual understanding and grammatical alignment.
 
 To address this problem, it is common to use a deep neural network with two submodules, an encoder and a decoder. The job of the encoder is to first read in and process the entire text, and the decoder then produces the translated text.
 
-Before the advent of transformers, recurrent neural networks (RNNs) were the most popular encoder–decoder architecture for language translation. An RNN is a type of neural network where outputs from previous steps are fed as inputs to the current
-
-step, making them well-suited for sequential data like text. If you are unfamiliar with RNNs, don’t worry—you don’t need to know the detailed workings of RNNs to follow this discussion; our focus here is more on the general concept of the encoder– decoder setup.
+Before the advent of transformers, recurrent neural networks (RNNs) were the most popular encoder–decoder architecture for language translation. An RNN is a type of neural network where outputs from previous steps are fed as inputs to the current step, making them well-suited for sequential data like text. If you are unfamiliar with RNNs, don’t worry—you don’t need to know the detailed workings of RNNs to follow this discussion; our focus here is more on the general concept of the encoder– decoder setup.
 
 In an encoder–decoder RNN, the input text is fed into the encoder, which processes it sequentially. The encoder updates its hidden state (the internal values at the hidden layers) at each step, trying to capture the entire meaning of the input sentence in the final hidden state, as illustrated in figure 3.4. The decoder then takes this final hidden state to start generating the translated sentence, one word at a time. It also updates its hidden state at each step, which is supposed to carry the context necessary for the next-word prediction.
 
-The translated English sentence
-
-Decoder
-
-you Can help
-
-Outputs
-
-Hidden states
-
-Encoder
-
-A memory cell (hidden state) memorizing entire input
-
-Inputs
-
-du Kannst mir
-
-German input sentence to translate
-
 ![Fig 3.4](extracted_images/figures/Fig3.4_p075.png)
+
 **Figure 3.4** Before the advent of transformer models, encoder–decoder RNNs were a popular choice for machine translation. The encoder takes a sequence of tokens from the source language as input, where a hidden state (an intermediate neural network layer) of the encoder encodes a compressed representation of the entire input sequence. Then, the decoder uses its current hidden state to begin the translation, token by token.
 
 While we don’t need to know the inner workings of these encoder–decoder RNNs, the key idea here is that the encoder part processes the entire input text into a hidden state (memory cell). The decoder then takes in this hidden state to produce the output. You can think of this hidden state as an embedding vector, a concept we discussed in chapter 2.
@@ -2059,55 +1467,29 @@ The big limitation of encoder–decoder RNNs is that the RNN can’t directly ac
 
 Fortunately, it is not essential to understand RNNs to build an LLM. Just remember that encoder–decoder RNNs had a shortcoming that motivated the design of attention mechanisms.
 
-3.2 Capturing data dependencies with attention mechanisms
+### 3.2 Capturing data dependencies with attention mechanisms
 
 Although RNNs work fine for translating short sentences, they don’t work well for longer texts as they don’t have direct access to previous words in the input. One major shortcoming in this approach is that the RNN must remember the entire encoded input in a single hidden state before passing it to the decoder (figure 3.4).
 
 Hence, researchers developed the Bahdanau attention mechanism for RNNs in 2014 (named after the first author of the respective paper; for more information, see appendix B), which modifies the encoder–decoder RNN such that the decoder can selectively access different parts of the input sequence at each decoding step as illustrated in figure 3.5.
 
-We are focusing on generating the second output token.
-
-you Can help
-
-Outputs
-
-Hidden states
-
-When generating an output token, the model has a way to access to all input tokens.
-
-Inputs
-
-du Kannst mir
-
-The dotted line width is proportional to how important the input token is for the respective output token.
-
 ![Fig 3.5](extracted_images/figures/Fig3.5_p076.png)
+
 **Figure 3.5** Using an attention mechanism, the text-generating decoder part of the network can access all input tokens selectively. This means that some input tokens are more important than others for generating a given output token. The importance is determined by the attention weights, which we will compute later. Note that this figure shows the general idea behind attention and does not depict the exact implementation of the Bahdanau mechanism, which is an RNN method outside this book’s scope.
 
-Interestingly, only three years later, researchers found that RNN architectures are not required for building deep neural networks for natural language processing and
-
-proposed the original transformer architecture (discussed in chapter 1) including a self-attention mechanism inspired by the Bahdanau attention mechanism.
+Interestingly, only three years later, researchers found that RNN architectures are not required for building deep neural networks for natural language processing and proposed the original transformer architecture (discussed in chapter 1) including a self-attention mechanism inspired by the Bahdanau attention mechanism.
 
 Self-attention is a mechanism that allows each position in the input sequence to consider the relevancy of, or “attend to,” all other positions in the same sequence when computing the representation of a sequence. Self-attention is a key component of contemporary LLMs based on the transformer architecture, such as the GPT series.
 
 This chapter focuses on coding and understanding this self-attention mechanism used in GPT-like models, as illustrated in figure 3.6. In the next chapter, we will code the remaining parts of the LLM.
 
-Output text
-
 The remaining parts of the LLM architecture are the topic of the next chapter
 
-Postprocessing steps
-
-Self-attention module
-
-Preprocessing steps
-
-Input text
-
 ![Fig 3.6](extracted_images/figures/Fig3.6_p077.png)
+
 **Figure 3.6** Self-attention is a mechanism in transformers used to compute more efficient input representations by allowing each position in a sequence to interact with and weigh the importance of all other positions within the same sequence. In this chapter, we will code this self-attention mechanism from the ground up before we code the remaining parts of the GPT-like LLM in the following chapter.
 
-3.3 Attending to different parts of the input with self-attention
+### 3.3 Attending to different parts of the input with self-attention
 
 We’ll now cover the inner workings of the self-attention mechanism and learn how to code it from the ground up. Self-attention serves as the cornerstone of every LLM based on the transformer architecture. This topic may require a lot of focus and attention (no pun intended), but once you grasp its fundamentals, you will have conquered one of the toughest aspects of this book and LLM implementation in general.
 
@@ -2117,23 +1499,21 @@ This is in contrast to traditional attention mechanisms, where the focus is on t
 
 Since self-attention can appear complex, especially if you are encountering it for the first time, we will begin by examining a simplified version of it. Then we will implement the self-attention mechanism with trainable weights used in LLMs.
 
-3.3.1 A simple self-attention mechanism without trainable weights
+#### 3.3.1 A simple self-attention mechanism without trainable weights
 
 Let’s begin by implementing a simplified variant of self-attention, free from any trainable weights, as summarized in figure 3.7. The goal is to illustrate a few key concepts in self-attention before adding trainable weights.
 
-The context vector z(2) is computed as a combination of all input vectors weighted with respect to input element x(2)
-
 ![Fig 3.7](extracted_images/figures/Fig3.7_p078.png)
+
 **Figure 3.7** The goal of self-attention is to compute a context vector for each input element that combines information from all other input elements. In this example, we compute the context vector z(2). The importance or contribution of each input element for computing z(2) is determined by the attention weights α21 to α2T. When computing z(2), the attention weights are calculated with respect to input element x(2) and all other inputs.
 
 ![Fig 3.7](extracted_images/figures/Fig3.7_p078.png)
+
 Figure 3.7 shows an input sequence, denoted as x, consisting of T elements represented as x(1) to x(T). This sequence typically represents text, such as a sentence, that has already been transformed into token embeddings.
 
 For example, consider an input text like “Your journey starts with one step.” In this case, each element of the sequence, such as x(1), corresponds to a d-dimensional embedding vector representing a specific token, like “Your.” Figure 3.7 shows these input vectors as three-dimensional embeddings.
 
-In self-attention, our goal is to calculate context vectors z(i) for each element x(i)
-
-in the input sequence. A context vector can be interpreted as an enriched embedding vector.
+In self-attention, our goal is to calculate context vectors z(i) for each element x(i) in the input sequence. A context vector can be interpreted as an enriched embedding vector.
 
 To illustrate this concept, let’s focus on the embedding vector of the second input element, x(2) (which corresponds to the token “journey”), and the corresponding context vector, z(2), shown at the bottom of figure 3.7. This enhanced context vector, z(2), is an embedding that contains information about x(2) and all other input elements, x(1) to x(T).
 
@@ -2157,12 +1537,12 @@ The first step of implementing self-attention is to compute the intermediate val
 
 The embedded query token is one of the embedded input tokens (here, the query is the second token).
 
-Attention score between input and query x(1) x(2) Attention score between input and query x(3) x(2)
-
 ![Fig 3.8](extracted_images/figures/Fig3.8_p080.png)
+
 **Figure 3.8** The overall goal is to illustrate the computation of the context vector z(2) using the second input element, x(2) as a query. This figure shows the first intermediate step, computing the attention scores ω between the query x(2) and all other input elements as a dot product. (Note that the numbers are truncated to one digit after the decimal point to reduce visual clutter.)
 
 ![Fig 3.8](extracted_images/figures/Fig3.8_p080.png)
+
 Figure 3.8 illustrates how we calculate the intermediate attention scores between the query token and each input token. We determine these scores by computing the dot product of the query, x(2), with every other input token:
 
 ```python
@@ -2191,13 +1571,8 @@ print("Attention weights:", attn_weights_2_tmp)
 print("Sum:", attn_weights_2_tmp.sum())
 ```
 
-We computed these attention scores in the previous step.
-
-We now normalize the attention scores to obtain ω the attention weights α
-
-Attention weights:
-
 ![Fig 3.9](extracted_images/figures/Fig3.9_p081.png)
+
 **Figure 3.9** After computing the attention scores ω21 to ω2T with respect to the input query x(2), the next step is to obtain the attention weights α21 to α2T by normalizing the attention scores.
 
 As the output shows, the attention weights now sum to 1:
@@ -2207,9 +1582,7 @@ Attention weights: tensor([0.1455, 0.2278, 0.2249, 0.1285, 0.1077, 0.1656])
 Sum: tensor(1.0000)
 ```
 
-In practice, it’s more common and advisable to use the softmax function for normalization. This approach is better at managing extreme values and offers more favorable
-
-gradient properties during training. The following is a basic implementation of the softmax function for normalizing the attention scores:
+In practice, it’s more common and advisable to use the softmax function for normalization. This approach is better at managing extreme values and offers more favorable gradient properties during training. The following is a basic implementation of the softmax function for normalizing the attention scores:
 
 ```python
 def softmax_naive(x):
@@ -2259,29 +1632,17 @@ tensor([0.4419, 0.6515, 0.5683])
 This is the second context vector because the attention weights were computed with respect to the second input vector in the previous steps.
 
 ![Fig 3.10](extracted_images/figures/Fig3.10_p083.png)
+
 **Figure 3.10** The final step, after calculating and normalizing the attention scores to obtain the attention weights for query x(2), is to compute the context vector z(2). This context vector is a combination of all input vectors x(1) to x(T) weighted by the attention weights.
 
 Next, we will generalize this procedure for computing context vectors to calculate all context vectors simultaneously.
 
-3.3.2 Computing attention weights for all input tokens
+#### 3.3.2 Computing attention weights for all input tokens
 
 So far, we have computed attention weights and the context vector for input 2, as shown in the highlighted row in figure 3.11. Now let’s extend this computation to calculate attention weights and context vectors for all inputs.
 
-journey
-
-starts
-
-Your
-
-step
-
-with
-
-one
-
-This row contains the attention weights (normalized attention scores) computed previously
-
 ![Fig 3.11](extracted_images/figures/Fig3.11_p083.png)
+
 **Figure 3.11** The highlighted row shows the attention weights for the second input element as a query. Now we will generalize the computation to obtain all other attention weights. (Please note that the numbers in this figure are truncated to two digits after the decimal point to reduce visual clutter. The values in each row should add up to 1.0 or 100%.)
 
 We follow the same three steps as before (see figure 3.12), except that we make a few modifications in the code to compute all context vectors instead of only the second one, z(2):
@@ -2294,13 +1655,8 @@ for i, x_i in enumerate(inputs):
 print(attn_scores)
 ```
 
-Compute the attention scores as dot products between the inputs.
-
-The attention weights are a normalized version of the attention scores.
-
-The context vectors are computed as a weighted sum over the inputs.
-
 ![Fig 3.12](extracted_images/figures/Fig3.12_p084.png)
+
 **Figure 3.12** In step 1, we add an additional `for` loop to compute the dot products for all pairs of inputs.
 
 The resulting attention scores are as follows:
@@ -2411,15 +1767,8 @@ We already implemented a simpliﬁed attention mechanism.
 
 We will now extend the self-attention mechanism with trainable weights.
 
-Dataset with class labels
-
-Classiﬁer
-
-Personal assistant
-
-Instruction dataset
-
 ![Fig 3.13](extracted_images/figures/Fig3.13_p086.png)
+
 **Figure 3.13** Previously, we coded a simplified attention mechanism to understand the basic mechanism behind attention mechanisms. Now, we add trainable weights to this attention mechanism. Later, we will extend this
 
 As illustrated in figure 3.13, the self-attention mechanism with trainable weights builds on the previous concepts: we want to compute context vectors as weighted sums over the input vectors specific to a certain input element. As you will see, there are only slight differences compared to the basic self-attention mechanism we coded earlier.
@@ -2428,13 +1777,12 @@ The most notable difference is the introduction of weight matrices that are upda
 
 We will tackle this self-attention mechanism in the two subsections. First, we will code it step by step as before. Second, we will organize the code into a compact Python class that can be imported into the LLM architecture.
 
-3.4.1 Computing the attention weights step by step
+#### 3.4.1 Computing the attention weights step by step
 
 We will implement the self-attention mechanism step by step by introducing the three trainable weight matrices Wq, Wk, and Wv. These three matrices are used to project the embedded input tokens, x(i), into query, key, and value vectors, respectively, as illustrated in figure 3.14.
 
-key value
-
 ![Fig 3.14](extracted_images/figures/Fig3.14_p087.png)
+
 **Figure 3.14** In the first step of the self-attention mechanism with trainable weight matrices, we compute query (q), key (k), and value (v) vectors for input elements x. Similar to previous sections, we designate the second input, x(2), as the query input. The query vector q(2) is obtained via matrix multiplication between the input x(2) and the weight matrix Wq. Similarly, we obtain the key and value vectors via matrix multiplication involving the weight matrices Wk and Wv.
 
 Earlier, we defined the second input element x(2) as the query when we computed the simplified attention weights to compute the context vector z(2). Then we generalized this to compute all context vectors z(1) ... z(T) for the six-word input sentence “Your journey starts with one step.”
@@ -2495,15 +1843,12 @@ values.shape: torch.Size([6, 2])
 
 The second step is to compute the attention scores, as shown in figure 3.15.
 
-key value
-
-query
-
 The unscaled attention score is computed as a dot product between the query and the key vectors.
 
 Since we want to compute the context vector for the second input token, the query is derived from that second input token.
 
 ![Fig 3.15](extracted_images/figures/Fig3.15_p089.png)
+
 **Figure 3.15** The attention score computation is a dot-product computation similar to what we used in the simplified self-attention mechanism in section 3.3. The new aspect here is that we are not directly computing the dot-product between the input elements but using the query and key obtained by transforming the inputs via the respective weight matrices.
 
 First, let’s compute the attention score ω22:
@@ -2532,19 +1877,8 @@ attn_weights_2 = torch.softmax(attn_scores_2 / d_k**0.5, dim=-1)
 print(attn_weights_2)
 ```
 
-key value
-
-query q(2)
-
-q(2)
-
-0.1 0.2 0.1 The unscaled attention score from the previous step.
-
-Attention weight
-
-The attention weights are computed using the softmax function.
-
 ![Fig 3.16](extracted_images/figures/Fig3.16_p090.png)
+
 **Figure 3.16** After computing the attention scores ω, the next step is to normalize these scores using the softmax function to obtain the attention weights α.
 
 The resulting attention weights are
@@ -2559,24 +1893,13 @@ The scaling by the square root of the embedding dimension is the reason why this
 
 Now, the final step is to compute the context vectors, as illustrated in figure 3.17.
 
-0 3 . 0 7 . 0 1 . 0 8 . 0 4 . 1 1 . 0 3 . 1 0 . 0 3 . 0 9 . 0 3 . 0 7 . 0 4 . 1 4 .
-
-0 4 . 1 4 . 0 4 . 1 4 .
-
-query
-
 1 2 . 1 8 . 1 5 .
 
-T
-
-The last step is multiplying each value vector with its respective attention weight and then summing them to obtain the context vector
-
 ![Fig 3.17](extracted_images/figures/Fig3.17_p091.png)
+
 **Figure 3.17** In the final step of the self-attention computation, we compute the context vector by combining all value vectors via the attention weights.
 
-Similar to when we computed the context vector as a weighted sum over the input vectors (see section 3.3), we now compute the context vector as a weighted sum over the value vectors. Here, the attention weights serve as a weighting factor that weighs
-
-the respective importance of each value vector. Also as before, we can use matrix multiplication to obtain the output in one step:
+Similar to when we computed the context vector as a weighted sum over the input vectors (see section 3.3), we now compute the context vector as a weighted sum over the value vectors. Here, the attention weights serve as a weighting factor that weighs the respective importance of each value vector. Also as before, we can use matrix multiplication to obtain the output in one step:
 
 ```python
 context_vec_2 = attn_weights_2 @ values
@@ -2599,7 +1922,7 @@ The key is like a database key used for indexing and searching. In the attention
 
 The value in this context is similar to the value in a key-value pair in a database. It represents the actual content or representation of the input items. Once the model determines which keys (and thus which parts of the input) are most relevant to the query (the current focus item), it retrieves the corresponding values.
 
-3.4.2 Implementing a compact self-attention Python class
+#### 3.4.2 Implementing a compact self-attention Python class
 
 At this point, we have gone through a lot of steps to compute the self-attention outputs. We did so mainly for illustration purposes so we could go through one step at a time. In practice, with the LLM implementation in the next chapter in mind, it is helpful to organize this code into a Python class, as shown in the following listing.
 
@@ -2657,55 +1980,10 @@ Self-attention involves the trainable weight matrices Wq, Wk, and Wv. These matr
 
 We can improve the `SelfAttention_v1` implementation further by utilizing PyTorch’s `nn.Linear` layers, which effectively perform matrix multiplication when the bias units are disabled. Additionally, a significant advantage of using `nn.Linear`
 
-Weight
-
-Weight
-
-Weight
-
-matrix
-
-matrix
-
-matrix
-
-Inputs
-
-Queries Keys Values
-
-journey
-
 We multiply the inputs X with weight matrix Wv to get the value matrix V.
 
-starts
-
-Your
-
-step
-
-with
-
-one
-
-Your
-
-Context vector corresponding to the second input token
-
-journey
-
-starts
-
-Context
-
-with
-
-vectors
-
-one
-
-step
-
 ![Fig 3.18](extracted_images/figures/Fig3.18_p094.png)
+
 **Figure 3.18** In self-attention, we transform the input vectors in the input matrix X with the three weight matrices, Wq, Wk, and Wv. The new compute the attention weight matrix based on the resulting queries (Q) and keys (K). Using the attention weights and values (V), we then compute the context vectors (Z). For visual clarity, we focus on a single input text with n tokens, not a batch of multiple inputs. Consequently, the three-dimensional input tensor is simplified to a two-dimensional matrix in this context. This approach allows for a more straightforward visualization and understanding of the processes involved. For consistency with later figures, the values in the attention matrix do not depict the real attention weights. (The numbers in this figure are truncated to two digits after the decimal point to reduce visual clutter. The values in each row should add up to 1.0 or 100%.)
 
 instead of manually implementing `nn.Parameter(torch.rand(...))` is that `nn.Linear` has an optimized weight initialization scheme, contributing to more stable and effective model training.
@@ -2767,80 +2045,18 @@ For many LLM tasks, you will want the self-attention mechanism to consider only 
 
 Now, we will modify the standard self-attention mechanism to create a causal attention mechanism, which is essential for developing an LLM in the subsequent chapters. To achieve this in GPT-like LLMs, for each token processed, we mask out the future tokens, which come after the current token in the input text, as illustrated in figure 3.19. We mask out the attention weights above the diagonal, and we
 
-journey
-
-journey
-
-starts
-
-starts
-
-Your
-
-Your
-
-step
-
-step
-
-with
-
-with
-
-one
-
-one
-
-Masked out future tokens for the “Your” token
-
-Your
-
-Your
-
-journey
-
-journey
-
-starts
-
-starts
-
-with
-
-with
-
-one
-
-one
-
-step
-
-step
-
-Attention weight for input tokens corresponding to “step” and “Your”
-
 ![Fig 3.19](extracted_images/figures/Fig3.19_p096.png)
+
 **Figure 3.19** In causal attention, we mask out the attention weights above the diagonal such that for a given input, the LLM can’t access future tokens when computing the context vectors using the attention weights. For example, for the word “journey” in the second row, we only keep the attention
 
 normalize the nonmasked attention weights such that the attention weights sum to 1 in each row. Later, we will implement this masking and normalization procedure in code.
 
-3.5.1 Applying a causal attention mask
+#### 3.5.1 Applying a causal attention mask
 
 Our next step is to implement the causal attention mask in code. To implement the steps to apply a causal attention mask to obtain the masked attention weights, as summarized in figure 3.20, let’s work with the attention scores and weights from the previous section to code the causal attention mechanism.
 
-1) Apply softmax
-
-2) Mask with 0’s above diagonal
-
-Attention scores
-
-Attention weights
-
-Masked attention scores
-
-Masked attention weights
-
 ![Fig 3.20](extracted_images/figures/Fig3.20_p097.png)
+
 **Figure 3.20** One way to obtain the masked attention weight matrix in causal attention is to apply the softmax function to the attention scores, zeroing out the elements above the diagonal and normalizing the resulting matrix.
 
 In the first step, we compute the attention weights using the softmax function as we have done previously:
@@ -2925,15 +2141,8 @@ In simpler terms, after masking and renormalization, the distribution of attenti
 
 While we could wrap up our implementation of causal attention at this point, we can still improve it. Let’s take a mathematical property of the softmax function and implement the computation of the masked attention weights more efficiently in fewer steps, as shown in figure 3.21.
 
-1) Mask with −∞ above diagonal
-
-Attention scores
-
-Masked attention scores
-
-Masked attention weights
-
 ![Fig 3.21](extracted_images/figures/Fig3.21_p099.png)
+
 **Figure 3.21** A more efficient way to obtain the masked attention weight matrix in causal attention is to mask the attention scores with negative infinity values before applying the softmax function.
 
 The softmax function converts its inputs into a probability distribution. When negative infinity values (`-`∞) are present in a row, the softmax function treats them as zero probability. (Mathematically, this is because e –∞ approaches 0.)
@@ -2981,7 +2190,7 @@ We could now use the modified attention weights to compute the context vectors v
 
 `context_vec` `=` `attn_weights` `@` `values`, as in section 3.4. However, we will first cover another minor tweak to the causal attention mechanism that is useful for reducing overfitting when training LLMs.
 
-3.5.2 Masking additional attention weights with dropout
+#### 3.5.2 Masking additional attention weights with dropout
 
 Dropout in deep learning is a technique where randomly selected hidden layer units are ignored during training, effectively “dropping” them out. This method helps pre- vent overfitting by ensuring that a model does not become overly reliant on any specific set of hidden layer units. It’s important to emphasize that dropout is only used during training and is disabled afterward.
 
@@ -2993,61 +2202,8 @@ We choose a dropout rate of 50%.
 
 Here, we create a matrix of 1s.
 
-journey
-
-starts
-
-Your
-
-step
-
-with
-
-one
-
-Your
-
-journey
-
-starts
-
-with
-
-one
-
-step
-
-Dropout mask with random positions to be dropped
-
-Attention weight for input tokens corresponding to “step” and “Your”
-
-journey
-
-starts
-
-Your
-
-step
-
-with
-
-one
-
-Your
-
-journey
-
-starts
-
-with
-
-The dropout mask applied to the attention scores will zero out certain attention scores
-
-one
-
-step
-
 ![Fig 3.22](extracted_images/figures/Fig3.22_p101.png)
+
 **Figure 3.22** Using the causal attention mask (upper left), we apply an additional dropout mask (upper right) to zero out additional attention weights to reduce overfitting during training.
 
 As we can see, approximately half of the values are zeroed out:
@@ -3061,9 +2217,7 @@ tensor([[2., 2., 0., 2., 2., 0.],
         [0., 2., 2., 2., 2., 0.]])
 ```
 
-When applying dropout to an attention weight matrix with a rate of 50%, half of the elements in the matrix are randomly set to zero. To compensate for the reduction in active elements, the values of the remaining elements in the matrix are scaled up by a factor of 1/0.5 = 2. This scaling is crucial to maintain the overall balance of the atten-
-
-tion weights, ensuring that the average influence of the attention mechanism remains consistent during both the training and inference phases.
+When applying dropout to an attention weight matrix with a rate of 50%, half of the elements in the matrix are randomly set to zero. To compensate for the reduction in active elements, the values of the remaining elements in the matrix are scaled up by a factor of 1/0.5 = 2. This scaling is crucial to maintain the overall balance of the atten- tion weights, ensuring that the average influence of the attention mechanism remains consistent during both the training and inference phases.
 
 Now let’s apply dropout to the attention weight matrix itself:
 
@@ -3088,7 +2242,7 @@ Note that the resulting dropout outputs may look different depending on your ope
 
 Having gained an understanding of causal attention and dropout masking, we can now develop a concise Python class. This class is designed to facilitate the efficient application of these two techniques.
 
-3.5.3 Implementing a compact causal attention class
+#### 3.5.3 Implementing a compact causal attention class
 
 We will now incorporate the causal attention and dropout modifications into the
 
@@ -3127,9 +2281,7 @@ memory copies.
         return context_vec
 ```
 
-While all added code lines should be familiar at this point, we now added a `self`
-
-`.register_buffer()` call in the `__init__` method. The use of `register_buffer` in PyTorch is not strictly necessary for all use cases but offers several advantages here. For instance, when we use the `CausalAttention` class in our LLM, buffers are automatically moved to the appropriate device (CPU or GPU) along with our model, which will be relevant when training our LLM. This means we don’t need to manually ensure these tensors are on the same device as your model parameters, avoiding device mismatch errors.
+While all added code lines should be familiar at this point, we now added a `self` `.register_buffer()` call in the `__init__` method. The use of `register_buffer` in PyTorch is not strictly necessary for all use cases but offers several advantages here. For instance, when we use the `CausalAttention` class in our LLM, buffers are automatically moved to the appropriate device (CPU or GPU) along with our model, which will be relevant when training our LLM. This means we don’t need to manually ensure these tensors are on the same device as your model parameters, avoiding device mismatch errors.
 
 We can use the `CausalAttention` class as follows, similar to `SelfAttention` previously:
 
@@ -3148,6 +2300,7 @@ context_vecs.shape: torch.Size([2, 6, 2])
 ```
 
 ![Fig 3.23](extracted_images/figures/Fig3.23_p104.png)
+
 Figure 3.23 summarizes what we have accomplished so far. We have focused on the concept and implementation of causal attention in neural networks. Next, we will expand on this concept and implement a multi-head attention module that implements several causal attention mechanisms in parallel.
 
 In the previous section, we implemented a self-attention mechanism with trainable weights.
@@ -3157,64 +2310,32 @@ In this section, we extended the self-attention mechanism with a causal mask and
 In the next section, we extend causal attention to multi-head attention.
 
 ![Fig 3.23](extracted_images/figures/Fig3.23_p104.png)
+
 **Figure 3.23** Here’s what we’ve done so far. We began with a simplified attention mechanism, added trainable weights, and then added a causal attention mask. Next, we will extend the causal attention mechanism and code multi-head attention, which we will use in our LLM.
 
-3.6 Extending single-head attention to multi-head attention
+<a id="3-6-extending-single-head-attention-to-multi-head"></a>
+### 3.6 Extending single-head attention to multi-head attention
 
 Our final step will be to extend the previously implemented causal attention class over multiple heads. This is also called multi-head attention.
 
 The term “multi-head” refers to dividing the attention mechanism into multiple “heads,” each operating independently. In this context, a single causal attention module can be considered single-head attention, where there is only one set of attention weights processing the input sequentially.
 
-We will tackle this expansion from causal attention to multi-head attention. First, we will intuitively build a multi-head attention module by stacking multiple `Causal-`
+We will tackle this expansion from causal attention to multi-head attention. First, we will intuitively build a multi-head attention module by stacking multiple `CausalAttention` modules. Then we will then implement the same multi-head attention module in a more complicated but more computationally efficient way.
 
-`Attention` modules. Then we will then implement the same multi-head attention module in a more complicated but more computationally efficient way.
-
-3.6.1 Stacking multiple single-head attention layers
+#### 3.6.1 Stacking multiple single-head attention layers
 
 In practical terms, implementing multi-head attention involves creating multiple instances of the self-attention mechanism (see figure 3.18), each with its own weights, and then combining their outputs. Using multiple instances of the self-attention mechanism can be computationally intensive, but it’s crucial for the kind of complex pattern recognition that models like transformer-based LLMs are known for.
 
 ![Fig 3.24](extracted_images/figures/Fig3.24_p105.png)
+
 Figure 3.24 illustrates the structure of a multi-head attention module, which consists of multiple single-head attention modules, as previously depicted in figure 3.18, stacked on top of each other.
 
 The embedded input tokens remain unchanged.
 
-Weight
-
-Weight
-
-Weight
-
-matrix
-
-matrix
-
-matrix
-
-Instead of one value weight matrix Wv in single-head attention, use two matrices Wv1 and . Wv2
-
-Inputs
-
-The values of the 5th row (input) are shown as an example.
-
-Queries Keys Values
-
-Instead of one query matrix , we Q have two query matrices Q1and . Q2
-
-We now have two sets of context vectors, Z1and . Z2
-
-Context
-
-vectors
-
-Combined
-
 For multi-head attention with two heads, we obtain two attention weight matrices, including causal and dropout masks.
 
-context vectors Z
-
-The context vector in Z2 corresponding to the ﬁfth input that was highlighted in the inputs . X
-
 ![Fig 3.24](extracted_images/figures/Fig3.24_p105.png)
+
 **Figure 3.24** The multi-head attention module includes two single-head attention modules stacked on top of each other. So, instead of using a single matrix Wv for computing the value matrices, in a multi-head attention module with two heads, we now have two value weight matrices: Wv1 and Wv2. The same applies to the other weight matrices, WQ and Wk. We obtain two sets of context vectors Z1 and Z2 that we can combine into a single context vector matrix Z.
 
 As mentioned before, the main idea behind multi-head attention is to run the attention mechanism multiple times (in parallel) with different, learned linear projections—the results of multiplying the input data (like the query, key, and value vectors in attention mechanisms) by a weight matrix. In code, we can achieve this by implementing a simple `MultiHeadAttentionWrapper` class that stacks multiple instances of our previously implemented `CausalAttention` module.
@@ -3239,34 +2360,15 @@ For example, if we use this `MultiHeadAttentionWrapper` class with two attention
 
 Concatenated context vector
 
-Context
-
-vector matrices
-
 matrices
-
-Z1
-
-Inputs
-
-Multi-head attention
-
-Z
-
-X
-
-Two attention heads produces a tensor stacking two matrices that represent the context vectors.
-
-Z2
 
 Choosing an embedding dimension of 2 (d_out = 2) for the context vectors results in a ﬁnal embedding dimension of 4 (d_out × num_heads).
 
 ![Fig 3.25](extracted_images/figures/Fig3.25_p106.png)
+
 **Figure 3.25** Using the `MultiHeadAttentionWrapper`, we specified the number of attention heads (`num_heads`). If we set `num_heads=2`, as in this example, we obtain a tensor with two sets of context vector matrices. In each context vector matrix, the rows represent the context vectors corresponding to the tokens, and the columns correspond to the embedding dimension specified via `d_out=4`. We concatenate these context vector matrices along the column dimension. Since we have two attention heads and an embedding dimension of 2, the final embedding dimension is 2 × 2 = 4.
 
-To illustrate this further with a concrete example, we can use the `MultiHeadAttention-`
-
-`Wrapper` class similar to the `CausalAttention` class before:
+To illustrate this further with a concrete example, we can use the `MultiHeadAttentionWrapper` class similar to the `CausalAttention` class before:
 
 ```python
 torch.manual_seed(123)
@@ -3309,15 +2411,13 @@ Up to this point, we have implemented a `MultiHeadAttentionWrapper` that combine
 
 `[head(x)` `for` `head` `in` `self.heads]` in the forward method. We can improve this implementation by processing the heads in parallel. One way to achieve this is by computing the outputs for all attention heads simultaneously via matrix multiplication.
 
-3.6.2 Implementing multi-head attention with weight splits
+#### 3.6.2 Implementing multi-head attention with weight splits
 
 So far, we have created a `MultiHeadAttentionWrapper` to implement multi-head attention by stacking multiple single-head attention modules. This was done by instantiating and combining several `CausalAttention` objects.
 
 Instead of maintaining two separate classes, `MultiHeadAttentionWrapper` and
 
-`CausalAttention`, we can combine these concepts into a single `MultiHeadAttention` class. Also, in addition to merging the `MultiHeadAttentionWrapper` with the `Causal-`
-
-`Attention` code, we will make some other modifications to implement multi-head attention more efficiently.
+`CausalAttention`, we can combine these concepts into a single `MultiHeadAttention` class. Also, in addition to merging the `MultiHeadAttentionWrapper` with the `CausalAttention` code, we will make some other modifications to implement multi-head attention more efficiently.
 
 In the `MultiHeadAttentionWrapper`, multiple heads are implemented by creating a list of `CausalAttention` objects (`self.heads`), each representing a separate attention head. The `CausalAttention` class independently performs the attention mechanism, and the results from each head are concatenated. In contrast, the following
 
@@ -3356,13 +2456,7 @@ we unroll the
 
 last dim: (b, num_tokens, d_out) -> (b,
 
-Transposes from shape (b, num_tokens, num_heads, head_dim) to (b, num_heads, num_tokens, head_dim)
-
-num_tokens,
-
-num_heads,
-
-head_dim).
+Transposes from shape (b, num_tokens, num_heads, head_dim) to (b, num_heads, num_tokens, head_dim) num_tokens, num_heads, head_dim).
 
 Masks truncated to the number of tokens
 
@@ -3376,11 +2470,7 @@ Combines heads, where self.d_out = self.num_heads * self.head_dim
 
 Adds an optional linear projection
 
-Even though the reshaping (`.view`) and transposing (`.transpose`) of tensors inside the `MultiHeadAttention` class looks very mathematically complicated, the `Multi-`
-
-`HeadAttention` class implements the same concept as the `MultiHeadAttention-`
-
-`Wrapper` earlier.
+Even though the reshaping (`.view`) and transposing (`.transpose`) of tensors inside the `MultiHeadAttention` class looks very mathematically complicated, the `MultiHeadAttention` class implements the same concept as the `MultiHeadAttentionWrapper` earlier.
 
 On a big-picture level, in the previous `MultiHeadAttentionWrapper`, we stacked multiple single-head attention layers that we combined into a multi-head attention layer. The `MultiHeadAttention` class takes an integrated approach. It starts with a multi-head layer and then internally splits this layer into individual attention heads, as illustrated in figure 3.26.
 
@@ -3390,36 +2480,15 @@ The key operation is to split the `d_out` dimension into `num_heads` and `head_d
 
 `(b,` `num_tokens,` `num_heads,` `head_dim)`.
 
-Weight
-
-Queries
-
-matrix
-
-Inputs X
-
-Weight
-
-matrix
-
-Queries
-
-Perform two matrix multiplications to obtain the two query matrices, Q1and . Q2
-
-Inputs Queries Queries Weight
-
-matrix Queries
-
-Then split queries into Q Q1and . Q2
+Perform two matrix multiplications to obtain the two query matrices, Q1and . Q2 matrix Queries
 
 Obtain queries with only one Q matrix multiplication.
 
 ![Fig 3.26](extracted_images/figures/Fig3.26_p110.png)
+
 **Figure 3.26** In the `MultiHeadAttentionWrapper` class with two attention heads, we initialized two weight matrices, Wq1 and Wq2, and computed two query matrices, Q1 and Q2 (top). In the `MultiheadAttention` class, we initialize one larger weight matrix Wq, only perform one matrix multiplication with the inputs to obtain a query matrix Q, and then split the query matrix into Q1 and Q2 (bottom). We do the same for the keys and values, which are not shown to reduce visual clutter.
 
-The tensors are then transposed to bring the `num_heads` dimension before the `num_`
-
-`tokens` dimension, resulting in a shape of `(b,` `num_heads,` `num_tokens,` `head_dim)`. This transposition is crucial for correctly aligning the queries, keys, and values across the different heads and performing batched matrix multiplications efficiently.
+The tensors are then transposed to bring the `num_heads` dimension before the `numtokens` dimension, resulting in a shape of `(b,` `num_heads,` `num_tokens,` `head_dim)`. This transposition is crucial for correctly aligning the queries, keys, and values across the different heads and performing batched matrix multiplications efficiently.
 
 To illustrate this batched matrix multiplication, suppose we have the following tensor:
 
@@ -3483,17 +2552,9 @@ Second head:
         [0.7003, 1.3737, 1.0620],
         [0.5903, 1.0620, 0.9912]])
 
-Continuing with `MultiHeadAttention`, after computing the attention weights and context vectors, the context vectors from all heads are transposed back to the shape `(b,`
+Continuing with `MultiHeadAttention`, after computing the attention weights and context vectors, the context vectors from all heads are transposed back to the shape `(b,` `num_tokens,` `num_heads,` `head_dim)`. These vectors are then reshaped (flattened) into the shape `(b,` `num_tokens,` `d_out)`, effectively combining the outputs from all heads.
 
-`num_tokens,` `num_heads,` `head_dim)`. These vectors are then reshaped (flattened) into the shape `(b,` `num_tokens,` `d_out)`, effectively combining the outputs from all heads.
-
-Additionally, we added an output projection layer (`self.out_proj`) to `Multi-`
-
-`HeadAttention` after combining the heads, which is not present in the `Causal-`
-
-`Attention` class. This output projection layer is not strictly necessary (see appendix B for
-
-more details), but it is commonly used in many LLM architectures, which is why I added it here for completeness.
+Additionally, we added an output projection layer (`self.out_proj`) to `MultiHeadAttention` after combining the heads, which is not present in the `CausalAttention` class. This output projection layer is not strictly necessary (see appendix B for more details), but it is commonly used in many LLM architectures, which is why I added it here for completeness.
 
 Even though the `MultiHeadAttention` class looks more complicated than the
 
@@ -3538,72 +2599,38 @@ For comparison, the smallest GPT-2 model (117 million parameters) has 12 attenti
 
 Exercise 3.3 Initializing GPT-2 size attention modules Using the `MultiHeadAttention` class, initialize a multi-head attention module that has the same number of attention heads as the smallest GPT-2 model (12 attention heads). Also ensure that you use the respective input and output embedding sizes similar to GPT-2 (768 dimensions). Note that the smallest GPT-2 model supports a context length of 1,024 tokens.
 
-Summary
+### Summary
 
-> Attention mechanisms transform input elements into enhanced context vector
+> Attention mechanisms transform input elements into enhanced context vector representations that incorporate information about all inputs.
 
+> A self-attention mechanism computes the context vector representation as a weighted sum over the inputs.
 
-representations that incorporate information about all inputs.
+> In a simplified attention mechanism, the attention weights are computed via dot products.
 
-> A self-attention mechanism computes the context vector representation as a
+> A dot product is a concise way of multiplying two vectors element-wise and then summing the products.
 
+> Matrix multiplications, while not strictly required, help us implement computa- tions more efficiently and compactly by replacing nested `for` loops.
 
-weighted sum over the inputs.
+> In self-attention mechanisms used in LLMs, also called scaled-dot product attention, we include trainable weight matrices to compute intermediate transformations of the inputs: queries, values, and keys.
 
-> In a simplified attention mechanism, the attention weights are computed via
+> When working with LLMs that read and generate text from left to right, we add a causal attention mask to prevent the LLM from accessing future tokens.
 
+> In addition to causal attention masks to zero-out attention weights, we can add a dropout mask to reduce overfitting in LLMs.
 
-dot products.
+> The attention modules in transformer-based LLMs involve multiple instances of causal attention, which is called multi-head attention.
 
-> A dot product is a concise way of multiplying two vectors element-wise and then
+> We can create a multi-head attention module by stacking multiple instances of causal attention modules.
 
+> A more efficient way of creating multi-head attention modules involves batched matrix multiplications.
 
-summing the products.
+## 4 Implementing a GPT model from scratch to generate text
 
-> Matrix multiplications, while not strictly required, help us implement computa-
-
-
-tions more efficiently and compactly by replacing nested `for` loops.
-
-> In self-attention mechanisms used in LLMs, also called scaled-dot product
-
-
-attention, we include trainable weight matrices to compute intermediate transformations of the inputs: queries, values, and keys.
-
-> When working with LLMs that read and generate text from left to right, we add
-
-
-a causal attention mask to prevent the LLM from accessing future tokens.
-
-> In addition to causal attention masks to zero-out attention weights, we can add
-
-
-a dropout mask to reduce overfitting in LLMs.
-
-> The attention modules in transformer-based LLMs involve multiple instances of
-
-
-causal attention, which is called multi-head attention.
-
-> We can create a multi-head attention module by stacking multiple instances of
-
-
-causal attention modules.
-
-> A more efficient way of creating multi-head attention modules involves batched
-
-
-matrix multiplications.
-
-Implementing a GPT model from scratch to generate text
-
-This chapter covers
-
-network training
-
-networks
-
-models of various sizes
+This chapter covers:
+- Coding a GPT-like large language model (LLM) that can be trained to generate human-like text
+- Normalizing layer activations to stabilize neural network training
+- Adding shortcut connections in deep neural networks
+- Implementing transformer blocks to create GPT models of various sizes
+- Computing the number of parameters and storage requirements of GPT models
 
 You’ve already learned and coded the multi-head attention mechanism, one of the core components of LLMs. Now, we will code the other building blocks of an LLM and assemble them into a GPT-like model that we will train in the next chapter to generate human-like text.
 
@@ -3615,19 +2642,8 @@ In this chapter, we will now implement the other parts of the LLM
 
 In the next chapter, we add the training loop and pretrain the LLM
 
-Dataset with class labels
-
-Classiﬁer
-
-Building an LLM
-
-Foundation model
-
-Personal assistant
-
-Instruction dataset
-
 ![Fig 4.1](extracted_images/figures/Fig4.1_p115.png)
+
 **Figure 4.1** The three main stages of coding an LLM. This chapter focuses on step 3 of stage 1: implementing the LLM architecture.
 
 <a id="4-1-coding-an-llm-architecture"></a>
@@ -3641,31 +2657,8 @@ Previously, we used smaller embedding dimensions for simplicity, ensuring that t
 
 In the context of deep learning and LLMs like GPT, the term “parameters” refers to the trainable weights of the model. These weights are essentially the internal variables of the model that are adjusted and optimized during the training process to minimize a specific loss function. This optimization allows the model to learn from the training data.
 
-GPT model
-
-In this chapter, we implement a GPT model including all of its subcomponents.
-
-Output layers
-
-Transformer block
-
-Transformer blocks are a key component of GPT-like LLMs.
-
-We implemented the attention module in the previous chapter.
-
-Masked multi-head
-
-attention
-
-Embedding layers
-
-Embedding layers and tokenization were covered in hapter 2. c
-
-Tokenized text
-
-“Every eﬀort moves you”
-
 ![Fig 4.2](extracted_images/figures/Fig4.2_p116.png)
+
 **Figure 4.2** A GPT model. In addition to the embedding layers, it consists of one or more transformer blocks containing the masked multi-head attention module we previously implemented.
 
 For example, in a neural network layer that is represented by a 2,048 × 2,048–dimensional matrix (or tensor) of weights, each element of this matrix is a parameter. Since there are 2,048 rows and 2,048 columns, the total number of parameters in this layer is 2,048 multiplied by 2,048, which equals 4,194,304 parameters.
@@ -3690,40 +2683,26 @@ In the `GPT_CONFIG_124M` dictionary, we use concise variable names for clarity a
 
 > `vocab_size` refers to a vocabulary of 50,257 words, as used by the BPE tokenizer (see chapter 2).
 
-
 > `context_length` denotes the maximum number of input tokens the model can handle via the positional embeddings (see chapter 2).
-
 
 > `emb_dim` represents the embedding size, transforming each token into a 768dimensional vector.
 
-
 > `n_heads` indicates the count of attention heads in the multi-head attention mechanism (see chapter 3).
-
 
 > `n_layers` specifies the number of transformer blocks in the model, which we will cover in the upcoming discussion.
 
-
 > `drop_rate` indicates the intensity of the dropout mechanism (0.1 implies a 10% random drop out of hidden units) to prevent overfitting (see chapter 3).
-
 
 > `qkv_bias` determines whether to include a bias vector in the `Linear` layers of the multi-head attention for query, key, and value computations. We will initially disable this, following the norms of modern LLMs, but we will revisit it in chapter 6 when we load pretrained GPT-2 weights from OpenAI into our model (see chapter 6).
 
-
-Using this configuration, we will implement a GPT placeholder architecture (`Dummy-`
-
-`GPTModel`), as shown in figure 4.3. This will provide us with a big-picture view of how everything fits together and what other components we need to code to assemble the full GPT model architecture.
+Using this configuration, we will implement a GPT placeholder architecture (`DummyGPTModel`), as shown in figure 4.3. This will provide us with a big-picture view of how everything fits together and what other components we need to code to assemble the full GPT model architecture.
 
 The numbered boxes in figure 4.3 illustrate the order in which we tackle the individual concepts required to code the final GPT architecture. We will start with step 1, a placeholder GPT backbone we will call `DummyGPTModel`.
 
-Finally, we will use multiple transformer blocks to implement the untrained GPT model.
-
-Then we will combine building blocks 2 5, including the – multi-head attention module from chapter 3, into a transformer block.
-
 Next, we will implement building blocks 2 5. –
 
-We developed a GPT placeholder model to see the overall structure of the model.
-
 ![Fig 4.3](extracted_images/figures/Fig4.3_p118.png)
+
 **Figure 4.3** The order in which we code the GPT architecture. We start with the GPT backbone, a placeholder architecture, before getting to the individual core pieces and eventually assembling them in a transformer block for the final GPT architecture.
 
 ```python
@@ -3792,37 +2771,12 @@ batch.append(torch.tensor(tokenizer.encode(txt2)))
 batch = torch.stack(batch, dim=0)
 print(batch)
 
-The goal is to generate the next word, “forward.”
-
-effort moves you forward
-
-Output text
-
-The number of input tokens matches the number of output tokens; hence, the ﬁrst token (“Every”) will not be contained in the output.
-
 The LLM returns one 768dimensional output vector for each 768-dimensional input token embedding.
-
-Postprocessing steps
-
-Outputs:
-
-For the smallest GPT-2 model, each embedding vector consists of 768 dimensions (only the ﬁrst 2 dimensions are shown).
-
-GPT model
-
-Token embeddings:
 
 Token IDs: We tokenize the input text and convert it into token embeddings.
 
-Tokenized text:
-
-you moves effort Every
-
-Input text:
-
-Every effort moves you
-
 ![Fig 4.4](extracted_images/figures/Fig4.4_p120.png)
+
 **Figure 4.4** A big-picture overview showing how the input data is tokenized, embedded, and fed to the GPT model. Note that in our `DummyGPTClass` coded earlier, the token embedding is handled inside the GPT model. In LLMs, the embedded input token dimension typically matches the output dimension. The output embeddings here represent the context vectors (see chapter 3).
 
 The resulting token IDs for the two texts are as follows:
@@ -3873,19 +2827,10 @@ Training deep neural networks with many layers can sometimes prove challenging d
 
 NOTE If you are new to neural network training and the concepts of gradients, a brief introduction to these concepts can be found in section A.4 in appendix A. However, a deep mathematical understanding of gradients is not required to follow the contents of this book.
 
-Let’s now implement layer normalization to improve the stability and efficiency of neural network training. The main idea behind layer normalization is to adjust the activations (outputs) of a neural network layer to have a mean of 0 and a variance of 1, also known as unit variance. This adjustment speeds up the convergence to effective weights and ensures consistent, reliable training. In GPT-2 and modern transformer architectures, layer normalization is typically applied before and after the multi-head attention module, and, as we have seen with the `DummyLayerNorm` placeholder, before
-
-the final output layer. Figure 4.5 provides a visual overview of how layer normalization functions.
-
-Zero-centered mean and unit variance after normalization
-
-Apply layer normalization
-
-Layer outputs
-
-Layer inputs, where the ﬁve values represent a single training example
+Let’s now implement layer normalization to improve the stability and efficiency of neural network training. The main idea behind layer normalization is to adjust the activations (outputs) of a neural network layer to have a mean of 0 and a variance of 1, also known as unit variance. This adjustment speeds up the convergence to effective weights and ensures consistent, reliable training. In GPT-2 and modern transformer architectures, layer normalization is typically applied before and after the multi-head attention module, and, as we have seen with the `DummyLayerNorm` placeholder, before the final output layer. Figure 4.5 provides a visual overview of how layer normalization functions.
 
 ![Fig 4.5](extracted_images/figures/Fig4.5_p122.png)
+
 **Figure 4.5** An illustration of layer normalization where the six outputs of the layer, also called activations, are normalized such that they have a 0 mean and a variance of 1.
 
 We can recreate the example shown in figure 4.5 via the following code, where we implement a neural network layer with five inputs and six outputs that we apply to two input examples:
@@ -3930,25 +2875,8 @@ Using `keepdim=True` in operations like mean or variance calculation ensures tha
 
 The `dim` parameter specifies the dimension along which the calculation of the statistic (here, mean or variance) should be performed in a tensor. As figure 4.6 explains, for
 
-Mean
-
-0.13
-
-Input 1
-
-0.21
-
-Input 2
-
-`dim=0` calculates mean across the row dimension to obtain one mean per column
-
-Input 1
-
-Input 2
-
-0.21 0.29 0.00 0.37 0.16 0.00 Mean
-
 ![Fig 4.6](extracted_images/figures/Fig4.6_p123.png)
+
 **Figure 4.6** An illustration of the dim parameter when calculating the mean of a tensor. For instance, if we have a two-dimensional tensor (matrix) with dimensions `[rows,` `columns]`, using `dim=0` will perform the operation across rows (vertically, as shown at the bottom), resulting in an output that aggregates the data for each column. Using `dim=1` or `dim=-1` will perform the operation across columns (horizontally, as shown at the top), resulting in
 
 a two-dimensional tensor (like a matrix), using `dim=-1` for operations such as mean or variance calculation is the same as using `dim=1`. This is because `-1` refers to the tensor’s last dimension, which corresponds to the columns in a two-dimensional tensor. Later, when adding layer normalization to the GPT model, which produces three-dimensional tensors with the shape `[batch_size,` `num_tokens,` `embedding_size]`, we can still use
@@ -4052,16 +2980,15 @@ We have now covered two of the building blocks we will need to implement the GPT
 
 We implemented layer normalization.
 
-We implemented a GPT placeholder model to see the overall structure of the model.
-
 Next, we will implement components 3 and 4.
 
 ![Fig 4.7](extracted_images/figures/Fig4.7_p126.png)
+
 **Figure 4.7** The building blocks necessary to build the GPT architecture. So far, we have completed the GPT backbone and layer normalization. Next, we will focus on GELU activation and the feed forward network.
 
 computational resources, and the available hardware or the specific use case can dictate the batch size during training or inference. Since layer normalization normalizes each input independently of the batch size, it offers more flexibility and stability in these scenarios. This is particularly beneficial for distributed training or when deploying models in environments where resources are constrained.
 
-4.3 Implementing a feed forward network with GELU activations
+### 4.3 Implementing a feed forward network with GELU activations
 
 Next, we will implement a small neural network submodule used as part of the transformer block in LLMs. We begin by implementing the GELU activation function, which plays a crucial role in this neural network submodule.
 
@@ -4094,6 +3021,7 @@ Creates 100 sample data points in the range –3 to 3
 As we can see in the resulting plot in figure 4.8, ReLU (right) is a piecewise linear function that outputs the input directly if it is positive; otherwise, it outputs zero. GELU (left) is a smooth, nonlinear function that approximates ReLU but with a non- zero gradient for almost all negative values (except at approximately x = –0.75).
 
 ![Fig 4.8](extracted_images/figures/Fig4.8_p128.png)
+
 **Figure 4.8** The output of the GELU and ReLU plots using matplotlib. The x-axis shows the function inputs and the y-axis shows the function outputs.
 
 The smoothness of GELU can lead to better optimization properties during training, as it allows for more nuanced adjustments to the model’s parameters. In contrast, ReLU has a sharp corner at zero (figure 4.18, right), which can sometimes make optimization harder, especially in networks that are very deep or have complex architectures. Moreover, unlike ReLU, which outputs zero for any negative input, GELU allows for a small, non-zero output for negative values. This characteristic means that during the training process, neurons that receive negative input can still contribute to the learning process, albeit to a lesser extent than positive inputs.
@@ -4121,48 +3049,16 @@ Output tensor with
 
 shape (2, 3, 768)
 
-The second linear layer decreases the embedding dimension by a factor of 4.
-
-Input: (2, 3, 3072) Output: (2, 3, 768)
-
-Linear layer
-
-Input: (2, 3, 3072) Output: (2, 3, 3072)
-
-GELU activation
-
-The ﬁrst linear layer increases the embedding dimension by a factor of 4.
-
-Input: (2, 3, 768) Output: (2, 3, 3072)
-
-Linear layer
-
-The three values represent the batch size (2), number of tokens (3), and embedding size (768).
-
-Input tensor with shape (2, 3, 768)
-
 ![Fig 4.9](extracted_images/figures/Fig4.9_p129.png)
+
 **Figure 4.9** An overview of the connections between the layers of the feed forward neural network. This neural network can accommodate variable batch sizes and numbers of tokens in the input. However, the embedding size for each token is determined and fixed when initializing the weights.
 
 Following the example in figure 4.9, let’s initialize a new `FeedForward` module with a token embedding size of 768 and feed it a batch input with two samples and three tokens each:
 
 The `FeedForward` module plays a crucial role in enhancing the model’s ability to learn from and generalize the data. Although the input and output dimensions of this module are the same, it internally expands the embedding dimension into a higherdimensional space through the first linear layer, as illustrated in figure 4.10. This expansion is followed by a nonlinear GELU activation and then a contraction back to the original dimension with the second linear transformation. Such a design allows for the exploration of a richer representation space.
 
-Outputs
-
-The second linear layer shrinks the outputs by a factor of 4, so that they match the original input dimensions.
-
-...
-
-...
-
-The inputs are projected into a four-times larger space via the ﬁrst linear layer.
-
-Inputs
-
-...
-
 ![Fig 4.10](extracted_images/figures/Fig4.10_p130.png)
+
 **Figure 4.10** An illustration of the expansion and contraction of the layer outputs in the feed forward neural network. First, the inputs expand by a factor of 4 from 768 to 3,072 values. Then, the second layer compresses the 3,072 values back into a 768-dimensional representation.
 
 Moreover, the uniformity in input and output dimensions simplifies the architecture by enabling the stacking of multiple layers, as we will do later, without the need to adjust dimensions between them, thus making the model more scalable.
@@ -4174,6 +3070,7 @@ We implemented building blocks 2-4, which we need for implementing a GPT model.
 Next, we implement shortcut connections so that we can assemble the transformer block.
 
 ![Fig 4.11](extracted_images/figures/Fig4.11_p131.png)
+
 **Figure 4.11** The building blocks necessary to build the GPT architecture. The black checkmarks indicating those we have already covered.
 
 <a id="4-4-adding-shortcut-connections"></a>
@@ -4182,6 +3079,7 @@ Next, we implement shortcut connections so that we can assemble the transformer 
 Let’s discuss the concept behind shortcut connections, also known as skip or residual connections. Originally, shortcut connections were proposed for deep networks in computer vision (specifically, in residual networks) to mitigate the challenge of vanishing gradients. The vanishing gradient problem refers to the issue where gradients (which guide weight updates during training) become progressively smaller as they propagate backward through the layers, making it difficult to effectively train earlier layers.
 
 ![Fig 4.12](extracted_images/figures/Fig4.12_p132.png)
+
 Figure 4.12 shows that a shortcut connection creates an alternative, shorter path for the gradient to flow through the network by skipping one or more layers, which is achieved by adding the output of one layer to the output of a later layer. This is why these connections are also known as skip connections. They play a crucial role in pre- serving the flow of gradients during the backward pass in training.
 
 In the following list, we implement the neural network in figure 4.12 to see how we can add shortcut connections in the `forward` method.
@@ -4190,65 +3088,10 @@ Deep neural network Deep neural network with
 
 shortcut connections
 
-GELU
-
-GELU
-
-Linear
-
-Linear
-
-GELU
-
-GELU
-
-Linear
-
-Linear
-
-GELU
-
-GELU
-
-Linear
-
-Linear
-
-GELU
-
-GELU
-
-Layer 2 Gradient: 0.20
-
-Layer 2
-
-Gradient: 0.0001
-
-Linear
-
-Linear
-
-Shortcut connection adds input values to the outputs of layer 1
-
-GELU
-
-GELU
-
-Layer 1
-
-Layer 1 Gradient: 0.22
-
-Gradient: 0.0002
-
-Linear
-
-Linear
-
 In very deep networks, the gradient values in early layers become vanishingly small
 
-The shortcut connections help with maintaining relatively large gradient values even in early layers
-
 ![Fig 4.12](extracted_images/figures/Fig4.12_p132.png)
+
 **Figure 4.12** A comparison between a deep neural network consisting of five layers without (left) and with shortcut connections (right). Shortcut connections involve adding the inputs of a layer to its outputs, effectively creating an alternate path that bypasses certain layers. The gradients denote the mean absolute gradient at each layer, which we compute in listing 4.5.
 
 Implements five layers
@@ -4365,11 +3208,12 @@ In conclusion, shortcut connections are important for overcoming the limitations
 
 Next, we’ll connect all of the previously covered concepts (layer normalization, GELU activations, feed forward module, and shortcut connections) in a transformer block, which is the final building block we need to code the GPT architecture.
 
-4.5 Connecting attention and linear layers in a transformer block
+### 4.5 Connecting attention and linear layers in a transformer block
 
 Now, let’s implement the transformer block, a fundamental building block of GPT and other LLM architectures. This block, which is repeated a dozen times in the 124-millionparameter GPT-2 architecture, combines several concepts we have previously covered: multi-head attention, layer normalization, dropout, feed forward layers, and GELU activations. Later, we will connect this transformer block to the remaining parts of the GPT architecture.
 
 ![Fig 4.13](extracted_images/figures/Fig4.13_p136.png)
+
 Figure 4.13 shows a transformer block that combines several components, including the masked multi-head attention module (see chapter 3) and the `FeedForward` module we previously implemented (see section 4.3). When a transformer block processes an input sequence, each element in the sequence (for example, a word or sub- word token) is represented by a fixed-size vector (in this case, 768 dimensions). The operations within the transformer block, including multi-head attention and feed forward layers, are designed to transform these vectors in a way that preserves their dimensionality.
 
 The idea is that the self-attention mechanism in the multi-head attention block identifies and analyzes relationships between elements in the input sequence. In contrast, the feed forward network modifies the data individually at each position. This combination not only enables a more nuanced understanding and processing of the input but also enhances the model’s overall capacity for handling complex data patterns.
@@ -4380,57 +3224,18 @@ The idea is that the self-attention mechanism in the multi-head attention block 
 
 [-0.0178, ...,  0.7431],
 
-Outputs have the same form and dimensions as the inputs.
-
-Linear layer
-
-Dropout
-
-Feed forward
-
-The transformer block
-
-GELU activation
-
-Linear layer
-
-Dropout
-
 A view into the “ eed f forward” block
 
-Masked multi-head
-
-attention
-
-The input tokens to be embedded
-
-Shortcut connection
-
 ```text
-[[0.2961, ..., 0.4604],
 ```
 
-Every
-
-This tensor represents an embedded text sample that serves as input to the transformer block.
-
 ```text
-[0.2238, ..., 0.7598],
 ```
-
-effort
-
-[0.6945, ..., 0.5963],
-
-moves
-
-[0.0890, ..., 0.5833]]
-
-you
 
 Each row is a 768-dimensional vector representing an embedded input token.
 
 ![Fig 4.13](extracted_images/figures/Fig4.13_p136.png)
+
 **Figure 4.13** An illustration of a transformer block. Input tokens have been embedded into 768dimensional vectors. Each row corresponds to one token’s vector representation. The outputs of the transformer block are vectors of the same dimension as the input, which can then be fed into subsequent layers in an LLM.
 
 We can create the `TransformerBlock` in code.
@@ -4460,9 +3265,7 @@ Shortcut connection for feed forward block
 
 Adds the original input back
 
-The given code defines a `TransformerBlock` class in PyTorch that includes a multi-head attention mechanism (`MultiHeadAttention`) and a feed forward network (`Feed-`
-
-`Forward`), both configured based on a provided configuration dictionary (`cfg`), such as `GPT_CONFIG_124M`.
+The given code defines a `TransformerBlock` class in PyTorch that includes a multi-head attention mechanism (`MultiHeadAttention`) and a feed forward network (`FeedForward`), both configured based on a provided configuration dictionary (`cfg`), such as `GPT_CONFIG_124M`.
 
 Layer normalization (`LayerNorm`) is applied before each of these two components, and dropout is applied after them to regularize the model and prevent overfitting. This is also known as Pre-LayerNorm. Older architectures, such as the original transformer model, applied layer normalization after the self-attention and feed forward networks instead, known as Post-LayerNorm, which often leads to worse training dynamics.
 
@@ -4490,11 +3293,8 @@ The preservation of shape throughout the transformer block architecture is not i
 
 With the transformer block implemented, we now have all the building blocks needed to implement the GPT architecture. As illustrated in figure 4.14, the transformer block combines layer normalization, the feed forward network, GELU activations, and shortcut connections. As we will eventually see, this transformer block will make up the main component of the GPT architecture.
 
-Next, we will assemble these building blocks to create a GPT model.
-
-We have completed building blocks 6, which we need to 1– implement a GPT model.
-
 ![Fig 4.14](extracted_images/figures/Fig4.14_p139.png)
+
 **Figure 4.14** The building blocks necessary to build the GPT architecture. The black checks indicate the blocks we have completed.
 
 <a id="4-6-coding-the-gpt-model"></a>
@@ -4516,49 +3316,20 @@ The goal is for these embeddings to be converted back into text such that the la
 [[-0.0055, ..., -0.4747],
 ```
 
-A 4 50,257 dimensional × – tensor
-
 ```text
 [ 0.2663, ..., -0.4224],
 [ 1.1146, ...,  0.0276],
 [-0.8239, ..., -0.3993]]
 ```
 
-GPT model
-
-Linear output layer
-
 The last linear layer embeds each token vector into a 50,257dimensional embedding, where 50,257 is the size of the vocabulary.
-
-Final LayerNorm
-
-Dropout
-
-Feed forward
-
-Dropout
-
-Masked multi-head
-
-attention
-
-The transformer block is repeated 12 times.
-
-12 The GPT code implementation includes a token embedding and positional embedding layer (see chapter 2).
-
-Dropout
-
-Positional embedding layer
-
-Token embedding layer
-
-Tokenized text
 
 ```text
 Every effort moves you
 ```
 
 ![Fig 4.15](extracted_images/figures/Fig4.15_p140.png)
+
 **Figure 4.15** An overview of the GPT model architecture showing the flow of data through the GPT model. Starting from the bottom, tokenized text is first converted into token embeddings, which are then augmented with positional embeddings. This combined information forms a tensor that is passed through a series of transformer blocks shown in the center (each containing multi-head attention and feed forward neural network
 
 ```python
@@ -4590,9 +3361,7 @@ Next, the `__init__` method creates a sequential stack of `TransformerBlock` mod
 
 The forward method takes a batch of input token indices, computes their embeddings, applies the positional embeddings, passes the sequence through the transformer blocks, normalizes the final output, and then computes the logits, representing the next token’s unnormalized probabilities. We will convert these logits into tokens and text outputs in the next section.
 
-Let’s now initialize the 124-million-parameter GPT model using the `GPT_CONFIG_`
-
-`124M` dictionary we pass into the `cfg` parameter and feed it with the batch text input we previously created:
+Let’s now initialize the 124-million-parameter GPT model using the `GPT_CONFIG124M` dictionary we pass into the `cfg` parameter and feed it with the batch text input we previously created:
 
 ```python
 torch.manual_seed(123)
@@ -4707,27 +3476,18 @@ Exercise 4.2 Initializing larger GPT models We initialized a 124-million-paramet
 We will now implement the code that converts the tensor outputs of the GPT model back into text. Before we get started, let’s briefly review how a generative model like an LLM generates text one word (or token) at a time.
 
 ![Fig 4.16](extracted_images/figures/Fig4.16_p145.png)
+
 Figure 4.16 illustrates the step-by-step process by which a GPT model generates text given an input context, such as “Hello, I am.” With each iteration, the input context grows, allowing the model to generate coherent and contextually appropriate text. By the sixth iteration, the model has constructed a complete sentence: “Hello, I am a model ready to help.” We’ve seen that our current `GPTModel` implementation outputs tensors with shape `[batch_size,` `num_token,` `vocab_size]`. Now the question is: How does a GPT model go from these output tensors to the generated text?
 
 The process by which a GPT model goes from output tensors to generated text involves several steps, as illustrated in figure 4.17. These steps include decoding the
 
 The input context for the model
 
-The next generated token
-
-The token generated in the previous round is appended to the input for the next iteration
-
-2nd iteration:
-
-3rd iteration:
-
-6th iteration:
-
 ```text
-Hello , I am a model ready to help .
 ```
 
 ![Fig 4.16](extracted_images/figures/Fig4.16_p145.png)
+
 **Figure 4.16** The step-by-step process by which an LLM generates text, one token at a time. Starting with an initial input context (“Hello, I am”), the model predicts a subsequent token during each iteration, appending it to the input context for the next round of prediction. As shown, the first iteration adds “a,” the second “model,” and the third “ready,” progressively building the sentence.
 
 output tensors, selecting tokens based on a probability distribution, and converting these tokens into human-readable text.
@@ -4740,32 +3500,24 @@ In practice, we repeat this process over many iterations, such as shown in figur
 
 1. Encodes text input into four token IDs
 
-GPT
-
 6. Appends token to the previous inputs for the next round
 
 ```text
-"a"
 ```
 
 ![Fig 4.17](extracted_images/figures/Fig4.17_p146.png)
+
 **Figure 4.17** The mechanics of text generation in a GPT model by showing a single iteration in the token generation process. The process begins by encoding the input text into token IDs, which are then fed into the GPT model. The outputs of the model are then converted back into text and appended to the original input text.
 
-Crops current context if it exceeds the supported context size, e.g., if LLM supports only 5 tokens, and the context size is 10, then only the last 5 tokens are used as context
+Crops current context if it exceeds the supported context size, e.g., if LLM supports only 5 tokens, and the context size is 10, then only the last 5 tokens are used as context idx is a (batch, n_tokens) array of indices in the current context.
 
-idx is a (batch, n_tokens) array of indices in the current context.
-
-Focuses only on the last time step, so that (batch, n_token, vocab_size) becomes (batch, vocab_size)
-
-probas has shape (batch, vocab_size).
+Focuses only on the last time step, so that (batch, n_token, vocab_size) becomes (batch, vocab_size) probas has shape (batch, vocab_size).
 
 ```text
     return idx
 ```
 
-Appends sampled index to the running sequence, where idx has
-
-idx_next has shape (batch, 1).
+Appends sampled index to the running sequence, where idx has idx_next has shape (batch, 1).
 
 shape (batch, n_tokens+1)
 
@@ -4802,50 +3554,27 @@ The predicted token ID is appended to the context for the next round.
 
 The initial tokens (context) provided as input to the LLM
 
-Iteration
-
-ID
-
 Predict
 
-The token IDs converted into a text representation for illustration purposes
-
-Append
-
 ```text
-Hello
 ```
 
 3
 
-[15496, 11, 314, 716, 257, 2746]
-
-[3492]
-
-Hello
 am
 ,
 I
 a
 model
 
-ready
-
-...
-
-...
-
-The output tokens after six iterations (max_new_tokens=6)
-
 ```text
 6
 ```
 
-[15496, ..., 3492, 284, 1037, 13]
-
 Hello, I am a model ready to help.
 
 ![Fig 4.18](extracted_images/figures/Fig4.18_p148.png)
+
 **Figure 4.18** The six iterations of a token prediction cycle, where the model takes a sequence of initial token IDs as input, predicts the next token, and appends this token to the input sequence for the next iteration. (The token IDs are also translated into their corresponding text for better understanding.)
 
 Next, we put the model into `.eval()` mode. This disables random components like dropout, which are only used during training, and use the `generate_text_simple` function on the encoded input tensor:
@@ -4877,50 +3606,29 @@ As we can see, the model generated gibberish, which is not at all like the coher
 
 `Hello,` `I` `am` `a` `model` `ready` `to` `help`. What happened? The reason the model is unable to produce coherent text is that we haven’t trained it yet. So far, we have only implemented the GPT architecture and initialized a GPT model instance with initial random weights. Model training is a large topic in itself, and we will tackle it in the next chapter.
 
-Summary
+### Summary
 
-> Layer normalization stabilizes training by ensuring that each layer’s outputs
+> Layer normalization stabilizes training by ensuring that each layer’s outputs have a consistent mean and variance.
 
+> Shortcut connections are connections that skip one or more layers by feeding the output of one layer directly to a deeper layer, which helps mitigate the vanishing gradient problem when training deep neural networks, such as LLMs.
 
-have a consistent mean and variance.
+> Transformer blocks are a core structural component of GPT models, combin- ing masked multi-head attention modules with fully connected feed forward networks that use the GELU activation function.
 
-> Shortcut connections are connections that skip one or more layers by feeding
+> GPT models are LLMs with many repeated transformer blocks that have mil- lions to billions of parameters.
 
+> GPT models come in various sizes, for example, 124, 345, 762, and 1,542 mil- lion parameters, which we can implement with the same `GPTModel` Python class.
 
-the output of one layer directly to a deeper layer, which helps mitigate the vanishing gradient problem when training deep neural networks, such as LLMs.
+> The text-generation capability of a GPT-like LLM involves decoding output ten- sors into human-readable text by sequentially predicting one token at a time based on a given input context.
 
-> Transformer blocks are a core structural component of GPT models, combin-
+> Without training, a GPT model generates incoherent text, which underscores the importance of model training for coherent text generation.
 
+## 5 Pretraining on unlabeled data
 
-ing masked multi-head attention modules with fully connected feed forward networks that use the GELU activation function.
-
-> GPT models are LLMs with many repeated transformer blocks that have mil-
-
-
-lions to billions of parameters.
-
-> GPT models come in various sizes, for example, 124, 345, 762, and 1,542 mil-
-
-
-lion parameters, which we can implement with the same `GPTModel` Python class.
-
-> The text-generation capability of a GPT-like LLM involves decoding output ten-
-
-
-sors into human-readable text by sequentially predicting one token at a time based on a given input context.
-
-> Without training, a GPT model generates incoherent text, which underscores
-
-
-the importance of model training for coherent text generation.
-
-Pretraining on unlabeled data
-
-This chapter covers
-
-the LLM
-
-training an LLM
+This chapter covers:
+- Computing the training and validation set losses to assess the quality of LLM-generated text during training
+- Implementing a training function and pretraining the LLM
+- Saving and loading model weights to continue training an LLM
+- Loading pretrained weights from OpenAI
 
 Thus far, we have implemented the data sampling and attention mechanism and coded the LLM architecture. It is now time to implement a training function and pretrain the LLM. We will learn about basic model evaluation techniques to measure the quality of the generated text, which is a requirement for optimizing the LLM during the training process. Moreover, we will discuss how to load pretrained weights, giving our LLM a solid starting point for fine-tuning. Figure 5.1 lays out our overall plan, highlighting what we will discuss in this chapter.
 
@@ -4932,21 +3640,12 @@ In the previous chapter, we implemented a GPT-like LLM architecture.
 
 Dataset with class labels
 
-Classiﬁer
-
-Building an LLM
-
-Foundation model
-
-Personal assistant
-
 STAGE 2
 
 In this chapter, we will pretrain the LLM model.
 
-Instruction dataset
-
 ![Fig 5.1](extracted_images/figures/Fig5.1_p151.png)
+
 **Figure 5.1** The three main stages of coding an LLM. This chapter focuses on stage 2: pretraining the LLM (step 4), which includes implementing the training code (step 5), evaluating the performance (step 6), and saving and loading model weights (step 7).
 
 Weight parameters In the context of LLMs and other deep learning models, weights refer to the trainable parameters that the learning process adjusts. These weights are also known as weight parameters or simply parameters. In frameworks like PyTorch, these weights are stored in linear layers; we used these to implement the multi-head attention module in chapter 3 and the `GPTModel` in chapter 4. After initializing a layer (`new_layer` `=` `torch.nn.Linear(...)`), we can access its weights through the `.weight` attribute, `new_layer.weight`. Additionally, for convenience, PyTorch allows direct access to all a model’s trainable parameters, including weights and biases, through the method `model.parameters()`, which we will use later when implementing the model training.
@@ -4956,20 +3655,11 @@ Weight parameters In the context of LLMs and other deep learning models, weights
 
 After briefly recapping the text generation from chapter 4, we will set up our LLM for text generation and then discuss basic ways to evaluate the quality of the generated text. We will then calculate the training and validation losses. Figure 5.2 shows the topics covered in this chapter, with these first three steps highlighted.
 
-Implement additional LLM text generation strategies to reduce training data memorization
-
-Implement functions to save and load the LLM weights to use or continue training the LLM later
-
-Train the model to generate human-like text
-
-losses
-
-Evaluate how well the model performs
-
 ![Fig 5.2](extracted_images/figures/Fig5.2_p152.png)
+
 **Figure 5.2** An overview of the topics covered in this chapter. We begin by recapping text generation (step 1) before moving on to discuss basic model evaluation techniques (step 2) and training and validation losses (step 3).
 
-5.1.1 Using GPT to generate text
+#### 5.1.1 Using GPT to generate text
 
 Let’s set up the LLM and briefly recap the text generation process we implemented in chapter 4. We begin by initializing the GPT model that we will later evaluate and train using the `GPTModel` class and `GPT_CONFIG_124M` dictionary (see chapter 4):
 
@@ -4982,17 +3672,11 @@ We shorten the context length from 1,024 to 256 tokens.
 
 It’s possible and common to set dropout to 0.
 
-Considering the `GPT_CONFIG_124M` dictionary, the only adjustment we have made compared to the previous chapter is that we have reduced the context length (`context_`
+Considering the `GPT_CONFIG_124M` dictionary, the only adjustment we have made compared to the previous chapter is that we have reduced the context length (`contextlength`) to 256 tokens. This modification reduces the computational demands of training the model, making it possible to carry out the training on a standard laptop computer.
 
-`length`) to 256 tokens. This modification reduces the computational demands of training the model, making it possible to carry out the training on a standard laptop computer.
+Originally, the GPT-2 model with 124 million parameters was configured to handle up to 1,024 tokens. After the training process, we will update the context size setting and load pretrained weights to work with a model configured for a 1,024-token context length.
 
-Originally, the GPT-2 model with 124 million parameters was configured to handle up to 1,024 tokens. After the training process, we will update the context size setting
-
-and load pretrained weights to work with a model configured for a 1,024-token context length.
-
-Using the `GPTModel` instance, we adopt the `generate_text_simple` function from chapter 4 and introduce two handy functions: `text_to_token_` `ids` and `token_ids_`
-
-`to_text`. These functions facilitate the conversion between text and token representations, a technique we will utilize throughout this chapter.
+Using the `GPTModel` instance, we adopt the `generate_text_simple` function from chapter 4 and introduce two handy functions: `text_to_token_` `ids` and `token_idsto_text`. These functions facilitate the conversion between text and token representations, a technique we will utilize throughout this chapter.
 
 1. Use the tokenizer to encode input text into a token ID representation.
 
@@ -5009,9 +3693,11 @@ Tokenizer
 2. Given four input token IDs, the model produces 4 logit vectors (rows) where each vector has 50,257 elements (columns) equal to the vocabulary size.
 
 ![Fig 5.3](extracted_images/figures/Fig5.3_p153.png)
+
 **Figure 5.3** Generating text involves encoding text into token IDs that the LLM processes into logit vectors. The logit vectors are then converted back into token IDs, detokenized into a text representation.
 
 ![Fig 5.3](extracted_images/figures/Fig5.3_p153.png)
+
 Figure 5.3 illustrates a three-step text generation process using a GPT model. First, the tokenizer converts input text into a series of token IDs (see chapter 2). Second, the model receives these token IDs and generates corresponding logits, which are vectors representing the probability distribution for each token in the vocabulary (see chapter 4). Third, these logits are converted back into token IDs, which the tokenizer decodes into human-readable text, completing the cycle from textual input to textual output.
 
 We can implement the text generation process, as shown in the following listing.
@@ -5052,16 +3738,18 @@ Clearly, the model isn’t yet producing coherent text because it hasn’t under
 
 Next, we will calculate a loss metric for the generated outputs. This loss serves as a progress and success indicator of the training progress. Furthermore, in later chapters, when we fine-tune our LLM, we will review additional methodologies for assessing model quality.
 
-5.1.2 Calculating the text generation loss
+#### 5.1.2 Calculating the text generation loss
 
 Next, let’s explore techniques for numerically assessing text quality generated during training by calculating a text generation loss. We will go over this topic step by step with a practical example to make the concepts clear and applicable, beginning with a short recap of how the data is loaded and how the text is generated via the
 
 `generate_text_simple` function.
 
 ![Fig 5.4](extracted_images/figures/Fig5.4_p155.png)
+
 Figure 5.4 illustrates the overall flow from input text to LLM-generated text using a five-step procedure. This text-generation process shows what the `generate_text_simple` function does internally. We need to perform these same initial steps before we can compute a loss that measures the generated text quality later in this section.
 
 ![Fig 5.4](extracted_images/figures/Fig5.4_p155.png)
+
 Figure 5.4 outlines the text generation process with a small seven-token vocabulary to fit this image on a single page. However, our `GPTModel` works with a much larger
 
 3. Locate the index position with the highest probability value in each row vector, which is done via the function. `argmax`
@@ -5070,45 +3758,24 @@ Figure 5.4 outlines the text generation process with a small seven-token vocabul
 
 5. Map index positions back into text via the inverse vocabulary.
 
-every
-
-effort
-
 ```text
-[2,
 ```
 
-eﬀort
-
-moves
-
 ```text
-,
 ```
 
-1,
-
-moves
-
 ```text
-]
 ```
 
-you
-
 ```text
-4]
 ```
 
 Input text
 
 4. Obtain all predicted token IDs as the index positions with the highest probabilities.
 
-The output text generated by the LLM
-
-2. Obtain seven-dimensional probability row vector for each input token via the function. `softmax`
-
 ![Fig 5.4](extracted_images/figures/Fig5.4_p155.png)
+
 **Figure 5.4** For each of the three input tokens, shown on the left, we compute a vector containing probability scores corresponding to each token in the vocabulary. The index position of the highest probability score in each vector represents the most likely next token ID. These token IDs associated with the highest probability scores are selected and mapped back into a text that represents the text generated by the model.
 
 vocabulary consisting of 50,257 words; hence, the token IDs in the following code will range from 0 to 50,256 rather than 0 to 6.
@@ -5187,17 +3854,12 @@ The model produces random text that is different from the target text because it
 
 Implement functions to save and load the LLM weights to use or continue training the LLM later
 
-Implement the loss computation to evaluate how well the model performs.
-
 Load pretrained weights from OpenAI into our LLM model
-
-Train the model to generate human-like text
-
-losses
 
 Apply the loss to the entire dataset, which we split into a training and validation portion
 
 ![Fig 5.5](extracted_images/figures/Fig5.5_p157.png)
+
 **Figure 5.5** An overview of the topics covered in this chapter. We have completed step 1. We are now ready to implement the text evaluation function (step 2).
 
 Part of the text evaluation process that we implement, as shown in figure 5.5, is to measure “how far” the generated tokens are from the correct predictions (targets). The training function we implement later will use this information to adjust the model weights to generate text that is more similar to (or, ideally, matches) the target text.
@@ -5208,31 +3870,14 @@ Remember that figure 5.6 displays the softmax probabilities for a compact sevent
 
 3. An untrained model produces random vectors for each token.
 
-every
-
-effort
-
-eﬀort
-
 ```text
-1,
 ```
 
-moves
-
 ```text
-,
 ```
 
-4]
-
-moves
-
 ```text
-]
 ```
-
-you
 
 ```text
 "a"
@@ -5252,11 +3897,10 @@ you
 
 4. In model training, the goal is to maximize the values that correspond to the index of the token in the target vector.
 
-1. The model receives three input tokens and generates three vectors.
-
 2. Each vector index position in the model-generated tensors corresponds to a word in the vocabulary.
 
 ![Fig 5.6](extracted_images/figures/Fig5.6_p158.png)
+
 **Figure 5.6** Before training, the model produces random next-token probability vectors. The goal of model training is to ensure that the probability values corresponding to the highlighted target token IDs are maximized.
 
 For each of the two input texts, we can print the initial softmax probability scores corresponding to the target tokens using the following code:
@@ -5286,9 +3930,7 @@ Backpropagation requires a loss function, which calculates the difference betwee
 
 Next, we will calculate the loss for the probability scores of the two example batches,
 
-`target_probas_1` and `target_probas_2`. The main steps are illustrated in figure 5.7. Since we already applied steps 1 to 3 to obtain `target_probas_1` and `target_`
-
-`probas_2`, we proceed with step 4, applying the logarithm to the probability scores:
+`target_probas_1` and `target_probas_2`. The main steps are illustrated in figure 5.7. Since we already applied steps 1 to 3 to obtain `target_probas_1` and `targetprobas_2`, we proceed with step 4, applying the logarithm to the probability scores:
 
 ```python
 log_probas = torch.log(torch.cat((target_probas_1, target_probas_2)))
@@ -5313,25 +3955,16 @@ Target probabilities
 
 = [-9.5042, -10.3796, -11.3677, ..., ]
 
-Log probabilities
-
-Average log probability
-
 ```text
 = -10.7940
 ```
-
-The negative average log probability is the loss we want to compute
-
-Negative average
 
 ```text
 = 10.7940
 ```
 
-log probability
-
 ![Fig 5.7](extracted_images/figures/Fig5.7_p159.png)
+
 **Figure 5.7** Calculating the loss involves several steps. Steps 1 to 3, which we have already completed, calculate the token probabilities corresponding to the target tensors. These probabilities are then transformed via a logarithm and averaged in steps 4 to 6.
 
 This results in the following values:
@@ -5427,7 +4060,7 @@ Perplexity is often considered more interpretable than the raw loss value becaus
 
 We have now calculated the loss for two small text inputs for illustration purposes. Next, we will apply the loss computation to the entire training and validation sets.
 
-5.1.3 Calculating the training and validation set losses
+#### 5.1.3 Calculating the training and validation set losses
 
 We must first prepare the training and validation datasets that we will use to train the LLM. Then, as highlighted in figure 5.8, we will calculate the cross entropy for the training and validation sets, which is an important component of the model training process.
 
@@ -5435,22 +4068,15 @@ Implement additional LLM text generation strategies to reduce training data memo
 
 Implement functions to save and load the LLM weights to use or continue training the LLM later.
 
-Implement the loss computation to evaluate how well the model performs.
-
 Load pretrained weights from OpenAI into our LLM model.
-
-Train the model to generate human-like text.
-
-losses
 
 Apply the loss to the entire dataset, which we split into a training and validation portion.
 
 ![Fig 5.8](extracted_images/figures/Fig5.8_p162.png)
+
 **Figure 5.8** Having completed steps 1 and 2, including computing the cross entropy loss, we can now apply this loss computation to the entire text dataset that we will use for model training.
 
-To compute the loss on the training and validation datasets, we use a very small text dataset, the “The Verdict” short story by Edith Wharton, which we have already worked with in chapter 2. By selecting a text from the public domain, we circumvent any concerns related to usage rights. Additionally, using such a small dataset allows for the execution of code examples on a standard laptop computer in a matter of
-
-minutes, even without a high-end GPU, which is particularly advantageous for educational purposes.
+To compute the loss on the training and validation datasets, we use a very small text dataset, the “The Verdict” short story by Edith Wharton, which we have already worked with in chapter 2. By selecting a text from the public domain, we circumvent any concerns related to usage rights. Additionally, using such a small dataset allows for the execution of code examples on a standard laptop computer in a matter of minutes, even without a high-end GPU, which is particularly advantageous for educational purposes.
 
 NOTE Interested readers can also use the supplementary code for this book to prepare a larger-scale dataset consisting of more than 60,000 public domain books from Project Gutenberg and train an LLM on these (see appendix D for details).
 
@@ -5490,19 +4116,11 @@ The ﬁrst sample in the tokenized dataset of length 6
 
 The second sample in the tokenized dataset when the stride is set to 6
 
-We use a large portion of the input text dataset for model training.
-
-Tokenizer
-
-Process the dataset with a max length of 6
-
 ```text
 11, 6095, 262, 19657, 9136, 326, 481, 6070, 262,
 ```
 
 7951, 13, 1081, 262, 4252, 3350 ]
-
-The second sample in the tokenized dataset
 
 ```python
 ...
@@ -5510,13 +4128,8 @@ The second sample in the tokenized dataset
 
 [  7850,    11,  2456, 42462,   588,  9813 ]]
 
-gentle river, words ripple like waves against the shore.
-
 ```text
-[[[ 1900,   355,  8474, 13829,  4696,    13 ],
 ```
-
-[    11,   810,  2695, 13580,    82, 17700 ]],
 
 We use a small portion of the data to construct the validation set.
 
@@ -5525,10 +4138,6 @@ We use a small portion of the data to construct the validation set.
 [  3423,    11, 31095,   262, 10296, 20009 ]],
 ```
 
-Batch 2
-
-Organize dataset into batches; here with batch size 2 and shufﬂing enabled.
-
 ```python
 ...
 ```
@@ -5536,9 +4145,8 @@ Organize dataset into batches; here with batch size 2 and shufﬂing enabled.
 [[   11,   612,  7160,   257, 46944, 25451 ],
 [   818,   262, 13360,   286,  5874, 33543 ]]]
 
-Last batch
-
 ![Fig 5.9](extracted_images/figures/Fig5.9_p164.png)
+
 **Figure 5.9** When preparing the data loaders, we split the input text into training and validation set portions. Then we tokenize the text (only shown for the training set portion for simplicity) and divide the tokenized text into chunks of a user-specified length (here, 6). Finally, we shuffle the rows and organize the chunked text into batches (here, batch size 2), which we can use for model training.
 
 NOTE We are training the model with training data presented in similarly sized chunks for simplicity and efficiency. However, in practice, it can also be beneficial to train an LLM with variable-length inputs to help the LLM to better generalize across different types of inputs when it is being used.
@@ -5638,9 +4246,7 @@ data loader
 
 Averages the loss over all batches
 
-By default, the `calc_loss_loader` function iterates over all batches in a given data loader, accumulates the loss in the `total_loss` variable, and then computes and
-
-averages the loss over the total number of batches. Alternatively, we can specify a smaller number of batches via `num_batches` to speed up the evaluation during model training.
+By default, the `calc_loss_loader` function iterates over all batches in a given data loader, accumulates the loss in the `total_loss` variable, and then computes and averages the loss over the total number of batches. Alternatively, we can specify a smaller number of batches via `num_batches` to speed up the evaluation during model training.
 
 Let’s now see this `calc_loss_loader` function in action, applying it to the training and validation set loaders:
 
@@ -5665,17 +4271,14 @@ The loss values are relatively high because the model has not yet been trained. 
 
 Now that we have a way to measure the quality of the generated text, we will train the LLM to reduce this loss so that it becomes better at generating text, as illustrated in figure 5.10.
 
-Implement additional LLM text generation strategies to reduce training data memorization.
-
 Implement functions to save and load the LLM weights to use or continue training the LLM later.
 
 Load pretrained weights from OpenAI into our LLM model.
 
 Train the model to generate human-like text.
 
-losses
-
 ![Fig 5.10](extracted_images/figures/Fig5.10_p167.png)
+
 **Figure 5.10** We have recapped the text generation process (step 1) and implemented basic model evaluation techniques (step 2) to compute the training and validation set losses (step 3). Next, we will go to the training functions and pretrain the LLM (step 4).
 
 Next, we will focus on pretraining the LLM. After model training, we will implement alternative text generation strategies and save and load pretrained model weights.
@@ -5687,20 +4290,11 @@ It is finally time to implement the code for pretraining the LLM, our `GPTModel`
 
 NOTE Interested readers can learn about more advanced techniques, including learning rate warmup, cosine annealing, and gradient clipping, in appendix D.
 
-One epoch is one complete pass over a training set.
-
-The number of batches is determined by the training set size divided by the size of each batch.
-
-These are the usual steps used for training deep neural networks in PyTorch.
-
-Optional steps for tracking the training progress.
-
 ![Fig 5.11](extracted_images/figures/Fig5.11_p168.png)
+
 **Figure 5.11** A typical training loop for training deep neural networks in PyTorch consists of numerous steps, iterating over the batches in the training set for several epochs. In each loop, we calculate the loss for each training set batch to determine loss gradients, which we use to update the model weights so that the training set loss is minimized.
 
-The flowchart in figure 5.11 depicts a typical PyTorch neural network training workflow, which we use for training an LLM. It outlines eight steps, starting with iterating over each epoch, processing batches, resetting gradients, calculating the loss and new
-
-gradients, and updating weights and concluding with monitoring steps like printing losses and generating text samples.
+The flowchart in figure 5.11 depicts a typical PyTorch neural network training workflow, which we use for training an LLM. It outlines eight steps, starting with iterating over each epoch, processing batches, resetting gradients, calculating the loss and new gradients, and updating weights and concluding with monitoring steps like printing losses and generating text samples.
 
 NOTE If you are relatively new to training deep neural networks with PyTorch and any of these steps are unfamiliar, consider reading sections A.5 to A.8 in appendix A.
 
@@ -5724,9 +4318,7 @@ Prints a sample text after each epoch
 
 Note that the `train_model_simple` function we just created uses two functions we have not defined yet: `evaluate_model` and `generate_and_print_sample`.
 
-The `evaluate_model` function corresponds to step 7 in figure 5.11. It prints the training and validation set losses after each model update so we can evaluate whether the training improves the model. More specifically, the `evaluate_model` function calculates the loss over the training and validation set while ensuring the model is in eval-
-
-uation mode with gradient tracking and dropout disabled when calculating the loss over the training and validation sets:
+The `evaluate_model` function corresponds to step 7 in figure 5.11. It prints the training and validation set losses after each model update so we can evaluate whether the training improves the model. More specifically, the `evaluate_model` function calculates the loss over the training and validation set while ensuring the model is in eval- uation mode with gradient tracking and dropout disabled when calculating the loss over the training and validation sets:
 
 Dropout is disabled during evaluation for stable, reproducible results.
 
@@ -5762,18 +4354,15 @@ Creates a second x-axis that shares the same y-axis
 
 Invisible plot for aligning ticks
 
-The resulting training and validation loss plot is shown in figure 5.12. As we can see, both the training and validation losses start to improve for the first epoch. However, the losses start to diverge past the second epoch. This divergence and the fact that the validation loss is much larger than the training loss indicate that the model is overfitting to the training data. We can confirm that the model memorizes the training data verbatim by searching for the generated text snippets, such as `quite` `insensible` `to`
-
-`the` `irony` in the “The Verdict” text file.
+The resulting training and validation loss plot is shown in figure 5.12. As we can see, both the training and validation losses start to improve for the first epoch. However, the losses start to diverge past the second epoch. This divergence and the fact that the validation loss is much larger than the training loss indicate that the model is overfitting to the training data. We can confirm that the model memorizes the training data verbatim by searching for the generated text snippets, such as `quite` `insensible` `to` `the` `irony` in the “The Verdict” text file.
 
 ![Fig 5.12](extracted_images/figures/Fig5.12_p172.png)
+
 **Figure 5.12** At the beginning of the training, both the training and validation set losses sharply decrease, which is a sign that the model is learning. However, the training set loss continues to decrease past the second epoch, whereas the validation loss stagnates. This is a sign that the model is still learning, but it’s overfitting to the training set past epoch 2.
 
 This memorization is expected since we are working with a very, very small training dataset and training the model for multiple epochs. Usually, it’s common to train a model on a much larger dataset for only one epoch.
 
 NOTE As mentioned earlier, interested readers can try to train the model on 60,000 public domain books from Project Gutenberg, where this overfitting does not occur; see appendix B for details.
-
-Implement additional LLM text generation strategies to reduce training data memorization.
 
 Implement functions to save and load the LLM weights to use or continue training the LLM later.
 
@@ -5781,9 +4370,8 @@ Train the model to generate human-like text.
 
 At the end of this chapter, load pretrained weights from OpenAI into our LLM model.
 
-losses
-
 ![Fig 5.13](extracted_images/figures/Fig5.13_p173.png)
+
 **Figure 5.13** Our model can generate coherent text after implementing the training function. However, it often memorizes passages from the training set verbatim. Next, we will discuss strategies to generate more diverse output texts.
 
 As illustrated in figure 5.13, we have completed four of our objectives for this chaper. Next, we will cover text generation strategies for LLMs to reduce training data memorization and increase the originality of the LLM-generated text before we cover weight loading and saving and loading pretrained weights from OpenAI’s GPT model.
@@ -5821,11 +4409,9 @@ Every effort moves you know," was one of the axioms he laid down across the
 Sevres and silver of an exquisitely appointed lun
 ```
 
-As explained earlier, the generated token is selected at each generation step corresponding to the largest probability score among all tokens in the vocabulary. This means that the LLM will always generate the same outputs even if we run the preceding `generate_text_simple` function multiple times on the same start context (`Every`
+As explained earlier, the generated token is selected at each generation step corresponding to the largest probability score among all tokens in the vocabulary. This means that the LLM will always generate the same outputs even if we run the preceding `generate_text_simple` function multiple times on the same start context (`Every` `effort` `moves` `you`).
 
-`effort` `moves` `you`).
-
-5.3.1 Temperature scaling
+#### 5.3.1 Temperature scaling
 
 Let’s now look at temperature scaling, a technique that adds a probabilistic selection process to the next-token generation task. Previously, inside the `generate_text_simple` function, we always sampled the token with the highest probability as the next token using `torch.argmax`, also known as greedy decoding. To generate text with more variety, we can replace `argmax` with a function that samples from a probability distribution (here, the probability scores the LLM generates for each vocabulary entry at each token generation step).
 
@@ -5902,11 +4488,7 @@ The sampling output is
 0 x pizza
 343 x toward
 
-As we can see, the word `forward` is sampled most of the time (582 out of 1,000 times), but other tokens such as `closer`, `inches`, and `toward` will also be sampled some of the time. This means that if we replaced the `argmax` function with the `multinomial` function inside the `generate_and_print_sample` function, the LLM would sometimes generate texts such as `every` `effort` `moves` `you` `toward`, `every` `effort` `moves`
-
-`you` `inches`, and `every` `effort` `moves` `you` `closer` instead of `every` `effort` `moves` `you`
-
-`forward`.
+As we can see, the word `forward` is sampled most of the time (582 out of 1,000 times), but other tokens such as `closer`, `inches`, and `toward` will also be sampled some of the time. This means that if we replaced the `argmax` function with the `multinomial` function inside the `generate_and_print_sample` function, the LLM would sometimes generate texts such as `every` `effort` `moves` `you` `toward`, `every` `effort` `moves` `you` `inches`, and `every` `effort` `moves` `you` `closer` instead of `every` `effort` `moves` `you` `forward`.
 
 We can further control the distribution and selection process via a concept called temperature scaling. Temperature scaling is just a fancy description for dividing the logits by a number greater than 0:
 
@@ -5925,15 +4507,14 @@ The resulting plot is shown in figure 5.14.
 A temperature of 1 divides the logits by 1 before passing them to the `softmax` function to compute the probability scores. In other words, using a temperature of 1 is the same as not using any temperature scaling. In this case, the tokens are selected with a probability equal to the original softmax probability scores via the `multinomial` sampling function in PyTorch. For example, for the temperature setting 1, the token corresponding to “forward” would be selected about 60% of the time, as we can see in figure 5.14.
 
 ![Fig 5.14](extracted_images/figures/Fig5.14_p177.png)
+
 **Figure 5.14** A temperature of 1 represents the unscaled probability scores for each token in the vocabulary. Decreasing the temperature to 0.1 sharpens the distribution, so the most likely token (here, “forward”) will have an even higher probability score. Likewise, increasing the temperature to 5 makes the distribution more uniform.
 
-Also, as we can see in figure 5.14, applying very small temperatures, such as 0.1, will result in sharper distributions such that the behavior of the `multinomial` function selects the most likely token (here, `"forward"`) almost 100% of the time, approaching the behavior of the `argmax` function. Likewise, a temperature of 5 results in a more uniform distribution where other tokens are selected more often. This can add more variety to the generated texts but also more often results in nonsensical text. For example, using the temperature of 5 results in texts such as `every` `effort` `moves` `you`
-
-`pizza` about 4% of the time.
+Also, as we can see in figure 5.14, applying very small temperatures, such as 0.1, will result in sharper distributions such that the behavior of the `multinomial` function selects the most likely token (here, `"forward"`) almost 100% of the time, approaching the behavior of the `argmax` function. Likewise, a temperature of 5 results in a more uniform distribution where other tokens are selected more often. This can add more variety to the generated texts but also more often results in nonsensical text. For example, using the temperature of 5 results in texts such as `every` `effort` `moves` `you` `pizza` about 4% of the time.
 
 Exercise 5.1 Use the `print_sampled_tokens` function to print the sampling frequencies of the softmax probabilities scaled with the temperatures shown in figure 5.14. How often is the word `pizza` sampled in each case? Can you think of a faster and more accurate way to determine how often the word `pizza` is sampled?
 
-5.3.2 Top-k sampling
+#### 5.3.2 Top-k sampling
 
 We’ve now implemented a probabilistic sampling approach coupled with temperature scaling to increase the diversity of the outputs. We saw that higher temperature values result in more uniformly distributed next-token probabilities, which result in more diverse outputs as it reduces the likelihood of the model repeatedly selecting the most probable token. This method allows for the exploring of less likely but potentially more interesting and creative paths in the generation process. However, one downside of this approach is that it sometimes leads to grammatically incorrect or completely nonsensical outputs such as `every` `effort` `moves` `you` `pizza`.
 
@@ -5974,6 +4555,7 @@ Softmax
 By assigning zero probabilities to the non-top-k positions, we ensure that the next token is always sampled from a top-k position.
 
 ![Fig 5.15](extracted_images/figures/Fig5.15_p178.png)
+
 **Figure 5.15** Using top-k sampling with k = 3, we focus on the three tokens associated with the highest logits and mask out all other tokens with negative infinity (`–inf`) before applying the `softmax` function. This results in a probability distribution with a probability value 0 assigned to all non-top-k tokens. (The numbers in this figure are truncated to two digits after the decimal point to reduce visual clutter. The values in the “Softmax” row should add up to 1.0.)
 
 The top-k approach replaces all nonselected logits with negative infinity value (`-inf`), such that when computing the softmax values, the probability scores of the non-top-k tokens are 0, and the remaining probabilities sum up to 1. (Careful readers may remember this masking trick from the causal attention module we implemented in chapter 3, section 3.5.1.)
@@ -6010,11 +4592,9 @@ tensor([0.0615, 0.0000, 0.0000, 0.5775, 0.0000, 0.0000, 0.0000, 0.3610,
 
 We can now apply the temperature scaling and multinomial function for probabilistic sampling to select the next token among these three non-zero probability scores to generate the next token. We do this next by modifying the text generation function.
 
-5.3.3 Modifying the text generation function
+#### 5.3.3 Modifying the text generation function
 
-Now, let’s combine temperature sampling and top-k sampling to modify the `generate_`
-
-`text_simple` function we used to generate text via the LLM earlier, creating a new
+Now, let’s combine temperature sampling and top-k sampling to modify the `generatetext_simple` function we used to generate text via the LLM earlier, creating a new
 
 `generate` function.
 
@@ -6049,9 +4629,7 @@ Output text:
  with random-
 ```
 
-As we can see, the generated text is very different from the one we previously generated via the `generate_simple` function in section 5.3 (`"Every` `effort` `moves` `you` `know,"`
-
-`was` `one` `of` `the` `axioms` `he` `laid...!` ), which was a memorized passage from the training set.
+As we can see, the generated text is very different from the one we previously generated via the `generate_simple` function in section 5.3 (`"Every` `effort` `moves` `you` `know,"` `was` `one` `of` `the` `axioms` `he` `laid...!` ), which was a memorized passage from the training set.
 
 Exercise 5.3 What are the different combinations of settings for the `generate` function to force deterministic behavior, that is, disabling the random sampling such that it always produces the same outputs similar to the `generate_simple` function?
 
@@ -6059,17 +4637,14 @@ Thus far, we have discussed how to numerically evaluate the training progress an
 
 So, let’s discuss how to save and load a pretrained model, as highlighted in figure 5.16. Later, we will load a more capable pretrained GPT model from OpenAI into our `GPTModel` instance.
 
-Implement additional LLM text generation strategies to reduce training data memorization
-
 Implement functions to save and load the LLM weights to use or continue training the LLM later
 
 Train the model to generate human-like text
 
 At the end of this chapter, load pretrained weights from OpenAI into our LLM model
 
-losses
-
 ![Fig 5.16](extracted_images/figures/Fig5.16_p181.png)
+
 **Figure 5.16** After training and inspecting the model, it is often helpful to save the model so that we can use or continue training it later (step 6).
 
 Fortunately, saving a PyTorch model is relatively straightforward. The recommended way is to save a model’s `state_dict`, a dictionary mapping each layer to its parameters, using the `torch.save` function:
@@ -6146,9 +4721,7 @@ urllib.request.urlretrieve(url, filename)
 
 Next, after downloading this file to the local directory of your Python session, you should briefly inspect the contents of this file to ensure that it was saved correctly and contains valid Python code.
 
-We can now import the `download_and_load_gpt2` function from the `gpt_download`
-
-`.py` file as follows, which will load the GPT-2 architecture settings (`settings`) and weight parameters (`params`) into our Python session:
+We can now import the `download_and_load_gpt2` function from the `gpt_download` `.py` file as follows, which will load the GPT-2 architecture settings (`settings`) and weight parameters (`params`) into our Python session:
 
 ```python
 from gpt_download import download_and_load_gpt2
@@ -6215,45 +4788,14 @@ The weights of the token embedding layer are
  [ 0.05135201 ...   0.00704835  0.15519823  0.12067825]]
 Token embedding weight tensor dimensions: (50257, 768)
 
-We downloaded and loaded the weights of the smallest GPT-2 model via the `download_`
-
-`and_load_gpt2(model_size="124M",` `...)` setting. OpenAI also shares the weights of larger models: `355M`, `774M`, and `1558M`. The overall architecture of these differently sized GPT models is the same, as illustrated in figure 5.17, except that different
-
-GPT model
-
-Linear output layer
-
-Final LayerNorm
-
-Dropout
-
-Feed forward
-
-Number of heads in multi-head attention: • 12 in “gpt2-small” • 16 in “gpt2-medium” • 20 in “gpt2-large” • 25 in gpt2-xl” “
-
-Dropout
-
-Masked multi-head
-
-attention
-
-N
-
-Dropout
-
-Embedding dimensions: • 768 in “gpt2-small” • 1,024 in “gpt2-medium” • 1,280 in “gpt2-large” • 1,600 in “gpt2-xl”
-
-Positional embedding layer
-
-Token embedding layer
-
-Tokenized text
+We downloaded and loaded the weights of the smallest GPT-2 model via the `downloadand_load_gpt2(model_size="124M",` `...)` setting. OpenAI also shares the weights of larger models: `355M`, `774M`, and `1558M`. The overall architecture of these differently sized GPT models is the same, as illustrated in figure 5.17, except that different
 
 ```text
 Every effort moves you
 ```
 
 ![Fig 5.17](extracted_images/figures/Fig5.17_p185.png)
+
 **Figure 5.17** GPT-2 LLMs come in several different model sizes, ranging from 124 million to 1,558 million
 
 architectural elements are repeated different numbers of times and the embedding size differs. The remaining code in this chapter is also compatible with these larger models.
@@ -6334,9 +4876,7 @@ import numpy as np
             gpt.trf_blocks[b].att.out_proj.weight,
             params["blocks"][b]["attn"]["c_proj"]["w"].T)
 
-The np.split function is used to divide the attention and bias weights
-
-into three equal parts for the query, key, and value components.
+The np.split function is used to divide the attention and bias weights into three equal parts for the query, key, and value components.
 
 Iterates over each transformer block in the model
 
@@ -6374,11 +4914,7 @@ Iterates over each transformer block in the model
 
 The original GPT-2 model by OpenAI reused the token
 
-embedding weights in the output layer to reduce the total number of parameters,
-
-which is a concept known as
-
-weight tying.
+embedding weights in the output layer to reduce the total number of parameters, which is a concept known as weight tying.
 
 ```text
     gpt.final_norm.scale = assign(gpt.final_norm.scale, params["g"])
@@ -6386,9 +4922,7 @@ weight tying.
     gpt.out_head.weight = assign(gpt.out_head.weight, params["wte"])
 ```
 
-In the `load_weights_into_gpt` function, we carefully match the weights from OpenAI’s implementation with our `GPTModel` implementation. To pick a specific example, OpenAI stored the weight tensor for the output projection layer for the first transformer block as `params["blocks"][0]["attn"]["c_proj"]["w"]`. In our implementation, this weight tensor corresponds to `gpt.trf_blocks[b].att.out_proj`
-
-`.weight`, where `gpt` is a `GPTModel` instance.
+In the `load_weights_into_gpt` function, we carefully match the weights from OpenAI’s implementation with our `GPTModel` implementation. To pick a specific example, OpenAI stored the weight tensor for the output projection layer for the first transformer block as `params["blocks"][0]["attn"]["c_proj"]["w"]`. In our implementation, this weight tensor corresponds to `gpt.trf_blocks[b].att.out_proj` `.weight`, where `gpt` is a `GPTModel` instance.
 
 Developing the `load_weights_into_gpt` function took a lot of guesswork since OpenAI used a slightly different naming convention from ours. However, the `assign` function would alert us if we try to match two tensors with different dimensions. Also, if we made a mistake in this function, we would notice this, as the resulting GPT model would be unable to produce coherent text.
 
@@ -6430,44 +4964,29 @@ Exercise 5.5 Calculate the training and validation set losses of the `GPTModel` 
 
 Exercise 5.6 Experiment with GPT-2 models of different sizes—for example, the largest 1,558 million parameter model—and compare the generated text to the 124 million model.
 
-Summary
+### Summary
 
 > When LLMs generate text, they output one token at a time.
 
+> By default, the next token is generated by converting the model outputs into probability scores and selecting the token from the vocabulary that corresponds to the highest probability score, which is known as “greedy decoding.” Using probabilistic sampling and temperature scaling, we can influence the diversity and coherence of the generated text.
 
-> By default, the next token is generated by converting the model outputs into
-
-
-probability scores and selecting the token from the vocabulary that corresponds to the highest probability score, which is known as “greedy decoding.”
-
-> Using probabilistic sampling and temperature scaling, we can influence the
-
-
-diversity and coherence of the generated text.
-
-> Training and validation set losses can be used to gauge the quality of text gener-
-
-
-ated by LLM during training.
+> Training and validation set losses can be used to gauge the quality of text gener- ated by LLM during training.
 
 > Pretraining an LLM involves changing its weights to minimize the training loss.
 
+> The training loop for LLMs itself is a standard procedure in deep learning, using a conventional cross entropy loss and AdamW optimizer.
 
-> The training loop for LLMs itself is a standard procedure in deep learning,
+> Pretraining an LLM on a large text corpus is timeand resource-intensive, so we can load openly available weights as an alternative to pretraining the model on a large dataset ourselves.
 
+## 6 Fine-tuning for classification
 
-using a conventional cross entropy loss and AdamW optimizer.
-
-> Pretraining an LLM on a large text corpus is timeand resource-intensive, so we
-
-
-can load openly available weights as an alternative to pretraining the model on a large dataset ourselves.
-
-Fine-tuning for classification
-
-This chapter covers
-
-classifier
+This chapter covers:
+- Introducing different LLM fine-tuning approaches
+- Preparing a dataset for text classification
+- Modifying a pretrained LLM for fine-tuning
+- Fine-tuning an LLM to identify spam messages
+- Evaluating the accuracy of a fine-tuned LLM classifier
+- Using a fine-tuned LLM to classify new data
 
 So far, we have coded the LLM architecture, pretrained it, and learned how to import pretrained weights from an external source, such as OpenAI, into our model. Now we will reap the fruits of our labor by fine-tuning the LLM on a specific target task, such as classifying text. The concrete example we examine is classifying text messages as “spam” or “not spam.” Figure 6.1 highlights the two main ways of fine-tuning an LLM: fine-tuning for classification (step 8) and fine-tuning to follow instructions (step 9).
 
@@ -6477,21 +4996,10 @@ In chapter 5, we also loaded pretrained model weights into the LLM architecture
 
 In this chapter, we will ﬁne-tune the pretrained LLM to classify texts
 
-Dataset with class labels
-
-Classiﬁer
-
-Building an LLM
-
-Foundation model
-
-Personal assistant
-
 In chapter 5, we pretrained an LLM
 
-Instruction dataset
-
 ![Fig 6.1](extracted_images/figures/Fig6.1_p192.png)
+
 **Figure 6.1** The three main stages of coding an LLM. This chapter focus on stage 3 (step 8): fine-tuning a pretrained LLM as a classifier.
 
 <a id="6-1-different-categories-of-fine-tuning"></a>
@@ -6499,24 +5007,11 @@ Instruction dataset
 
 The most common ways to fine-tune language models are instruction fine-tuning and classification fine-tuning. Instruction fine-tuning involves training a language model on a set of tasks using specific instructions to improve its ability to understand and execute tasks described in natural language prompts, as illustrated in figure 6.2.
 
-Is the following text ‘spam’?
-
-Yes.
-
-LLM
-
-Add instructions for the model
-
-Model input Model output Answer with 'yes' or 'no'.
-
-LLM
-
 ![Fig 6.2](extracted_images/figures/Fig6.2_p192.png)
+
 **Figure 6.2** Two different instruction fine-tuning scenarios. At the top, the model is tasked with determining whether a given text is spam. At the bottom, the model is given an instruction on how to translate an English sentence into German.
 
-In classification fine-tuning, a concept you might already be acquainted with if you have a background in machine learning, the model is trained to recognize a specific
-
-set of class labels, such as “spam” and “not spam.” Examples of classification tasks extend beyond LLMs and email filtering: they include identifying different species of plants from images; categorizing news articles into topics like sports, politics, and technology; and distinguishing between benign and malignant tumors in medical imaging.
+In classification fine-tuning, a concept you might already be acquainted with if you have a background in machine learning, the model is trained to recognize a specific set of class labels, such as “spam” and “not spam.” Examples of classification tasks extend beyond LLMs and email filtering: they include identifying different species of plants from images; categorizing news articles into topics like sports, politics, and technology; and distinguishing between benign and malignant tumors in medical imaging.
 
 The key point is that a classification fine-tuned model is restricted to predicting classes it has encountered during its training. For instance, it can determine whether something is “spam” or “not spam,” as illustrated in figure 6.3, but it can’t say anything else about the input text.
 
@@ -6524,13 +5019,8 @@ Spam LLM
 
 Model can only output two types of responses: “Spam” and “Not spam.”
 
-Model input without instructions
-
-Not spam
-
-LLM
-
 ![Fig 6.3](extracted_images/figures/Fig6.3_p193.png)
+
 **Figure 6.3** A text classification scenario using an LLM. A model fine-tuned for spam classification does not require further instruction alongside the input. In contrast to an instruction fine-tuned model, it can only respond with “spam” or “not spam.”
 
 In contrast to the classification fine-tuned model depicted in figure 6.3, an instruction fine-tuned model typically can undertake a broader range of tasks. We can view a classification fine-tuned model as highly specialized, and generally, it is easier to develop a specialized model than a generalist model that works well across various tasks.
@@ -6544,17 +5034,8 @@ While instruction fine-tuning is more versatile, it demands larger datasets and 
 
 We will modify and classification fine-tune the GPT model we previously implemented and pretrained. We begin by downloading and preparing the dataset, as highlighted in figure 6.4. To provide an intuitive and useful example of classification fine-tuning, we will work with a text message dataset that consists of spam and non-spam messages.
 
-Stage 1: Dataset preparation
-
-Stage 2: Model setup
-
-Stage 3: Model ﬁne-tuning
-
-and usage
-
-We start with downloading, inspecting, and preparing the dataset that we will use to ﬁne-tune the model.
-
 ![Fig 6.4](extracted_images/figures/Fig6.4_p194.png)
+
 **Figure 6.4** The three-stage process for classification fine-tuning an LLM. Stage 1 involves dataset preparation. Stage 2 focuses on model setup. Stage 3 covers fine-tuning and evaluating the model.
 
 NOTE Text messages typically sent via phone, not email. However, the same steps also apply to email classification, and interested readers can find links to email spam classification datasets in appendix B.
@@ -6571,13 +5052,9 @@ from pathlib import Path
 url = "https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip"
 zip_path = "sms_spam_collection.zip"
 extracted_path = "sms_spam_collection"
-data_file_path = Path(extracted_path) / "SMSSpamCollection.tsv"
-
-def download_and_unzip_spam_data(
+data_file_path = Path(extracted_path) / "SMSSpamCollection.tsv" def download_and_unzip_spam_data(
         url, zip_path, extracted_path, data_file_path):
     if data_file_path.exists():
-
-Downloads the file
 
 ```text
     with urllib.request.urlopen(url) as response:
@@ -6585,20 +5062,16 @@ Downloads the file
             out_file.write(response.read())
 ```
 
-Unzips the file
-
-Adds a .tsv file extension
-
 After executing the preceding code, the dataset is saved as a tab-separated text file,
 
 `SMSSpamCollection.tsv`, in the `sms_spam_collection` folder. We can load it into a pandas `DataFrame` as follows:
 
-Renders the data frame in a Jupyter notebook. Alternatively, use print(df).
-
 ![Fig 6.5](extracted_images/figures/Fig6.5_p195.png)
+
 Figure 6.5 shows the resulting data frame of the spam dataset.
 
 ![Fig 6.5](extracted_images/figures/Fig6.5_p195.png)
+
 **Figure 6.5** Preview of the `SMSSpamCollection` dataset in a pandas `DataFrame`, showing class labels (“ham” or “spam”) and corresponding text messages. The dataset consists of 5,572 rows (text messages and labels).
 
 Let’s examine the class label distribution:
@@ -6684,13 +5157,9 @@ We will develop PyTorch data loaders conceptually similar to those we implemente
 
 > Truncate all messages to the length of the shortest message in the dataset or batch.
 
-
 > Pad all messages to the length of the longest message in the dataset or batch.
 
-
-The first option is computationally cheaper, but it may result in significant information loss if shorter messages are much smaller than the average or longest messages,
-
-potentially reducing model performance. So, we opt for the second option, which preserves the entire content of all messages.
+The first option is computationally cheaper, but it may result in significant information loss if shorter messages are much smaller than the average or longest messages, potentially reducing model performance. So, we opt for the second option, which preserves the entire content of all messages.
 
 To implement batching, where all messages are padded to the length of the longest message in the dataset, we add padding tokens to all shorter messages. For this purpose, we use `"<|endoftext|>"` as a padding token.
 
@@ -6708,18 +5177,12 @@ print(tokenizer.encode("<|endoftext|>", allowed_special={"<|endoftext|>"}))
 
 Padded token IDs
 
-We use 50256 as a padding token.
-
 Token IDs
-
-This is another text message
 
 ```text
 1212, 318, 1194,
 2420, 3275
 ```
-
-This is the third text message, which is very long
 
 ```text
 1212, 318, 262, 2368,
@@ -6727,9 +5190,8 @@ This is the third text message, which is very long
 845, 890
 ```
 
-No padding in this last example because it is the longest message
-
 ![Fig 6.6](extracted_images/figures/Fig6.6_p198.png)
+
 **Figure 6.6** The input text preparation process. First, each input text message is converted into a sequence of token IDs. Then, to ensure uniform sequence lengths, shorter sequences are padded with a padding token (in this case, token ID 50256) to match the length of the longest sequence.
 
 Indeed, executing the preceding code returns `[50256]`.
@@ -6812,8 +5274,6 @@ Original message text
 
 At what time are you ...
 
-1
-
 XMAS Prize draws! ...
 
 2
@@ -6826,11 +5286,8 @@ Dear voucher holder ...
 
 Each batch consists of eight training examples.
 
-Each entry (row) represents the token IDs corresponding to the original message text
-
-The class label of the eighth training example
-
 ![Fig 6.7](extracted_images/figures/Fig6.7_p201.png)
+
 **Figure 6.7** A single training batch consisting of eight text messages represented as token IDs. Each text message consists of 120 token IDs. A class label array stores the eight class labels corresponding to the text messages, which can be either `0` (“not spam”) or `1` (“spam”).
 
 The code in the following listing creates the training, validation, and test set data loaders that load the text messages and labels in batches of size 8.
@@ -6910,11 +5367,8 @@ We must prepare the model for classification fine-tuning to identify spam messag
 
 In this section, we initialize the pretrained model from the previous chapter that we will ﬁne-tune.
 
-and usage
-
-In the previous section, we prepared the SPAM prediction dataset for classiﬁcation ﬁne-tuning.
-
 ![Fig 6.8](extracted_images/figures/Fig6.8_p203.png)
+
 **Figure 6.8** The three-stage process for classification fine-tuning the LLM. Having completed stage 1, preparing the dataset, we now must initialize the LLM, which we will then fine-tune to classify spam messages.
 
 To begin the model preparation process, we employ the same configurations we used to pretrain unlabeled data:
@@ -7032,17 +5486,12 @@ attention
 
 We replace the original linear output layer above with a layer that maps from 768 hidden units to only 2 units, where the 2 units represent the two classes ("spam" and "not spam").
 
-Positional embedding layer
-
-Token embedding layer
-
-Tokenized text
-
 ```text
 Inputs
 ```
 
 ![Fig 6.9](extracted_images/figures/Fig6.9_p206.png)
+
 **Figure 6.9** Adapting a GPT model for spam classification by altering its architecture. Initially, the model’s linear output layer mapped 768 hidden units to a vocabulary of 50,257 tokens. To detect spam, we replace this layer with a new output layer that maps the same 768 hidden units to just two classes, representing “spam” and “not
 
 Before we attempt the modification shown in figure 6.9, let’s print the model architecture via `print(model`):
@@ -7126,39 +5575,12 @@ Even though we added a new output layer and marked certain layers as trainable o
 Outputs
 ```
 
-GPT model
-
-Linear output layer
-
-Final LayerNorm
-
-We make the output layer, ﬁnal LayerNorm, and the last transformer block trainable
-
-Transformer
-
-block
-
-Dropout
-
-Feed forward
-
-Dropout
-
-Masked multihead
-
-attention
-
-Positional embedding layer
-
-Token embedding layer
-
-Tokenized text
-
 ```text
 Inputs
 ```
 
 ![Fig 6.10](extracted_images/figures/Fig6.10_p209.png)
+
 **Figure 6.10** The GPT model includes 12 repeated transformer blocks. Alongside the output layer, we set the final `LayerNorm` and the last transformer block as trainable. The remaining 11 transformer blocks and the embedding layers are kept nontrainable.
 
 instance, we can feed it an example text identical to our previously used example text:
@@ -7219,58 +5641,20 @@ We still need to convert the values into a class-label prediction. But first, le
 
 We have already explored the attention mechanism, which establishes a relationship between each input token and every other input token, and the concept of a causal attention mask, commonly used in GPT-like models (see chapter 3). This mask restricts a
 
-A 4 × 2–dimensional tensor
-
-The last row corresponds to the last token.
-
 The number of rows corresponds to the number of input tokens, as discussed in chapter 4.
-
-GPT model
-
-Linear output layer
-
-Final LayerNorm
-
-Dropout
-
-Feed forward
-
-Dropout
-
-This transformer block is repeated 12x in the 124M-parameter GPT-2 model.
-
-Masked multihead
-
-attention
-
-Positional embedding layer
-
-Token embedding layer
-
-Tokenized text
 
 ```text
 Do you have time
 ```
 
 ![Fig 6.11](extracted_images/figures/Fig6.11_p211.png)
+
 **Figure 6.11** The GPT model with a four-token example input and output. The output tensor consists of two columns due to the modified output layer. We are only interested in the last row corresponding to the last token when fine-tuning the model for spam classification.
 
 token’s focus to its current position and the those before it, ensuring that each token can only be influenced by itself and the preceding tokens, as illustrated in figure 6.12.
 
-Tokens masked out via the causal attention mask.
-
-have
-
-time
-
-you
-
-Do
-
-Do
-
 ![Fig 6.12](extracted_images/figures/Fig6.12_p212.png)
+
 **Figure 6.12** The causal attention mechanism, where the attention scores between input tokens are displayed in a matrix format. The empty cells indicate masked positions due to the causal attention mask, preventing tokens from attending to future tokens. The values in the cells represent attention scores; the last token, `time`, is the only one that computes attention scores for all preceding tokens.
 
 have
@@ -7292,17 +5676,8 @@ Only one small task remains before we fine-tune the model: we must implement the
 
 Before implementing the evaluation utilities, let’s briefly discuss how we convert the model outputs into class label predictions. We previously computed the token ID of the next token generated by the LLM by converting the 50,257 outputs into probabilities via the `softmax` function and then returning the position of the highest probability via the `argmax` function. We take the same approach here to calculate whether the model outputs a “spam” or “not spam” prediction for a given input, as shown in figure 6.14. The only difference is that we work with 2-dimensional instead of 50,257dimensional outputs.
 
-Stage 1: Dataset preparation
-
-Stage 2: Model setup
-
-Stage 3: Model ﬁne-tuning
-
-and usage
-
-Implement the utility function to calculate the classiﬁcation loss and accuracy of the model.
-
 ![Fig 6.13](extracted_images/figures/Fig6.13_p213.png)
+
 **Figure 6.13** The three-stage process for classification fine-tuning the LLM. We've completed the first six steps. We are now ready to undertake the last step of stage 2: implementing the functions to evaluate the model’s performance to classify spam messages before, during, and after the fine-tuning.
 
 Input text message
@@ -7313,22 +5688,10 @@ Outputs corresponding to the last row (token)
 
 The predicted labels
 
-LLM
-
-You won the lottery
-
-(not spam)
-
 ```text
-[ 3.5983,  -3.9902 ]
 ```
 
-LLM
-
-Do you have time
-
 ```text
-[ -3.9846,  5.2940 ]
 ```
 
 `0 1` Index position:
@@ -7338,6 +5701,7 @@ Do you have time
 2. Locate the index position with the highest probability value in each row vector, which is done via the function. `argmax`
 
 ![Fig 6.14](extracted_images/figures/Fig6.14_p213.png)
+
 **Figure 6.14** The model outputs corresponding to the last token are converted into probability scores for each input text. The class labels are obtained by looking up the index position of the highest probability score. The model predicts the spam labels incorrectly because it has not yet been trained.
 
 Let’s consider the last token output using a concrete example:
@@ -7469,15 +5833,8 @@ Next, we will implement a training function to fine-tune the model, which means 
 
 We must define and use the training function to fine-tune the pretrained LLM and improve its spam classification accuracy. The training loop, illustrated in figure 6.15, is the same overall training loop we used for pretraining; the only difference is that we calculate the classification accuracy instead of generating a sample text to evaluate the model.
 
-One epoch is one complete pass over a training set.
-
-The number of batches is determined by the training set size divided by the size of each batch.
-
-These are the usual steps used for training deep neural networks in PyTorch.
-
-Optional steps for tracking the training progress
-
 ![Fig 6.15](extracted_images/figures/Fig6.15_p217.png)
+
 **Figure 6.15** A typical training loop for training deep neural networks in PyTorch consists of several steps, iterating over the batches in the training set for several epochs. In each loop, we calculate the loss for each training set batch to determine loss gradients, which we use to update the model weights to minimize the training set loss.
 
 The training function implementing the concepts shown in figure 6.15 also closely mirrors the `train_model_simple` function used for pretraining the model. The only two distinctions are that we now track the number of training examples seen (`examples_seen`) instead of the number of tokens, and we calculate the accuracy after each epoch instead of printing a sample text.
@@ -7585,14 +5942,6 @@ Training completed in 5.65 minutes.
 
 We then use Matplotlib to plot the loss function for the training and validation set.
 
-Plots training and validation loss against epochs
-
-Creates a second x-axis for examples seen
-
-Invisible plot for aligning ticks
-
-Adjusts layout to make room
-
 ```text
     fig.tight_layout()
     plt.savefig(f"{label}-plot.pdf")
@@ -7600,14 +5949,14 @@ Adjusts layout to make room
 ```
 
 epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
-examples_seen_tensor = torch.linspace(0, examples_seen, len(train_losses))
-
-plot_values(epochs_tensor, examples_seen_tensor, train_losses, val_losses)
+examples_seen_tensor = torch.linspace(0, examples_seen, len(train_losses)) plot_values(epochs_tensor, examples_seen_tensor, train_losses, val_losses)
 
 ![Fig 6.16](extracted_images/figures/Fig6.16_p220.png)
+
 Figure 6.16 plots the resulting loss curves.
 
 ![Fig 6.16](extracted_images/figures/Fig6.16_p220.png)
+
 **Figure 6.16** The model’s training and validation loss over the five training epochs. Both the training loss, represented by the solid line, and the validation loss, represented by the dashed line, sharply decline in the first epoch and gradually stabilize toward the fifth epoch. This pattern indicates good learning progress and suggests that the model learned from the training data while generalizing well to the unseen validation data.
 
 As we can see based on the sharp downward slope in figure 6.16, the model is learning well from the training data, and there is little to no indication of overfitting; that is, there is no noticeable gap between the training and validation set losses.
@@ -7623,13 +5972,14 @@ examples_seen_tensor = torch.linspace(0, examples_seen, len(train_accs))
 
 plot_values(
     epochs_tensor, examples_seen_tensor, train_accs, val_accs,
-    label="accuracy"
 )
 
 ![Fig 6.17](extracted_images/figures/Fig6.17_p221.png)
+
 Figure 6.17 graphs the resulting accuracy. The model achieves a relatively high training and validation accuracy after epochs 4 and 5. Importantly, we previously set `eval_iter=5`
 
 ![Fig 6.17](extracted_images/figures/Fig6.17_p221.png)
+
 **Figure 6.17** Both the training accuracy (solid line) and the validation accuracy (dashed line) increase substantially in the early epochs and then plateau, achieving almost perfect accuracy scores of 1.0. The close proximity of the two lines throughout the epochs suggests that
 
 when using the `train_classifier_simple` function, which means our estimations of training and validation performance are based on only five batches for efficiency during training.
@@ -7654,9 +6004,7 @@ Validation accuracy: 97.32%
 Test accuracy: 95.67%
 ```
 
-The training and test set performances are almost identical. The slight discrepancy between the training and test set accuracies suggests minimal overfitting of the training data. Typically, the validation set accuracy is somewhat higher than the test set accuracy because the model development often involves tuning hyperparameters to perform well on the validation set, which might not generalize as effectively to the test set. This situation is common, but the gap could potentially be minimized by adjusting the model’s settings, such as increasing the dropout rate (`drop_rate`) or the `weight_`
-
-`decay` parameter in the optimizer configuration.
+The training and test set performances are almost identical. The slight discrepancy between the training and test set accuracies suggests minimal overfitting of the training data. Typically, the validation set accuracy is somewhat higher than the test set accuracy because the model development often involves tuning hyperparameters to perform well on the validation set, which might not generalize as effectively to the test set. This situation is common, but the gap could potentially be minimized by adjusting the model’s settings, such as increasing the dropout rate (`drop_rate`) or the `weightdecay` parameter in the optimizer configuration.
 
 <a id="6-8-using-the-llm-as-a-spam-classifier"></a>
 ### 6.8 Using the LLM as a spam classifier
@@ -7665,8 +6013,6 @@ Having fine-tuned and evaluated the model, we are now ready to classify spam mes
 
 Stage 1: Dataset preparation
 
-Stage 2: Model setup
-
 Stage 3: Model ﬁne-tuning
 
 and usage
@@ -7674,6 +6020,7 @@ and usage
 We are ready to try the model on new text messages.
 
 ![Fig 6.18](extracted_images/figures/Fig6.18_p223.png)
+
 **Figure 6.18** The three-stage process for classification fine-tuning our LLM. Step 10 is the final step of stage 3—using the fine-tuned model to classify new spam messages.
 
 ```python
@@ -7748,57 +6095,31 @@ model_state_dict = torch.load("review_classifier.pth, map_location=device")
 model.load_state_dict(model_state_dict)
 ```
 
-Summary
+### Summary
 
-> There are different strategies for fine-tuning LLMs, including classification
+> There are different strategies for fine-tuning LLMs, including classification fine-tuning and instruction fine-tuning.
 
+> Classification fine-tuning involves replacing the output layer of an LLM via a small classification layer.
 
-fine-tuning and instruction fine-tuning.
+> In the case of classifying text messages as “spam” or “not spam,” the new classifi- cation layer consists of only two output nodes. Previously, we used the number of output nodes equal to the number of unique tokens in the vocabulary (i.e., 50,256).
 
-> Classification fine-tuning involves replacing the output layer of an LLM via a
-
-
-small classification layer.
-
-> In the case of classifying text messages as “spam” or “not spam,” the new classifi-
-
-
-cation layer consists of only two output nodes. Previously, we used the number of output nodes equal to the number of unique tokens in the vocabulary (i.e., 50,256).
-
-> Instead of predicting the next token in the text as in pretraining, classification
-
-
-fine-tuning trains the model to output a correct class label—for example, “spam” or “not spam.”
-
-> The model input for fine-tuning is text converted into token IDs, similar to
-
-
-pretraining.
+> Instead of predicting the next token in the text as in pretraining, classification fine-tuning trains the model to output a correct class label—for example, “spam” or “not spam.” The model input for fine-tuning is text converted into token IDs, similar to pretraining.
 
 > Before fine-tuning an LLM, we load the pretrained model as a base model.
 
+> Evaluating a classification model involves calculating the classification accuracy (the fraction or percentage of correct predictions).
 
-> Evaluating a classification model involves calculating the classification accuracy
+> Fine-tuning a classification model uses the same cross entropy loss function as when pretraining the LLM.
 
+## 7 Fine-tuning to follow instructions
 
-(the fraction or percentage of correct predictions).
-
-> Fine-tuning a classification model uses the same cross entropy loss function as
-
-
-when pretraining the LLM.
-
-Fine-tuning to follow
-
-instructions
-
-This chapter covers
-
-fine-tuning
-
-follow human instructions
-
-for evaluation
+This chapter covers:
+- The instruction fine-tuning process of LLMs
+- Preparing a dataset for supervised instruction fine-tuning
+- Organizing instruction data in training batches
+- Loading a pretrained LLM and fine-tuning it to follow human instructions
+- Extracting LLM-generated instruction responses for evaluation
+- Evaluating an instruction-fine-tuned LLM
 
 Previously, we implemented the LLM architecture, carried out pretraining, and imported pretrained weights from external sources into our model. Then, we focused on fine-tuning our LLM for a specific classification task: distinguishing between spam and non-spam text messages. Now we’ll implement the process for fine-tuning an LLM to follow human instructions, as illustrated in figure 7.1. Instruction fine-tuning is one of the main techniques behind developing LLMs for chatbot applications, personal assistants, and other conversational tasks.
 
@@ -7807,18 +6128,6 @@ In chapter 4, we implemented a GPT-like LLM architecture.
 In chapter 5, we also loaded pretrained model weights into the LLM architecture.
 
 In the previous chapter, we ﬁne-tuned the pretrained LLM to classify texts.
-
-Dataset with class labels
-
-weights
-
-Classiﬁer
-
-Building an LLM
-
-Foundation model
-
-Personal assistant
 
 STAGE 2
 
@@ -7829,9 +6138,11 @@ Instruction dataset
 In this chapter, we ﬁne-tune the pretrained LLM to follow instructions.
 
 ![Fig 7.1](extracted_images/figures/Fig7.1_p227.png)
+
 **Figure 7.1** The three main stages of coding an LLM. This chapter focuses on step 9 of stage 3: fine-tuning a pretrained LLM to follow human instructions.
 
 ![Fig 7.1](extracted_images/figures/Fig7.1_p227.png)
+
 Figure 7.1 shows two main ways of fine-tuning an LLM: fine-tuning for classification (step 8) and fine-tuning an LLM to follow instructions (step 9). We implemented step 8 in chapter 6. Now we will fine-tune an LLM using an instruction dataset.
 
 <a id="7-1-introduction-to-instruction-fine-tuning"></a>
@@ -7841,37 +6152,21 @@ We now know that pretraining an LLM involves a training procedure where it learn
 
 Here, we focus on improving the LLM’s ability to follow such instructions and generate a desired response, as illustrated in figure 7.2. Preparing the dataset is a key aspect of instruction fine-tuning. Then we’ll complete all the steps in the three stages of the instruction fine-tuning process, beginning with the dataset preparation, as shown in figure 7.3.
 
-The goal for the LLM is to generate a desired response.
-
-The instructions serve as inputs for the LLM.
-
-Instruction Desired response
-
 Convert 45 kilometers to meters. 45 kilometers is 45000 meters.
 
 Edit the following sentence to remove all passive voice: “The song was composed by the artist.”
 
-The artist composed the song.
-
 ![Fig 7.2](extracted_images/figures/Fig7.2_p228.png)
+
 **Figure 7.2** Examples of instructions that are processed by an LLM to generate desired responses
 
 We start with downloading, inspecting, and preparing the dataset that we will use to ﬁne-tune the model.
 
-formatting
-
-Stage 2: Fine-tuning the LLM
-
-LLM
-
-loss
-
-Stage 3: Evaluating the LLM
-
 ![Fig 7.3](extracted_images/figures/Fig7.3_p228.png)
+
 **Figure 7.3** The three-stage process for instruction fine-tuning an LLM. Stage 1 involves dataset preparation, stage 2 focuses on model setup and fine-tuning, and stage 3 covers the evaluation of the model. We will begin with step 1 of stage 1: downloading and formatting the dataset.
 
-7.2 Preparing a dataset for supervised instruction fine-tuning
+### 7.2 Preparing a dataset for supervised instruction fine-tuning
 
 Let’s download and format the instruction dataset for instruction fine-tuning a pre- trained LLM. The dataset consists of 1,100 instruction–response pairs similar to those in figure 7.2. This dataset was created specifically for this book, but interested readers can find alternative, publicly available instruction datasets in appendix B.
 
@@ -7959,6 +6254,7 @@ following word.
 The correct spelling is 'Occasion'.
 
 ![Fig 7.4](extracted_images/figures/Fig7.4_p230.png)
+
 **Figure 7.4** Comparison of prompt styles for instruction fine-tuning in LLMs. The Alpaca style (left) uses a structured format with defined sections for instruction, input, and response, while the Phi-3 style (right) employs `<|user|><|assistant|>`
 
 example formats, often referred to as prompt styles, used in the training of notable LLMs such as Alpaca and Phi-3.
@@ -8022,9 +6318,7 @@ desired_response = f"\n\n### Response:\n{data[999]['output']}"
 print(model_input + desired_response)
 ```
 
-The output shows that entries with an empty `'input'` field don’t contain an `###`
-
-`Input:` section in the formatted input:
+The output shows that entries with an empty `'input'` field don’t contain an `###` `Input:` section in the formatted input:
 
 ```text
 Below is an instruction that describes a task. Write a response that
@@ -8074,26 +6368,15 @@ In this section, we learn how to efﬁciently pad the data samples to equal leng
 
 Then, we create the PyTorch data loaders we will use for ﬁne-tuning the LLM.
 
-formatting
-
-Stage 2: Fine-tuning the LLM
-
-LLM
-
-loss
-
-Stage 3: Evaluating the LLM
-
 ![Fig 7.5](extracted_images/figures/Fig7.5_p233.png)
+
 **Figure 7.5** The three-stage process for instruction fine-tuning an LLM. Next, we look at step 2 of stage 1: assembling the training batches.
 
 In the previous chapter, the training batches were created automatically by the PyTorch
 
 `DataLoader` class, which employs a default collate function to combine lists of samples into batches. A collate function is responsible for taking a list of individual data samples and merging them into a single batch that can be processed efficiently by the model during training.
 
-However, the batching process for instruction fine-tuning is a bit more involved and requires us to create our own custom collate function that we will later plug into
-
-the `DataLoader`. We implement this custom collate function to handle the specific requirements and formatting of our instruction fine-tuning dataset.
+However, the batching process for instruction fine-tuning is a bit more involved and requires us to create our own custom collate function that we will later plug into the `DataLoader`. We implement this custom collate function to handle the specific requirements and formatting of our instruction fine-tuning dataset.
 
 Let’s tackle the batching process in several steps, including coding the custom collate function, as illustrated in figure 7.6. First, to implement steps 2.1 and 2.2, we code an `InstructionDataset` class that applies `format_input` and pretokenizes all inputs in the dataset, similar to the `SpamDataset` in chapter 6. This two-step process, detailed in figure 7.7, is implemented in the `__init__` constructor method of the
 
@@ -8101,27 +6384,10 @@ Let’s tackle the batching process in several steps, including coding the custo
 
 Below is an instruction that describes a task. Write a response that appropriately completes the request.
 
-template.
-
 Format input into an instructionresponse template.
 
-Convert instruction-response entry into token IDs.
-
-2.2) Tokenize formatted data.
-
-Add end-of-text tokens (50256) to pad data samples to the same length.
-
-padding tokens.
-
-Create a list of target token IDs for the model to learn (these are the inputs shifted by 1, plus an additional padding token).
-
-training.
-
-2.5) Replace padding tokens with placeholders.
-
-Replace certain padding tokens by -100 to exclude them from the training loss.
-
 ![Fig 7.6](extracted_images/figures/Fig7.6_p234.png)
+
 **Figure 7.6** The five substeps involved in implementing the batching process: (2.1) applying the prompt template, (2.2) using tokenization from previous chapters, (2.3) adding padding tokens, (2.4) creating target token IDs, and (2.5) replacing `-100` placeholder tokens to mask padding tokens in the loss function.
 
 The input entry is formatted using the prompt template.
@@ -8190,6 +6456,7 @@ meters.'"
 }
 
 ![Fig 7.7](extracted_images/figures/Fig7.7_p235.png)
+
 **Figure 7.7** The first two steps involved in implementing the batching process. Entries are first formatted using a specific prompt template (2.1) and then tokenized (2.2), resulting in a sequence of token IDs that the model can process.
 
 ```python
@@ -8332,27 +6599,10 @@ We have just implemented our first custom collate function to create batches fro
 
 Below is an instruction that describes a task. Write a response that appropriately completes the request.
 
-template.
-
 Format input into an instructionresponse template.
 
-Convert instruction-response entry into token IDs.
-
-2.2) Tokenize formatted data.
-
-Add end-of-text tokens (50256) to pad data samples to the same length.
-
-padding tokens.
-
-Create a list of target token IDs for the model to learn (these are the inputs shifted by 1, plus an additional padding token).
-
-training.
-
-2.5) Replace padding tokens with placeholders.
-
-Replace certain padding tokens by -100 to exclude them from the training loss.
-
 ![Fig 7.9](extracted_images/figures/Fig7.9_p238.png)
+
 **Figure 7.9** The five substeps involved in implementing the batching process. We are now focusing on step 2.4, the creation of target token IDs. This step is essential as it enables the model to learn and predict the tokens it needs to generate.
 
 Similar to the process we used to pretrain an LLM, the target token IDs match the input token IDs but are shifted one position to the right. This setup, as shown in figure 7.10, allows the LLM to learn how to predict the next token in a sequence.
@@ -8366,6 +6616,7 @@ We add an end-of-text (padding) token.
 We always add an end-of-text (padding) token to the target.
 
 ![Fig 7.10](extracted_images/figures/Fig7.10_p239.png)
+
 **Figure 7.10** The input and target token alignment used in the instruction fine-tuning process of an LLM. For each input sequence, the corresponding target sequence is created by shifting the token IDs one position to the right, omitting the first token of the input, and appending an end-of-text token.
 
 The following updated collate function generates the target token IDs from the input token IDs:
@@ -8417,33 +6668,14 @@ In the next step, we assign a `-100` placeholder value to all padding tokens, as
 
 However, note that we retain one end-of-text token, ID `50256`, in the target list, as depicted in figure 7.12. Retaining it allows the LLM to learn when to generate an endof-text token in response to instructions, which we use as an indicator that the generated response is complete.
 
-In the following listing, we modify our custom collate function to replace tokens with ID `50256` with `-100` in the target lists. Additionally, we introduce an `allowed_`
-
-`max_length` parameter to optionally limit the length of the samples. This adjustment will be useful if you plan to work with your own datasets that exceed the 1,024-token context size supported by the GPT-2 model.
+In the following listing, we modify our custom collate function to replace tokens with ID `50256` with `-100` in the target lists. Additionally, we introduce an `allowedmax_length` parameter to optionally limit the length of the samples. This adjustment will be useful if you plan to work with your own datasets that exceed the 1,024-token context size supported by the GPT-2 model.
 
 Below is an instruction that describes a task. Write a response that appropriately completes the request.
 
-template.
-
 Format input into an instructionresponse template.
 
-Convert instruction-response entry into token IDs.
-
-2.2) Tokenize formatted data.
-
-Add end-of-text tokens (50256) to pad data samples to the same length.
-
-padding tokens.
-
-Create a list of target token IDs for the model to learn (these are the inputs shifted by 1, plus an additional padding token).
-
-training.
-
-2.5) Replace padding tokens with placeholders.
-
-Replace certain padding tokens by -100 to exclude them from the training loss.
-
 ![Fig 7.11](extracted_images/figures/Fig7.11_p241.png)
+
 **Figure 7.11** The five substeps involved in implementing the batching process. After creating the target sequence by shifting token IDs one position to the right and appending an end-of-text token, in step 2.5, we replace the end-of-text padding tokens with a placeholder value (`-100`).
 
 We don’t modify the ﬁrst instance of the end-of-text (padding) token.
@@ -8451,6 +6683,7 @@ We don’t modify the ﬁrst instance of the end-of-text (padding) token.
 We replace all but the ﬁrst instance of the end-of-text (padding) token with -100.
 
 ![Fig 7.12](extracted_images/figures/Fig7.12_p241.png)
+
 **Figure 7.12** Step 2.4 in the token replacement process in the target batch for the training data preparation. We `-100`
 
 ```python
@@ -8566,9 +6799,7 @@ loss_1 == loss_3: tensor(True)
 
 The resulting loss on these three training examples is identical to the loss we calculated from the two training examples earlier. In other words, the cross entropy loss function ignored the third entry in the `targets_3` vector, the token ID corresponding to `-100`. (Interested readers can try to replace the `-100` value with another token ID that is not `0` or `1`; it will result in an error.)
 
-So what’s so special about `-100` that it’s ignored by the cross entropy loss? The default setting of the cross entropy function in PyTorch is `cross_entropy(...,`
-
-`ignore_index=-100)`. This means that it ignores targets labeled with `-100`. We take advantage of this `ignore_index` to ignore the additional end-of-text (padding) tokens that we used to pad the training examples to have the same length in each batch. However, we want to keep one `50256` (end-of-text) token ID in the targets because it helps the LLM to learn to generate end-of-text tokens, which we can use as an indicator that a response is complete.
+So what’s so special about `-100` that it’s ignored by the cross entropy loss? The default setting of the cross entropy function in PyTorch is `cross_entropy(...,` `ignore_index=-100)`. This means that it ignores targets labeled with `-100`. We take advantage of this `ignore_index` to ignore the additional end-of-text (padding) tokens that we used to pad the training examples to have the same length in each batch. However, we want to keep one `50256` (end-of-text) token ID in the targets because it helps the LLM to learn to generate end-of-text tokens, which we can use as an indicator that a response is complete.
 
 In addition to masking out padding tokens, it is also common to mask out the target token IDs that correspond to the instruction, as illustrated in figure 7.13. By masking out the LLM’s target token IDs corresponding to the instruction, the cross entropy loss is only computed for the generated response target IDs. Thus, the model is trained to focus on generating accurate responses rather than memorizing instructions, which can help reduce overfitting.
 
@@ -8606,11 +6837,8 @@ Great results were achieved by the team.<|endoftext|>
 ### Response:
 Great results were achieved by the team.
 
-Tokenize Tokenize
-
-The instruction tokens are replaced by -100. The token IDs corresponding to the input text
-
 ![Fig 7.13](extracted_images/figures/Fig7.13_p244.png)
+
 **Figure 7.13** Left: The formatted input text we tokenize and then feed to the LLM during training. Right: The `-100ignore_index`
 
 As of this writing, researchers are divided on whether masking the instructions is universally beneficial during instruction fine-tuning. For instance, the 2024 paper by Shi et al., “Instruction Tuning With Loss Over Instructions” (https://arxiv.org/abs/ 2405.14394), demonstrated that not masking the instructions benefits the LLM performance (see appendix B for more details). Here, we will not apply masking and leave it as an optional exercise for interested readers.
@@ -8623,24 +6851,13 @@ In the previous section, we assembled multiple instruction examples in a batch.
 
 Now, we create the PyTorch data loaders we will use for ﬁne-tuning the LLM.
 
-formatting
-
-Stage 2: Fine-tuning the LLM
-
-LLM
-
-loss
-
-Stage 3: Evaluating the LLM
-
 ![Fig 7.14](extracted_images/figures/Fig7.14_p245.png)
+
 **Figure 7.14** The three-stage process for instruction fine-tuning an LLM. Thus far, we have prepared the dataset and implemented a custom collate function to batch the instruction dataset. Now, we can
 
 will automatically shuffle and organize the batches for the LLM instruction fine-tuning process.
 
-Before we implement the data loader creation step, we have to briefly talk about the `device` setting of the `custom_collate_fn`. The `custom_collate_fn` includes code to move the input and target tensors (for example, `torch.stack(inputs_lst).to`
-
-`(device)`) to a specified device, which can be either `"cpu"` or `"cuda"` (for NVIDIA GPUs) or, optionally, `"mps"` for Macs with Apple Silicon chips.
+Before we implement the data loader creation step, we have to briefly talk about the `device` setting of the `custom_collate_fn`. The `custom_collate_fn` includes code to move the input and target tensors (for example, `torch.stack(inputs_lst).to` `(device)`) to a specified device, which can be either `"cpu"` or `"cuda"` (for NVIDIA GPUs) or, optionally, `"mps"` for Macs with Apple Silicon chips.
 
 NOTE Using an `"mps"` device may result in numerical differences compared to the contents of this chapter, as Apple Silicon support in PyTorch is still experimental.
 
@@ -8743,19 +6960,10 @@ Before beginning instruction fine-tuning, we must first load a pretrained GPT mo
 
 Now, we create the PyTorch data loaders we will use for ﬁne-tuning the LLM.
 
-formatting
-
 Now, we are loading the LLM for ﬁne-tuning.
 
-Stage 2: Fine-tuning the LLM
-
-LLM
-
-loss
-
-Stage 3: Evaluating the LLM
-
 ![Fig 7.15](extracted_images/figures/Fig7.15_p248.png)
+
 **Figure 7.15** The three-stage process for instruction fine-tuning an LLM. After the dataset preparation, the process of fine-tuning an LLM for instruction-following begins with loading
 
 satisfactory results via instruction fine-tuning. Specifically, smaller models lack the necessary capacity to learn and retain the intricate patterns and nuanced behaviors required for high-quality instruction-following tasks.
@@ -8787,9 +6995,7 @@ model_configs = {
 CHOOSE_MODEL = "gpt2-medium (355M)"
 BASE_CONFIG.update(model_configs[CHOOSE_MODEL])
 
-model_size = CHOOSE_MODEL.split(" ")[-1].lstrip("(").rstrip(")")
-
-settings, params = download_and_load_gpt2(
+model_size = CHOOSE_MODEL.split(" ")[-1].lstrip("(").rstrip(")") settings, params = download_and_load_gpt2(
     model_size=model_size,
     models_dir="gpt2"
 )
@@ -8875,19 +7081,8 @@ This output shows that the pretrained model is not yet capable of correctly foll
 
 It’s time to fine-tune the LLM for instructions (figure 7.16). We will take the loaded pretrained model in the previous section and further train it using the previously pre- pared instruction dataset prepared earlier in this chapter. We already did all the hard work when we implemented the instruction dataset processing at the beginning of
 
-formatting
-
-After preparing the dataset and loading a pretrained model, we now ﬁne-tune the model on the instruction data.
-
-Stage 2: Fine-tuning the LLM
-
-LLM
-
-loss
-
-Stage 3: Evaluating the LLM
-
 ![Fig 7.16](extracted_images/figures/Fig7.16_p251.png)
+
 **Figure 7.16** The three-stage process for instruction fine-tuning an LLM. In step 5, we train the pretrained model we previously loaded on the instruction dataset we prepared earlier.
 
 this chapter. For the fine-tuning process itself, we can reuse the loss calculation and training functions implemented in chapter 5:
@@ -8991,11 +7186,7 @@ Training completed in 0.87 minutes.
 
 The training output shows that the model is learning effectively, as we can tell based on the consistently decreasing training and validation loss values over the two epochs. This result suggests that the model is gradually improving its ability to understand and follow the provided instructions. (Since the model demonstrated effective learning within these two epochs, extending the training to a third epoch or more is not essential and may even be counterproductive as it could lead to increased overfitting.)
 
-Moreover, the generated responses at the end of each epoch let us inspect the model’s progress in correctly executing the given task in the validation set example. In this case, the model successfully converts the active sentence `"The` `chef` `cooks` `the`
-
-`meal` `every` `day."` into its passive voice counterpart: `"The` `meal` `is` `cooked` `every` `day` `by`
-
-`the` `chef."`
+Moreover, the generated responses at the end of each epoch let us inspect the model’s progress in correctly executing the given task in the validation set example. In this case, the model successfully converts the active sentence `"The` `chef` `cooks` `the` `meal` `every` `day."` into its passive voice counterpart: `"The` `meal` `is` `cooked` `every` `day` `by` `the` `chef."`
 
 We will revisit and evaluate the response quality of the model in more detail later. For now, let’s examine the training and validation loss curves to gain additional insights into the model’s learning process. For this, we use the same `plot_losses` function we used for pretraining:
 
@@ -9005,11 +7196,10 @@ epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
 plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses)
 ```
 
-From the loss plot shown in figure 7.17, we can see that the model’s performance on both the training and validation sets improves substantially over the course of training. The rapid decrease in losses during the initial phase indicates that the model quickly learns meaningful patterns and representations from the data. Then, as training progresses to the second epoch, the losses continue to decrease but at a slower
-
-rate, suggesting that the model is fine-tuning its learned representations and converging to a stable solution.
+From the loss plot shown in figure 7.17, we can see that the model’s performance on both the training and validation sets improves substantially over the course of training. The rapid decrease in losses during the initial phase indicates that the model quickly learns meaningful patterns and representations from the data. Then, as training progresses to the second epoch, the losses continue to decrease but at a slower rate, suggesting that the model is fine-tuning its learned representations and converging to a stable solution.
 
 ![Fig 7.17](extracted_images/figures/Fig7.17_p255.png)
+
 **Figure 7.17** The training and validation loss trends over two epochs. The solid line represents the training loss, showing a sharp decrease before stabilizing, while the dotted line represents the validation loss, which follows a similar pattern.
 
 While the loss plot in figure 7.17 indicates that the model is training effectively, the most crucial aspect is its performance in terms of response quality and correctness. So, next, let’s extract the responses and store them in a format that allows us to evaluate and quantify the response quality.
@@ -9023,13 +7213,7 @@ This dataset contains 52,002 entries, which is approximately 50 times more than 
 
 Having fine-tuned the LLM on the training portion of the instruction dataset, we are now ready to evaluate its performance on the held-out test set. First, we extract the model-generated responses for each input in the test dataset and collect them for manual analysis, and then we evaluate the LLM to quantify the quality of the responses, as highlighted in figure 7.18.
 
-formatting
-
 Stage 2: Fine-tuning the LLM
-
-LLM
-
-loss
 
 Stage 3: Evaluating the LLM
 
@@ -9038,6 +7222,7 @@ In this section, we extract the responses from our ﬁne-tuned LLM.
 Then, we compare the model’s responses with the correct responses in the test set.
 
 ![Fig 7.18](extracted_images/figures/Fig7.18_p256.png)
+
 **Figure 7.18** The three-stage process for instruction fine-tuning the LLM. In the first two steps of stage 3, we extract and collect the model responses on the held-out test dataset for further analysis and then evaluate the model to quantify the performance of the instruction-fine-tuned LLM.
 
 To complete the response instruction step, we use the `generate` function. We then print the model responses alongside the expected test set answers for the first three test set entries, presenting them side by side for comparison:
@@ -9113,20 +7298,11 @@ As we can see based on the test set instructions, given responses, and the model
 
 Most importantly, model evaluation is not as straightforward as it is for completion fine-tuning, where we simply calculate the percentage of correct spam/non-spam class labels to obtain the classification’s accuracy. In practice, instruction-fine-tuned LLMs such as chatbots are evaluated via multiple approaches:
 
-> Short-answer and multiple-choice benchmarks, such as Measuring Massive Mul-
+> Short-answer and multiple-choice benchmarks, such as Measuring Massive Mul- titask Language Understanding (MMLU; https://arxiv.org/abs/2009.03300), which test the general knowledge of a model.
 
+> Human preference comparison to other LLMs, such as LMSYS chatbot arena (https://arena.lmsys.org).
 
-titask Language Understanding (MMLU; https://arxiv.org/abs/2009.03300), which test the general knowledge of a model.
-
-> Human preference comparison to other LLMs, such as LMSYS chatbot arena
-
-
-(https://arena.lmsys.org).
-
-> Automated conversational benchmarks, where another LLM like GPT-4 is
-
-
-used to evaluate the responses, such as AlpacaEval (https://tatsu-lab.github.io/ alpaca_eval/).
+> Automated conversational benchmarks, where another LLM like GPT-4 is used to evaluate the responses, such as AlpacaEval (https://tatsu-lab.github.io/ alpaca_eval/).
 
 In practice, it can be useful to consider all three types of evaluation methods: multiplechoice question answering, human evaluation, and automated metrics that measure conversational performance. However, since we are primarily interested in assessing conversational performance rather than just the ability to answer multiple-choice questions, human evaluation and automated metrics may be more relevant.
 
@@ -9205,9 +7381,7 @@ torch.save(model.state_dict(), file_name)
 print(f"Model saved as {file_name}")
 ```
 
-The saved model can then be loaded via `model.load_state_dict(torch.load("gpt2`
-
-`-medium355M-sft.pth")`).
+The saved model can then be loaded via `model.load_state_dict(torch.load("gpt2` `-medium355M-sft.pth")`).
 
 <a id="7-8-evaluating-the-fine-tuned-llm"></a>
 ### 7.8 Evaluating the fine-tuned LLM
@@ -9218,30 +7392,21 @@ To evaluate test set responses in an automated fashion, we utilize an existing i
 
 NOTE Ollama is an efficient application for running LLMs on a laptop. It serves as a wrapper around the open source llama.cpp library (https://github .com/ggerganov/llama.cpp), which implements LLMs in pure C/C++ to maximize efficiency. However, Ollama is only a tool for generating text using LLMs (inference) and does not support training or fine-tuning LLMs.
 
-formatting
-
-LLM
-
-loss
-
 Stage 3: Evaluating the LLM
 
 After extracting the responses by our ﬁne-tuned LLM, we use another LLM to automatically evaluate these responses.
 
 ![Fig 7.19](extracted_images/figures/Fig7.19_p261.png)
+
 **Figure 7.19** The three-stage process for instruction fine-tuning the LLM. In this last step of the instruction-fine-tuning pipeline, we implement a method to quantify the performance of the fine-tuned model by scoring the responses it generated for the test.
 
 The 8-billion-parameter Llama 3 model is a very capable LLM that runs locally. However, it’s not as capable as large proprietary LLMs such as GPT-4 offered by OpenAI. For readers interested in exploring how to utilize GPT-4 through the OpenAI API to assess generated model responses, an optional code notebook is available within the supplementary materials accompanying this book at https://mng.bz/BgEv.
 
 To execute the following code, install Ollama by visiting https://ollama.com and follow the provided instructions for your operating system:
 
-> For macOS and Windows users—Open the downloaded Ollama application. If
-
-
-prompted to install command-line usage, select Yes.
+> For macOS and Windows users—Open the downloaded Ollama application. If prompted to install command-line usage, select Yes.
 
 > For Linux users—Use the installation command available on the Ollama website.
-
 
 Before implementing the model evaluation code, let’s first download the Llama 3 model and verify that Ollama is functioning correctly by using it from the commandline terminal. To use Ollama from the command line, you must either start the Ollama application or run `ollama` `serve` in a separate terminal, as shown in figure 7.20.
 
@@ -9252,6 +7417,7 @@ First option: make sure to start ollama in a separate terminal via the command. 
 Then run to download `ollama run llama3` and use the 8-billion-parameter Llama 3 model.
 
 ![Fig 7.20](extracted_images/figures/Fig7.20_p262.png)
+
 **Figure 7.20** Two options for running Ollama. The left panel illustrates starting Ollama using `ollama` `serve`. The right panel shows a second option in macOS, running the Ollama application in the background instead of using the `ollama` `serve` command to start the application.
 
 With the Ollama application or `ollama` `serve` running in a different terminal, execute the following command on the command line (not in a Python session) to try out the 8-billion-parameter Llama 3 model:
@@ -9319,9 +7485,7 @@ if not ollama_running:
 )
 print("Ollama running:", check_if_running("ollama"))
 
-Ensure that the output from executing the previous code displays `Ollama` `running:`
-
-`True`. If it shows `False`, verify that the `ollama` `serve` command or the Ollama application is actively running.
+Ensure that the output from executing the previous code displays `Ollama` `running:` `True`. If it shows `False`, verify that the `ollama` `serve` command or the Ollama application is actively running.
 
 An alternative to the `ollama` `run` command for interacting with the model is through its REST API using Python. The `query_model` function shown in the following listing demonstrates how to use the API.
 
@@ -9465,9 +7629,7 @@ The only reason I wouldn’t give myself a perfect score is that the response is
 
 The generated responses show that the Llama 3 model provides reasonable evaluations and is capable of assigning partial points when a model’s answer is not entirely correct. For instance, if we consider the evaluation of the “cumulus cloud” answer, the model acknowledges the partial correctness of the response.
 
-The previous prompt returns highly detailed evaluations in addition to the score. We can modify the prompt to just generate integer scores ranging from 0 to 100, where 100 represents the best possible score. This modification allows us to calculate an average score for our model, which serves as a more concise and quantitative assessment of its performance. The `generate_model_scores` function shown in the following listing uses a modified prompt telling the model to `"Respond` `with` `the`
-
-`integer` `number` `only."`
+The previous prompt returns highly detailed evaluations in addition to the score. We can modify the prompt to just generate integer scores ranging from 0 to 100, where 100 represents the best possible score. This modification allows us to calculate an average score for our model, which serves as a more concise and quantitative assessment of its performance. The `generate_model_scores` function shown in the following listing uses a modified prompt telling the model to `"Respond` `with` `the` `integer` `number` `only."`
 
 Modified instruction line to only return the score
 
@@ -9492,35 +7654,13 @@ Number of scores: 110 of 110
 Average score: 50.32
 ```
 
-The evaluation output shows that our fine-tuned model achieves an average score above 50, which provides a useful benchmark for comparison against other models
-
-or for experimenting with different training configurations to improve the model’s performance.
+The evaluation output shows that our fine-tuned model achieves an average score above 50, which provides a useful benchmark for comparison against other models or for experimenting with different training configurations to improve the model’s performance.
 
 It’s worth noting that Ollama is not entirely deterministic across operating systems at the time of this writing, which means that the scores you obtain might vary slightly from the previous scores. To obtain more robust results, you can repeat the evaluation multiple times and average the resulting scores.
 
 To further improve our model’s performance, we can explore various strategies, such as
 
-> Adjusting the hyperparameters during fine-tuning, such as the learning rate,
-
-
-batch size, or number of epochs
-
-> Increasing the size of the training dataset or diversifying the examples to cover
-
-
-a broader range of topics and styles
-
-> Experimenting with different prompts or instruction formats to guide the
-
-
-model’s responses more effectively
-
-> Using a larger pretrained model, which may have greater capacity to capture
-
-
-complex patterns and generate more accurate responses
-
-NOTE For reference, when using the methodology described herein, the Llama 3 8B base model, without any fine-tuning, achieves an average score of 58.51 on the test set. The Llama 3 8B instruct model, which has been finetuned on a general instruction-following dataset, achieves an impressive average score of 82.6.
+> Adjusting the hyperparameters during fine-tuning, such as the learning rate, batch size, or number of epochs Increasing the size of the training dataset or diversifying the examples to cover a broader range of topics and styles Experimenting with different prompts or instruction formats to guide the model’s responses more effectively Using a larger pretrained model, which may have greater capacity to capture complex patterns and generate more accurate responses NOTE For reference, when using the methodology described herein, the Llama 3 8B base model, without any fine-tuning, achieves an average score of 58.51 on the test set. The Llama 3 8B instruct model, which has been finetuned on a general instruction-following dataset, achieves an impressive average score of 82.6.
 
 To instruction fine-tune an LLM more efficiently, modify the code in this chapter to use the low-rank adaptation method (LoRA) from appendix E. Compare the training run time and model performance before and after the modification.
 
@@ -9529,27 +7669,15 @@ To instruction fine-tune an LLM more efficiently, modify the code in this chapte
 
 This chapter marks the conclusion of our journey through the LLM development cycle. We have covered all the essential steps, including implementing an LLM architecture, pretraining an LLM, and fine-tuning it for specific tasks, as summarized in figure 7.21. Let’s discuss some ideas for what to look into next.
 
-7.9.1 What’s next?
+#### 7.9.1 What’s next?
 
-While we covered the most essential steps, there is an optional step that can be performed after instruction fine-tuning: preference fine-tuning. Preference fine-tuning is particularly useful for customizing a model to better align with specific user preferences. If you are interested in exploring this further, see the `04_preference-tuning-`
-
-`with-dpo` folder in this book’s supplementary GitHub repository at https://mng .bz/dZwD.
+While we covered the most essential steps, there is an optional step that can be performed after instruction fine-tuning: preference fine-tuning. Preference fine-tuning is particularly useful for customizing a model to better align with specific user preferences. If you are interested in exploring this further, see the `04_preference-tuningwith-dpo` folder in this book’s supplementary GitHub repository at https://mng .bz/dZwD.
 
 In chapter 4, we implemented a GPT-like LLM architecture.
 
 In chapter 5, we also loaded pretrained model weights into the LLM architecture.
 
 In the previous chapter, we ﬁne-tuned the pretrained LLM to classify texts.
-
-Dataset with class labels
-
-Classiﬁer
-
-Building an LLM
-
-Foundation model
-
-Personal assistant
 
 STAGE 2
 
@@ -9560,15 +7688,16 @@ Instruction dataset
 In this chapter, we ﬁne-tune the pretrained LLM to follow instructions.
 
 ![Fig 7.21](extracted_images/figures/Fig7.21_p270.png)
+
 **Figure 7.21** The three main stages of coding an LLM.
 
 In addition to the main content covered in this book, the GitHub repository also contains a large selection of bonus material that you may find valuable. To learn more about these additional resources, visit the Bonus Material section on the repository’s README page: https://mng.bz/r12g.
 
-7.9.2 Staying up to date in a fast-moving field
+#### 7.9.2 Staying up to date in a fast-moving field
 
 The fields of AI and LLM research are evolving at a rapid (and, depending on who you ask, exciting) pace. One way to keep up with the latest advancements is to explore recent research papers on arXiv at https://arxiv.org/list/cs.LG/recent. Additionally, many researchers and practitioners are very active in sharing and discussing the latest developments on social media platforms like X (formerly Twitter) and Reddit. The subreddit r/LocalLLaMA, in particular, is a good resource for connecting with the community and staying informed about the latest tools and trends. I also regularly share insights and write about the latest in LLM research on my blog, available at https://magazine.sebastianraschka.com and https://sebastianraschka.com/blog/.
 
-7.9.3 Final words
+#### 7.9.3 Final words
 
 I hope you have enjoyed this journey of implementing an LLM from the ground up and coding the pretraining and fine-tuning functions from scratch. In my opinion, building an LLM from scratch is the most effective way to gain a deep understanding of how LLMs work. I hope that this hands-on approach has provided you with valuable insights and a solid foundation in LLM development.
 
@@ -9576,44 +7705,23 @@ While the primary purpose of this book is educational, you may be interested in 
 
 Thank you for joining me on this learning journey, and I wish you all the best in your future endeavors in the exciting field of LLMs and AI!
 
-Summary
+### Summary
 
-> The instruction-fine-tuning process adapts a pretrained LLM to follow human
+> The instruction-fine-tuning process adapts a pretrained LLM to follow human instructions and generate desired responses.
 
+> Preparing the dataset involves downloading an instruction-response dataset, formatting the entries, and splitting it into train, validation, and test sets.
 
-instructions and generate desired responses.
+> Training batches are constructed using a custom collate function that pads sequences, creates target token IDs, and masks padding tokens.
 
-> Preparing the dataset involves downloading an instruction-response dataset,
+> We load a pretrained GPT-2 medium model with 355 million parameters to serve as the starting point for instruction fine-tuning.
 
+> The pretrained model is fine-tuned on the instruction dataset using a training loop similar to pretraining.
 
-formatting the entries, and splitting it into train, validation, and test sets.
+> Evaluation involves extracting model responses on a test set and scoring them (for example, using another LLM).
 
-> Training batches are constructed using a custom collate function that pads
+> The Ollama application with an 8-billion-parameter Llama model can be used to automatically score the fine-tuned model’s responses on the test set, providing an average score to quantify performance.
 
-
-sequences, creates target token IDs, and masks padding tokens.
-
-> We load a pretrained GPT-2 medium model with 355 million parameters to
-
-
-serve as the starting point for instruction fine-tuning.
-
-> The pretrained model is fine-tuned on the instruction dataset using a training
-
-
-loop similar to pretraining.
-
-> Evaluation involves extracting model responses on a test set and scoring them
-
-
-(for example, using another LLM).
-
-> The Ollama application with an 8-billion-parameter Llama model can be used
-
-
-to automatically score the fine-tuned model’s responses on the test set, providing an average score to quantify performance.
-
-appendix A Introduction to PyTorch
+## Appendix A: Introduction to PyTorch
 
 This appendix is designed to equip you with the necessary skills and knowledge to put deep learning into practice and implement large language models (LLMs) from scratch. PyTorch, a popular Python-based deep learning library, will be our primary tool for this book. I will guide you through setting up a deep learning workspace armed with PyTorch and GPU support.
 
@@ -9621,15 +7729,13 @@ Then you’ll learn about the essential concept of tensors and their usage in Py
 
 This appendix is meant as a primer for those new to deep learning in PyTorch. While it explains PyTorch from the ground up, it’s not meant to be an exhaustive coverage of the PyTorch library. Instead, we’ll focus on the PyTorch fundamentals we will use to implement LLMs. If you are already familiar with deep learning, you may skip this appendix and directly move on to chapter 2.
 
-A.1 What is PyTorch?
+### A.1 What is PyTorch?
 
 PyTorch (https://pytorch.org/) is an open source Python-based deep learning library. According to Papers With Code (https://paperswithcode.com/trends), a platform that tracks and analyzes research papers, PyTorch has been the most widely used deep learning library for research since 2019 by a wide margin. And, according to the Kaggle Data Science and Machine Learning Survey 2022 (https://www.kaggle .com/c/kaggle-survey-2022), the number of respondents using PyTorch is approximately 40%, which grows every year.
 
-One of the reasons PyTorch is so popular is its user-friendly interface and efficiency. Despite its accessibility, it doesn’t compromise on flexibility, allowing advanced users to tweak lower-level aspects of their models for customization and
+One of the reasons PyTorch is so popular is its user-friendly interface and efficiency. Despite its accessibility, it doesn’t compromise on flexibility, allowing advanced users to tweak lower-level aspects of their models for customization and optimization. In short, for many practitioners and researchers, PyTorch offers just the right balance between usability and features.
 
-optimization. In short, for many practitioners and researchers, PyTorch offers just the right balance between usability and features.
-
-A.1.1 The three core components of PyTorch
+#### A.1.1 The three core components of PyTorch
 
 PyTorch is a relatively comprehensive library, and one way to approach it is to focus on its three broad components, summarized in figure A.1.
 
@@ -9645,7 +7751,7 @@ Figure A.1 PyTorch’s three main components include a tensor library as a funda
 
 First, PyTorch is a tensor library that extends the concept of the array-oriented programming library NumPy with the additional feature that accelerates computation on GPUs, thus providing a seamless switch between CPUs and GPUs. Second, PyTorch is an automatic differentiation engine, also known as autograd, that enables the automatic computation of gradients for tensor operations, simplifying backpropagation and model optimization. Finally, PyTorch is a deep learning library. It offers modular, flexible, and efficient building blocks, including pretrained models, loss functions, and optimizers, for designing and training a wide range of deep learning models, catering to both researchers and developers.
 
-A.1.2 Defining deep learning
+#### A.1.2 Defining deep learning
 
 In the news, LLMs are often referred to as AI models. However, LLMs are also a type of deep neural network, and PyTorch is a deep learning library. Sound confusing? Let’s take a brief moment and summarize the relationship between these terms before we proceed.
 
@@ -9695,7 +7801,7 @@ ensure that the model satisfies our performance criteria before using it in a re
 
 If we train LLMs to classify texts, the workflow for training and using LLMs is similar to that depicted in figure A.3. If we are interested in training LLMs to generate texts, which is our main focus, figure A.3 still applies. In this case, the labels during pretraining can be derived from the text itself (the next-word prediction task introduced in chapter 1). The LLM will generate entirely new text (instead of predicting labels), given an input prompt during inference.
 
-A.1.3 Installing PyTorch
+#### A.1.3 Installing PyTorch
 
 PyTorch can be installed just like any other Python library or package. However, since PyTorch is a comprehensive library featuring CPUand GPU-compatible codes, the installation may require additional explanation.
 
@@ -9773,9 +7879,11 @@ Figure A.5 Select a GPU device for Google Colab under the Runtime/Change Runtime
 
 If it returns `True`, it means that your Mac has an Apple Silicon chip that can be used to accelerate PyTorch code.
 
-Exercise A.2 Run the supplementary code at https://mng.bz/o05v that checks whether your environment is set up correctly.
+### Exercise A.2
 
-A.2 Understanding tensors
+Run the supplementary code at https://mng.bz/o05v that checks whether your environment is set up correctly.
+
+### A.2 Understanding tensors
 
 Tensors represent a mathematical concept that generalizes vectors and matrices to potentially higher dimensions. In other words, tensors are mathematical objects that can be characterized by their order (or rank), which provides the number of dimensions. For example, a scalar (just a number) is a tensor of rank 0, a vector is a tensor of rank 1, and a matrix is a tensor of rank 2, as illustrated in figure A.6.
 
@@ -9797,7 +7905,7 @@ PyTorch tensors are similar to NumPy arrays but have several additional features
 
 PyTorch with a NumPy-like API PyTorch adopts most of the NumPy array API and syntax for its tensor operations. If you are new to NumPy, you can get a brief overview of the most relevant concepts via my article “Scientific Computing in Python: Introduction to NumPy and Matplotlib” at https://sebastianraschka.com/blog/2020/numpy-intro.html.
 
-A.2.1 Scalars, vectors, matrices, and tensors
+#### A.2.1 Scalars, vectors, matrices, and tensors
 
 As mentioned earlier, PyTorch tensors are data containers for array-like structures. A scalar is a zero-dimensional tensor (for instance, just a number), a vector is a onedimensional tensor, and a matrix is a two-dimensional tensor. There is no specific term for higher-dimensional tensors, so we typically refer to a three-dimensional tensor as just a 3D tensor, and so forth. We can create objects of PyTorch’s `Tensor` class using the `torch.tensor` function as shown in the following listing.
 
@@ -9825,7 +7933,7 @@ tensor3d = torch.tensor([[[1, 2], [3, 4]],
 
 Creates a three-dimensional tensor from a nested Python list
 
-A.2.2 Tensor data types
+#### A.2.2 Tensor data types
 
 PyTorch adopts the default 64-bit integer data type from Python. We can access the data type of a tensor via the `.dtype` attribute of a tensor:
 
@@ -9870,7 +7978,7 @@ torch.float32
 
 For more information about different tensor data types available in PyTorch, check the official documentation at https://pytorch.org/docs/stable/tensors.html.
 
-A.2.3 Common PyTorch tensor operations
+#### A.2.3 Common PyTorch tensor operations
 
 Comprehensive coverage of all the different PyTorch tensor operations and commands is outside the scope of this book. However, I will briefly describe relevant operations as we introduce them throughout the book.
 
@@ -9977,13 +8085,11 @@ tensor([[14, 32],
 
 As mentioned earlier, I introduce additional operations when needed. For readers who’d like to browse through all the different tensor operations available in PyTorch (we won’t need most of these), I recommend checking out the official documentation at https://pytorch.org/docs/stable/tensors.html.
 
-A.3 Seeing models as computation graphs
+### A.3 Seeing models as computation graphs
 
 Now let’s look at PyTorch’s automatic differentiation engine, also known as autograd. PyTorch’s autograd system provides functions to compute gradients in dynamic computational graphs automatically.
 
-A computational graph is a directed graph that allows us to express and visualize mathematical expressions. In the context of deep learning, a computation graph lays
-
-out the sequence of calculations needed to compute the output of a neural network— we will need this to compute the required gradients for backpropagation, the main training algorithm for neural networks.
+A computational graph is a directed graph that allows us to express and visualize mathematical expressions. In the context of deep learning, a computation graph lays out the sequence of calculations needed to compute the output of a neural network— we will need this to compute the required gradients for backpropagation, the main training algorithm for neural networks.
 
 Let’s look at a concrete example to illustrate the concept of a computation graph. The code in the following listing implements the forward pass (prediction step) of a simple logistic regression classifier, which can be seen as a single-layer neural network. It returns a score between 0 and 1, which is compared to the true class label (0 or 1) when computing the loss.
 
@@ -10009,7 +8115,7 @@ Figure A.7 A logistic regression forward pass as a computation graph. The input 
 
 In fact, PyTorch builds such a computation graph in the background, and we can use this to calculate gradients of a loss function with respect to the model parameters (here w1 and b) to train the model.
 
-A.4 Automatic differentiation made easy
+### A.4 Automatic differentiation made easy
 
 If we carry out computations in PyTorch, it will build a computational graph internally by default if one of its terminal nodes has the `requires_grad` attribute set to `True`. This is useful if we want to compute gradients. Gradients are required when training neural networks via the popular backpropagation algorithm, which can be considered an implementation of the chain rule from calculus for neural networks, illustrated in figure A.8.
 
@@ -10023,9 +8129,7 @@ Figure A.8 The most common way of computing the loss gradients in a computation 
 
 PARTIAL DERIVATIVES AND GRADIENTS Figure A.8 shows partial derivatives, which measure the rate at which a function changes with respect to one of its variables. A gradient is a vector containing all of the partial derivatives of a multivariate function, a function with more than one variable as input.
 
-If you are not familiar with or don’t remember the partial derivatives, gradients, or chain rule from calculus, don’t worry. On a high level, all you need to know for this book is that the chain rule is a way to compute gradients of a loss function given the model’s parameters in a computation graph. This provides the information needed to update each parameter to minimize the loss function, which serves as a proxy for measuring the
-
-model’s performance using a method such as gradient descent. We will revisit the computational implementation of this training loop in PyTorch in section A.7.
+If you are not familiar with or don’t remember the partial derivatives, gradients, or chain rule from calculus, don’t worry. On a high level, all you need to know for this book is that the chain rule is a way to compute gradients of a loss function given the model’s parameters in a computation graph. This provides the information needed to update each parameter to minimize the loss function, which serves as a proxy for measuring the model’s performance using a method such as gradient descent. We will revisit the computational implementation of this training loop in PyTorch in section A.7.
 
 How is this all related to the automatic differentiation (autograd) engine, the second component of the PyTorch library mentioned earlier? PyTorch’s autograd engine constructs a computational graph in the background by tracking every operation performed on tensors. Then, calling the `grad` function, we can compute the gradient of the loss concerning the model parameter `w1`, as shown in the following listing.
 
@@ -10081,7 +8185,7 @@ The outputs are
 
 I’ve provided you with a lot of information, and you may be overwhelmed by the calculus concepts, but don’t worry. While this calculus jargon is a means to explain PyTorch’s autograd component, all you need to take away is that PyTorch takes care of the calculus for us via the `.backward` method—we won’t need to compute any derivatives or gradients by hand.
 
-A.5 Implementing multilayer neural networks
+### A.5 Implementing multilayer neural networks
 
 Next, we focus on PyTorch as a library for implementing deep neural networks. To provide a concrete example, let’s look at a multilayer perceptron, a fully connected neural network, as illustrated in figure A.9.
 
@@ -10107,9 +8211,7 @@ Figure A.9 A multilayer perceptron with two hidden layers. Each node represents 
 
 When implementing a neural network in PyTorch, we can subclass the `torch.nn.Module` class to define our own custom network architecture. This `Module` base class provides a lot of functionality, making it easier to build and train models. For instance, it allows us to encapsulate layers and operations and keep track of the model’s parameters.
 
-Within this subclass, we define the network layers in the `__init__` constructor and specify how the layers interact in the forward method. The forward method describes how the input data passes through the network and comes together as a computation graph. In contrast, the backward method, which we typically do not need to implement ourselves, is used during training to compute gradients of the loss function given the model parameters (see section A.7). The code in the following listing implements a
-
-classic multilayer perceptron with two hidden layers to illustrate a typical usage of the
+Within this subclass, we define the network layers in the `__init__` constructor and specify how the layers interact in the forward method. The forward method describes how the input data passes through the network and comes together as a computation graph. In contrast, the backward method, which we typically do not need to implement ourselves, is used during training to compute gradients of the loss function given the model parameters (see section A.7). The code in the following listing implements a classic multilayer perceptron with two hidden layers to illustrate a typical usage of the
 
 `Module` class.
 
@@ -10175,9 +8277,7 @@ NeuralNetwork(
 
 Note that we use the `Sequential` class when we implement the `NeuralNetwork` class.
 
-`Sequential` is not required, but it can make our life easier if we have a series of layers we want to execute in a specific order, as is the case here. This way, after instantiating `self.layers` `=` `Sequential(...)` in the `__init__` constructor, we just have to
-
-call the `self.layers` instead of calling each layer individually in the `NeuralNetwork`’s
+`Sequential` is not required, but it can make our life easier if we have a series of layers we want to execute in a specific order, as is the case here. This way, after instantiating `self.layers` `=` `Sequential(...)` in the `__init__` constructor, we just have to call the `self.layers` instead of calling each layer individually in the `NeuralNetwork`’s
 
 `forward` method.
 
@@ -10311,7 +8411,7 @@ tensor([[0.3113, 0.3934, 0.2952]]))
 
 The values can now be interpreted as class-membership probabilities that sum up to 1. The values are roughly equal for this random input, which is expected for a randomly initialized model without training.
 
-A.6 Setting up efficient data loaders
+### A.6 Setting up efficient data loaders
 
 Before we can train our model, we have to briefly discuss creating efficient data loaders in PyTorch, which we will iterate over during training. The overall idea behind data loading in PyTorch is illustrated in figure A.10.
 
@@ -10505,7 +8605,7 @@ the tradeoff and make a calculated decision on setting the `num_workers` paramet
 
 In my experience, setting `num_workers=4` usually leads to optimal performance on many real-world datasets, but optimal settings depend on your hardware and the code used for loading a training example defined in the `Dataset` class.
 
-A.7 A typical training loop
+### A.7 A typical training loop
 
 Let’s now train a neural network on the toy dataset. The following listing shows the training code.
 
@@ -10543,13 +8643,13 @@ Epoch: 003/003 | Batch 001/002 | Train Loss: 0.00
 
 As we can see, the loss reaches 0 after three epochs, a sign that the model converged on the training set. Here, we initialize a model with two inputs and two outputs because our toy dataset has two input features and two class labels to predict. We used a stochastic gradient descent (`SGD`) optimizer with a learning rate (`lr`) of 0.5. The learning rate is a hyperparameter, meaning it’s a tunable setting that we must experiment with based on observing the loss. Ideally, we want to choose a learning rate such that the loss converges after a certain number of epochs—the number of epochs is another hyperparameter to choose.
 
-Exercise A.3 How many parameters does the neural network introduced in listing A.9 have?
+### Exercise A.3
+
+How many parameters does the neural network introduced in listing A.9 have?
 
 In practice, we often use a third dataset, a so-called validation dataset, to find the optimal hyperparameter settings. A validation dataset is similar to a test set. However, while we only want to use a test set precisely once to avoid biasing the evaluation, we usually use the validation set multiple times to tweak the model settings.
 
-We also introduced new settings called `model.train()` and `model.eval()`. As these names imply, these settings are used to put the model into a training and an evaluation mode. This is necessary for components that behave differently during training and inference, such as dropout or batch normalization layers. Since we don’t have dropout
-
-or other components in our `NeuralNetwork` class that are affected by these settings, using `model.train()` and `model.eval()` is redundant in our preceding code. However, it’s best practice to include them anyway to avoid unexpected behaviors when we change the model architecture or reuse the code to train a different model.
+We also introduced new settings called `model.train()` and `model.eval()`. As these names imply, these settings are used to put the model into a training and an evaluation mode. This is necessary for components that behave differently during training and inference, such as dropout or batch normalization layers. Since we don’t have dropout or other components in our `NeuralNetwork` class that are affected by these settings, using `model.train()` and `model.eval()` is redundant in our preceding code. However, it’s best practice to include them anyway to avoid unexpected behaviors when we change the model architecture or reuse the code to train a different model.
 
 As discussed earlier, we pass the logits directly into the `cross_entropy` loss function, which will apply the `softmax` function internally for efficiency and numerical stability reasons. Then, calling `loss.backward()` will calculate the gradients in the computation graph that PyTorch constructed in the background. The `optimizer.step()` method will use the gradients to update the model parameters to minimize the loss. In the case of the SGD optimizer, this means multiplying the gradients with the learning rate and adding the scaled negative gradient to the parameters.
 
@@ -10690,7 +8790,7 @@ This prints
 1.0
 ```
 
-A.8 Saving and loading models
+### A.8 Saving and loading models
 
 Now that we’ve trained our model, let’s see how to save it so we can reuse it later. Here’s the recommended way how we can save and load models in PyTorch:
 
@@ -10713,11 +8813,11 @@ The `torch.load("model.pth")` function reads the file `"model.pth"` and reconstr
 
 The line `model` `=` `NeuralNetwork(2,` `2)` is not strictly necessary if you execute this code in the same session where you saved a model. However, I included it here to illustrate that we need an instance of the model in memory to apply the saved parameters. Here, the `NeuralNetwork(2,` `2)` architecture needs to match the original saved model exactly.
 
-A.9 Optimizing training performance with GPUs
+### A.9 Optimizing training performance with GPUs
 
 Next, let’s examine how to utilize GPUs, which accelerate deep neural network training compared to regular CPUs. First, we’ll look at the main concepts behind GPU computing in PyTorch. Then we will train a model on a single GPU. Finally, we’ll look at distributed training using multiple GPUs.
 
-A.9.1 PyTorch computations on GPU devices
+#### A.9.1 PyTorch computations on GPU devices
 
 Modifying the training loop to run optionally on a GPU is relatively simple and only requires changing three lines of code (see section A.7). Before we make the modifications, it’s crucial to understand the main concept behind GPU computations within PyTorch. In PyTorch, a device is where computations occur and data resides. The CPU and the GPU are examples of devices. A PyTorch tensor resides in a device, and its operations are executed on the same device.
 
@@ -10785,7 +8885,7 @@ least two devices, cuda:0 and cpu!
 
 In sum, we only need to transfer the tensors onto the same GPU device, and PyTorch will handle the rest.
 
-A.9.2 Single-GPU training
+#### A.9.2 Single-GPU training
 
 Now that we are familiar with transferring tensors to the GPU, we can modify the training loop to run on a GPU. This step requires only changing three lines of code, as shown in the following listing.
 
@@ -10853,17 +8953,17 @@ to
 
 to take advantage of this chip.
 
-Exercise A.4 Compare the run time of matrix multiplication on a CPU to a GPU. At what matrix size do you begin to see the matrix multiplication on the GPU being faster than on the CPU? Hint: use the `%timeit` command in Jupyter to compare the run time. For example, given matrices `a` and `b`, run the command `%timeit` `a` `@` `b` in a new notebook cell.
+### Exercise A.4
 
-A.9.3 Training with multiple GPUs
+Compare the run time of matrix multiplication on a CPU to a GPU. At what matrix size do you begin to see the matrix multiplication on the GPU being faster than on the CPU? Hint: use the `%timeit` command in Jupyter to compare the run time. For example, given matrices `a` and `b`, run the command `%timeit` `a` `@` `b` in a new notebook cell.
+
+#### A.9.3 Training with multiple GPUs
 
 Distributed training is the concept of dividing the model training across multiple GPUs and machines. Why do we need this? Even when it is possible to train a model on a single GPU or machine, the process could be exceedingly time-consuming. The training time can be significantly reduced by distributing the training process across multiple machines, each with potentially multiple GPUs. This is particularly crucial in the experimental stages of model development, where numerous training iterations might be necessary to fine-tune the model parameters and architecture.
 
 NOTE For this book, access to or use of multiple GPUs is not required. This section is included for those interested in how multi-GPU computing works in PyTorch.
 
-Let’s begin with the most basic case of distributed training: PyTorch’s `Distributed-`
-
-`DataParallel` (DDP) strategy. DDP enables parallelism by splitting the input data across the available devices and processing these data subsets simultaneously.
+Let’s begin with the most basic case of distributed training: PyTorch’s `DistributedDataParallel` (DDP) strategy. DDP enables parallelism by splitting the input data across the available devices and processing these data subsets simultaneously.
 
 How does this work? PyTorch launches a separate process on each GPU, and each process receives and keeps a copy of the model; these copies will be synchronized during training. To illustrate this, suppose we have two GPUs that we want to use to train a neural network, as shown in figure A.12.
 
@@ -10887,9 +8987,7 @@ The gradients are synced across the GPUs to compute the weight updates for each 
 
 Figure A.13 The forward and backward passes in DDP are executed independently on each GPU with its corresponding data subset. Once the forward and backward passes are completed, gradients from each model replica (on each GPU) are synchronized across all GPUs. This ensures that every model replica has the same updated weights.
 
-The benefit of using DDP is the enhanced speed it offers for processing the dataset compared to a single GPU. Barring a minor communication overhead between devices that
-
-comes with DDP use, it can theoretically process a training epoch in half the time with two GPUs compared to just one. The time efficiency scales up with the number of GPUs, allowing us to process an epoch eight times faster if we have eight GPUs, and so on.
+The benefit of using DDP is the enhanced speed it offers for processing the dataset compared to a single GPU. Barring a minor communication overhead between devices that comes with DDP use, it can theoretically process a training epoch in half the time with two GPUs compared to just one. The time efficiency scales up with the number of GPUs, allowing us to process an epoch eight times faster if we have eight GPUs, and so on.
 
 NOTE DDP does not function properly within interactive Python environments like Jupyter notebooks, which don’t handle multiprocessing in the same way a standalone Python script does. Therefore, the following code should be executed as a script, not within a notebook interface like Jupyter. DDP needs to spawn multiple processes, and each process should have its own Python interpreter instance.
 
@@ -10906,9 +9004,7 @@ from torch.distributed import init_process_group, destroy_process_group
 
 Before we dive deeper into the changes to make the training compatible with DDP, let’s briefly go over the rationale and usage for these newly imported utilities that we need alongside the `DistributedDataParallel` class.
 
-PyTorch’s `multiprocessing` submodule contains functions such as `multiprocessing`
-
-`.spawn`, which we will use to spawn multiple processes and apply a function to multi- ple inputs in parallel. We will use it to spawn one training process per GPU. If we spawn multiple processes for training, we will need a way to divide the dataset among these different processes. For this, we will use the `DistributedSampler`.
+PyTorch’s `multiprocessing` submodule contains functions such as `multiprocessing` `.spawn`, which we will use to spawn multiple processes and apply a function to multi- ple inputs in parallel. We will use it to spawn one training process per GPU. If we spawn multiple processes for training, we will need a way to divide the dataset among these different processes. For this, we will use the `DistributedSampler`.
 
 `init_process_group` and `destroy_process_group` are used to initialize and quit the distributed training mods. The `init_process_group` function should be called at the beginning of the training script to initialize a process group for each process in the distributed setup, and `destroy_process_group` should be called at the end of the training script to destroy a given process group and release its resources. The code in the following listing illustrates how these new components are used to implement DDP training for the `NeuralNetwork` model we implemented earlier.
 
@@ -11029,623 +9125,191 @@ This is, in a nutshell, how distributed training via DDP works. If you are inter
 
 Alternative PyTorch APIs for multi-GPU training If you prefer a more straightforward way to use multiple GPUs in PyTorch, you can consider add-on APIs like the open-source Fabric library. I wrote about it in “Accelerating PyTorch Model Training: Using Mixed-Precision and Fully Sharded Data Parallelism” (https://mng.bz/jXle).
 
-Summary
+### Summary
 
-> PyTorch is an open source library with three core components: a tensor library,
-
-
-automatic differentiation functions, and deep learning utilities.
+> PyTorch is an open source library with three core components: a tensor library, automatic differentiation functions, and deep learning utilities.
 
 > PyTorch’s tensor library is similar to array libraries like NumPy.
 
+> In the context of PyTorch, tensors are array-like data structures representing scalars, vectors, matrices, and higher-dimensional arrays.
 
-> In the context of PyTorch, tensors are array-like data structures representing
+> PyTorch tensors can be executed on the CPU, but one major advantage of PyTorch’s tensor format is its GPU support to accelerate computations.
 
+> The automatic differentiation (autograd) capabilities in PyTorch allow us to conveniently train neural networks using backpropagation without manually deriving gradients.
 
-scalars, vectors, matrices, and higher-dimensional arrays.
+> The deep learning utilities in PyTorch provide building blocks for creating cus- tom deep neural networks.
 
-> PyTorch tensors can be executed on the CPU, but one major advantage of
-
-
-PyTorch’s tensor format is its GPU support to accelerate computations.
-
-> The automatic differentiation (autograd) capabilities in PyTorch allow us to
-
-
-conveniently train neural networks using backpropagation without manually deriving gradients.
-
-> The deep learning utilities in PyTorch provide building blocks for creating cus-
-
-
-tom deep neural networks.
-
-> PyTorch includes `Dataset` and `DataLoader` classes to set up efficient data-load-
-
-
-ing pipelines.
+> PyTorch includes `Dataset` and `DataLoader` classes to set up efficient data-load- ing pipelines.
 
 > It’s easiest to train models on a CPU or single GPU.
 
+> Using `DistributedDataParallel` is the simplest way in PyTorch to accelerate the training if multiple GPUs are available.
 
-> Using `DistributedDataParallel` is the simplest way in PyTorch to accelerate
-
-
-the training if multiple GPUs are available.
-
-appendix B References and further reading
+## Appendix B: References and further reading
 
 <a id="chapter-1"></a>
 ## Chapter 1
 
 Custom-built LLMs are able to outperform general-purpose LLMs as a team at Bloomberg showed via a version of GPT pretrained on finance data from scratch. The custom LLM outperformed ChatGPT on financial tasks while maintaining good performance on general LLM benchmarks:
 
-> “BloombergGPT: A Large Language Model for Finance” (2023) by Wu et al.,
+> “BloombergGPT: A Large Language Model for Finance” (2023) by Wu et al., https://arxiv.org/abs/2303.17564 Existing LLMs can be adapted and fine-tuned to outperform general LLMs as well, which teams from Google Research and Google DeepMind showed in a medical context:
 
+> “Towards Expert-Level Medical Question Answering with Large Language Models” (2023) by Singhal et al., https://arxiv.org/abs/2305.09617 The following paper proposed the original transformer architecture:
 
-https://arxiv.org/abs/2303.17564
+> “Attention Is All You Need” (2017) by Vaswani et al., https://arxiv.org/abs/ 1706.03762 On the original encoder-style transformer, called BERT, see “BERT: Pre-training of Deep Bidirectional Transformers for Language Under- standing” (2018) by Devlin et al., https://arxiv.org/abs/1810.04805 The paper describing the decoder-style GPT-3 model, which inspired modern LLMs and will be used as a template for implementing an LLM from scratch in this book, is “Language Models are Few-Shot Learners” (2020) by Brown et al., https:// arxiv.org/abs/2005.14165 The following covers the original vision transformer for classifying images, which illustrates that transformer architectures are not only restricted to text inputs:
 
-Existing LLMs can be adapted and fine-tuned to outperform general LLMs as well, which teams from Google Research and Google DeepMind showed in a medical context:
+> “An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale” (2020) by Dosovitskiy et al., https://arxiv.org/abs/2010.11929 The following experimental (but less popular) LLM architectures serve as examples that not all LLMs need to be based on the transformer architecture:
 
-> “Towards Expert-Level Medical Question Answering with Large Language
+> “RWKV: Reinventing RNNs for the Transformer Era” (2023) by Peng et al., https://arxiv.org/abs/2305.13048 “Hyena Hierarchy: Towards Larger Convolutional Language Models” (2023) by Poli et al., https://arxiv.org/abs/2302.10866 “Mamba: Linear-Time Sequence Modeling with Selective State Spaces” (2023) by Gu and Dao, https://arxiv.org/abs/2312.00752 Meta AI’s model is a popular implementation of a GPT-like model that is openly available in contrast to GPT-3 and ChatGPT:
 
+> “Llama 2: Open Foundation and Fine-Tuned Chat Models” (2023) by Touvron et al., https://arxiv.org/abs/2307.092881 For readers interested in additional details about the dataset references in section 1.5, this paper describes the publicly available The Pile dataset curated by Eleuther AI:
 
-Models” (2023) by Singhal et al., https://arxiv.org/abs/2305.09617
+> “The Pile: An 800GB Dataset of Diverse Text for Language Modeling” (2020) by Gao et al., https://arxiv.org/abs/2101.00027 The following paper provides the reference for InstructGPT for fine-tuning GPT-3, which was mentioned in section 1.6 and will be discussed in more detail in chapter 7:
 
-The following paper proposed the original transformer architecture:
-
-> “Attention Is All You Need” (2017) by Vaswani et al., https://arxiv.org/abs/
-
-
-1706.03762
-
-On the original encoder-style transformer, called BERT, see
-
-> “BERT: Pre-training of Deep Bidirectional Transformers for Language Under-
-
-
-standing” (2018) by Devlin et al., https://arxiv.org/abs/1810.04805
-
-The paper describing the decoder-style GPT-3 model, which inspired modern LLMs and will be used as a template for implementing an LLM from scratch in this book, is
-
-> “Language Models are Few-Shot Learners” (2020) by Brown et al., https://
-
-
-arxiv.org/abs/2005.14165
-
-The following covers the original vision transformer for classifying images, which illustrates that transformer architectures are not only restricted to text inputs:
-
-> “An Image is Worth 16x16 Words: Transformers for Image Recognition at
-
-
-Scale” (2020) by Dosovitskiy et al., https://arxiv.org/abs/2010.11929
-
-The following experimental (but less popular) LLM architectures serve as examples that not all LLMs need to be based on the transformer architecture:
-
-> “RWKV: Reinventing RNNs for the Transformer Era” (2023) by Peng et al.,
-
-
-https://arxiv.org/abs/2305.13048
-
-> “Hyena Hierarchy: Towards Larger Convolutional Language Models” (2023) by
-
-
-Poli et al., https://arxiv.org/abs/2302.10866
-
-> “Mamba: Linear-Time Sequence Modeling with Selective State Spaces” (2023)
-
-
-by Gu and Dao, https://arxiv.org/abs/2312.00752
-
-Meta AI’s model is a popular implementation of a GPT-like model that is openly available in contrast to GPT-3 and ChatGPT:
-
-> “Llama 2: Open Foundation and Fine-Tuned Chat Models” (2023) by Touvron
-
-
-et al., https://arxiv.org/abs/2307.092881
-
-For readers interested in additional details about the dataset references in section 1.5, this paper describes the publicly available The Pile dataset curated by Eleuther AI:
-
-> “The Pile: An 800GB Dataset of Diverse Text for Language Modeling” (2020) by
-
-
-Gao et al., https://arxiv.org/abs/2101.00027
-
-The following paper provides the reference for InstructGPT for fine-tuning GPT-3, which was mentioned in section 1.6 and will be discussed in more detail in chapter 7:
-
-> “Training Language Models to Follow Instructions with Human Feedback”
-
-
-(2022) by Ouyang et al., https://arxiv.org/abs/2203.02155
+> “Training Language Models to Follow Instructions with Human Feedback” (2022) by Ouyang et al., https://arxiv.org/abs/2203.02155
 
 <a id="chapter-2"></a>
 ## Chapter 2
 
 Readers who are interested in discussion and comparison of embedding spaces with latent spaces and the general notion of vector representations can find more information in the first chapter of my book:
 
-> Machine Learning Q and AI (2023) by Sebastian Raschka, https://leanpub.com/
+> Machine Learning Q and AI (2023) by Sebastian Raschka, https://leanpub.com/ machine-learning-q-and-ai The following paper provides more in-depth discussions of how byte pair encoding is used as a tokenization method:
 
+> “Neural Machine Translation of Rare Words with Subword Units” (2015) by Sennrich et al., https://arxiv.org/abs/1508.07909 The code for the byte pair encoding tokenizer used to train GPT-2 was open-sourced by OpenAI:
 
-machine-learning-q-and-ai
+> https://github.com/openai/gpt-2/blob/master/src/encoder.py OpenAI provides an interactive web UI to illustrate how the byte pair tokenizer in GPT models works:
 
-The following paper provides more in-depth discussions of how byte pair encoding is used as a tokenization method:
+> https://platform.openai.com/tokenizer For readers interested in coding and training a BPE tokenizer from the ground up, Andrej Karpathy’s GitHub repository `minbpe` offers a minimal and readable implementation:
 
-> “Neural Machine Translation of Rare Words with Subword Units” (2015) by
+> “A Minimal Implementation of a BPE Tokenizer,” https://github.com/karpa- thy/minbpe Readers who are interested in studying alternative tokenization schemes that are used by some other popular LLMs can find more information in the SentencePiece and WordPiece papers:
 
-
-Sennrich et al., https://arxiv.org/abs/1508.07909
-
-The code for the byte pair encoding tokenizer used to train GPT-2 was open-sourced by OpenAI:
-
-> https://github.com/openai/gpt-2/blob/master/src/encoder.py
-
-
-OpenAI provides an interactive web UI to illustrate how the byte pair tokenizer in GPT models works:
-
-> https://platform.openai.com/tokenizer
-
-
-For readers interested in coding and training a BPE tokenizer from the ground up, Andrej Karpathy’s GitHub repository `minbpe` offers a minimal and readable implementation:
-
-> “A Minimal Implementation of a BPE Tokenizer,” https://github.com/karpa-
-
-
-thy/minbpe
-
-Readers who are interested in studying alternative tokenization schemes that are used by some other popular LLMs can find more information in the SentencePiece and WordPiece papers:
-
-> “SentencePiece: A Simple and Language Independent Subword Tokenizer and
-
-
-Detokenizer for Neural Text Processing” (2018) by Kudo and Richardson, https://aclanthology.org/D18-2012/
-
-> “Fast WordPiece Tokenization” (2020) by Song et al., https://arxiv.org/abs/
-
-
-2012.15524
+> “SentencePiece: A Simple and Language Independent Subword Tokenizer and Detokenizer for Neural Text Processing” (2018) by Kudo and Richardson, https://aclanthology.org/D18-2012/ “Fast WordPiece Tokenization” (2020) by Song et al., https://arxiv.org/abs/ 2012.15524
 
 <a id="chapter-3"></a>
 ## Chapter 3
 
 Readers interested in learning more about Bahdanau attention for RNN and language translation can find detailed insights in the following paper:
 
-> “Neural Machine Translation by Jointly Learning to Align and Translate”
+> “Neural Machine Translation by Jointly Learning to Align and Translate” (2014) by Bahdanau, Cho, and Bengio, https://arxiv.org/abs/1409.0473 The concept of self-attention as scaled dot-product attention was introduced in the original transformer paper:
 
+> “Attention Is All You Need” (2017) by Vaswani et al., https://arxiv.org/abs/ 1706.03762 FlashAttention is a highly efficient implementation of a self-attention mechanism, which accelerates the computation process by optimizing memory access patterns. FlashAttention is mathematically the same as the standard self-attention mechanism but optimizes the computational process for efficiency:
 
-(2014) by Bahdanau, Cho, and Bengio, https://arxiv.org/abs/1409.0473
+> “FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness” (2022) by Dao et al., https://arxiv.org/abs/2205.14135 “FlashAttention-2: Faster Attention with Better Parallelism and Work Partition- ing” (2023) by Dao, https://arxiv.org/abs/2307.08691 PyTorch implements a function for self-attention and causal attention that supports FlashAttention for efficiency. This function is beta and subject to change:
 
-The concept of self-attention as scaled dot-product attention was introduced in the original transformer paper:
+> `scaled_dot_product_attention` documentation: https://mng.bz/NRJd PyTorch also implements an efficient `MultiHeadAttention` class based on the `scaleddot_product` function:
 
-> “Attention Is All You Need” (2017) by Vaswani et al., https://arxiv.org/abs/
+> `MultiHeadAttention` documentation: https://mng.bz/DdJV Dropout is a regularization technique used in neural networks to prevent overfitting by randomly dropping units (along with their connections) from the neural network during training:
 
+> “Dropout: A Simple Way to Prevent Neural Networks from Overfitting” (2014) by Srivastava et al., https://jmlr.org/papers/v15/srivastava14a.html While using the multi-head attention based on scaled-dot product attention remains the most common variant of self-attention in practice, authors have found that it’s possible to also achieve good performance without the value weight matrix and projection layer:
 
-1706.03762
-
-FlashAttention is a highly efficient implementation of a self-attention mechanism, which accelerates the computation process by optimizing memory access patterns. FlashAttention is mathematically the same as the standard self-attention mechanism but optimizes the computational process for efficiency:
-
-> “FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness”
-
-
-(2022) by Dao et al., https://arxiv.org/abs/2205.14135
-
-> “FlashAttention-2: Faster Attention with Better Parallelism and Work Partition-
-
-
-ing” (2023) by Dao, https://arxiv.org/abs/2307.08691
-
-PyTorch implements a function for self-attention and causal attention that supports FlashAttention for efficiency. This function is beta and subject to change:
-
-> `scaled_dot_product_attention` documentation: https://mng.bz/NRJd
-
-
-PyTorch also implements an efficient `MultiHeadAttention` class based on the `scaled_`
-
-`dot_product` function:
-
-> `MultiHeadAttention` documentation: https://mng.bz/DdJV
-
-
-Dropout is a regularization technique used in neural networks to prevent overfitting by randomly dropping units (along with their connections) from the neural network during training:
-
-> “Dropout: A Simple Way to Prevent Neural Networks from Overfitting” (2014)
-
-
-by Srivastava et al., https://jmlr.org/papers/v15/srivastava14a.html
-
-While using the multi-head attention based on scaled-dot product attention remains the most common variant of self-attention in practice, authors have found that it’s possible to also achieve good performance without the value weight matrix and projection layer:
-
-> “Simplifying Transformer Blocks” (2023) by He and Hofmann, https://arxiv
-
-
-.org/abs/2311.01906
+> “Simplifying Transformer Blocks” (2023) by He and Hofmann, https://arxiv .org/abs/2311.01906
 
 <a id="chapter-4"></a>
 ## Chapter 4
 
 The following paper introduces a technique that stabilizes the hidden state dynamics neural networks by normalizing the summed inputs to the neurons within a hidden layer, significantly reducing training time compared to previously published methods:
 
-> “Layer Normalization” (2016) by Ba, Kiros, and Hinton, https://arxiv.org/abs/
+> “Layer Normalization” (2016) by Ba, Kiros, and Hinton, https://arxiv.org/abs/ 1607.06450 Post-LayerNorm, used in the original transformer model, applies layer normalization after the self-attention and feed forward networks. In contrast, Pre-LayerNorm, as adopted in models like GPT-2 and newer LLMs, applies layer normalization before these components, which can lead to more stable training dynamics and has been shown to improve performance in some cases, as discussed in the following papers:
 
+> “On Layer Normalization in the Transformer Architecture” (2020) by Xiong et al., https://arxiv.org/abs/2002.04745 “ResiDual: Transformer with Dual Residual Connections” (2023) by Tie et al., https://arxiv.org/abs/2304.14802 A popular variant of LayerNorm used in modern LLMs is RMSNorm due to its improved computing efficiency. This variant simplifies the normalization process by normalizing the inputs using only the root mean square of the inputs, without sub- tracting the mean before squaring. This means it does not center the data before computing the scale. RMSNorm is described in more detail in “Root Mean Square Layer Normalization” (2019) by Zhang and Sennrich, https://arxiv.org/abs/1910.07467 The Gaussian Error Linear Unit (GELU) activation function combines the properties of both the classic ReLU activation function and the normal distribution’s cumulative distribution function to model layer outputs, allowing for stochastic regularization and nonlinearities in deep learning models:
 
-1607.06450
+> “Gaussian Error Linear Units (GELUs)” (2016) by Hendricks and Gimpel, https://arxiv.org/abs/1606.08415 The GPT-2 paper introduced a series of transformer-based LLMs with varying sizes— 124 million, 355 million, 774 million, and 1.5 billion parameters:
 
-Post-LayerNorm, used in the original transformer model, applies layer normalization after the self-attention and feed forward networks. In contrast, Pre-LayerNorm, as adopted in models like GPT-2 and newer LLMs, applies layer normalization before these components, which can lead to more stable training dynamics and has been shown to improve performance in some cases, as discussed in the following papers:
+> “Language Models Are Unsupervised Multitask Learners” (2019) by Radford et al., https://mng.bz/lMgo OpenAI’s GPT-3 uses fundamentally the same architecture as GPT-2, except that the largest version (175 billion) is 100x larger than the largest GPT-2 model and has been trained on much more data. Interested readers can refer to the official GPT-3 paper by OpenAI and the technical overview by Lambda Labs, which calculates that training GPT-3 on a single RTX 8000 consumer GPU would take 665 years:
 
-> “On Layer Normalization in the Transformer Architecture” (2020) by Xiong et
+> “Language Models are Few-Shot Learners” (2023) by Brown et al., https:// arxiv.org/abs/2005.14165 “OpenAI’s GPT-3 Language Model: A Technical Overview,” https://lambdalabs .com/blog/demystifying-gpt-3 NanoGPT is a code repository with a minimalist yet efficient implementation of a GPT-2 model, similar to the model implemented in this book. While the code in this book is different from nanoGPT, this repository inspired the reorganization of a large GPT Python parent class implementation into smaller submodules:
 
+> “NanoGPT, a Repository for Training Medium-Sized GPTs, https://github.com/ karpathy/nanoGPT An informative blog post showing that most of the computation in LLMs is spent in the feed forward layers rather than attention layers when the context size is smaller than 32,000 tokens is:
 
-al., https://arxiv.org/abs/2002.04745
-
-> “ResiDual: Transformer with Dual Residual Connections” (2023) by Tie et al.,
-
-
-https://arxiv.org/abs/2304.14802
-
-A popular variant of LayerNorm used in modern LLMs is RMSNorm due to its improved computing efficiency. This variant simplifies the normalization process by normalizing the inputs using only the root mean square of the inputs, without sub- tracting the mean before squaring. This means it does not center the data before computing the scale. RMSNorm is described in more detail in
-
-> “Root Mean Square Layer Normalization” (2019) by Zhang and Sennrich,
-
-
-https://arxiv.org/abs/1910.07467
-
-The Gaussian Error Linear Unit (GELU) activation function combines the properties of both the classic ReLU activation function and the normal distribution’s cumulative distribution function to model layer outputs, allowing for stochastic regularization and nonlinearities in deep learning models:
-
-> “Gaussian Error Linear Units (GELUs)” (2016) by Hendricks and Gimpel,
-
-
-https://arxiv.org/abs/1606.08415
-
-The GPT-2 paper introduced a series of transformer-based LLMs with varying sizes— 124 million, 355 million, 774 million, and 1.5 billion parameters:
-
-> “Language Models Are Unsupervised Multitask Learners” (2019) by Radford et
-
-
-al., https://mng.bz/lMgo
-
-OpenAI’s GPT-3 uses fundamentally the same architecture as GPT-2, except that the largest version (175 billion) is 100x larger than the largest GPT-2 model and has been trained on much more data. Interested readers can refer to the official GPT-3 paper by OpenAI and the technical overview by Lambda Labs, which calculates that training GPT-3 on a single RTX 8000 consumer GPU would take 665 years:
-
-> “Language Models are Few-Shot Learners” (2023) by Brown et al., https://
-
-
-arxiv.org/abs/2005.14165
-
-> “OpenAI’s GPT-3 Language Model: A Technical Overview,” https://lambdalabs
-
-
-.com/blog/demystifying-gpt-3
-
-NanoGPT is a code repository with a minimalist yet efficient implementation of a GPT-2 model, similar to the model implemented in this book. While the code in this book is different from nanoGPT, this repository inspired the reorganization of a large GPT Python parent class implementation into smaller submodules:
-
-> “NanoGPT, a Repository for Training Medium-Sized GPTs, https://github.com/
-
-
-karpathy/nanoGPT
-
-An informative blog post showing that most of the computation in LLMs is spent in the feed forward layers rather than attention layers when the context size is smaller than 32,000 tokens is:
-
-> “In the Long (Context) Run” by Harm de Vries, https://www.harmdevries.com/
-
-
-post/context-length/
+> “In the Long (Context) Run” by Harm de Vries, https://www.harmdevries.com/ post/context-length/
 
 <a id="chapter-5"></a>
 ## Chapter 5
 
 For information on detailing the loss function and applying a log transformation to make it easier to handle for mathematical optimization, see my lecture video:
 
-> L8.2 Logistic Regression Loss Function, https://www.youtube.com/watch?v=
+> L8.2 Logistic Regression Loss Function, https://www.youtube.com/watch?v= GxJe0DZvydM The following lecture and code example by the author explain how PyTorch’s cross- entropy functions works under the hood:
 
+> L8.7.1 OneHot Encoding and Multi-category Cross Entropy, https://www .youtube.com/watch?v=4n71-tZ94yk Understanding Onehot Encoding and Cross Entropy in PyTorch, https:// mng.bz/o05v The following two papers detail the dataset, hyperparameter, and architecture details used for pretraining LLMs:
 
-GxJe0DZvydM
+> “Pythia: A Suite for Analyzing Large Language Models Across Training and Scaling” (2023) by Biderman et al., https://arxiv.org/abs/2304.01373 “OLMo: Accelerating the Science of Language Models” (2024) by Groeneveld et al., https://arxiv.org/abs/2402.00838 The following supplementary code available for this book contains instructions for preparing 60,000 public domain books from Project Gutenberg for LLM training:
 
-The following lecture and code example by the author explain how PyTorch’s cross- entropy functions works under the hood:
+> Pretraining GPT on the Project Gutenberg Dataset, https://mng.bz/Bdw2 Chapter 5 discusses the pretraining of LLMs, and appendix D covers more advanced training functions, such as linear warmup and cosine annealing. The following paper finds that similar techniques can be successfully applied to continue pretraining already pretrained LLMs, along with additional tips and insights:
 
-> L8.7.1 OneHot Encoding and Multi-category Cross Entropy, https://www
+> “Simple and Scalable Strategies to Continually Pre-train Large Language Mod- els” (2024) by Ibrahim et al., https://arxiv.org/abs/2403.08763 BloombergGPT is an example of a domain-specific LLM created by training on both general and domain-specific text corpora, specifically in the field of finance:
 
+> “BloombergGPT: A Large Language Model for Finance” (2023) by Wu et al., https://arxiv.org/abs/2303.17564 GaLore is a recent research project that aims to make LLM pretraining more efficient. The required code change boils down to just replacing PyTorch’s `AdamW` optimizer in the training function with the `GaLoreAdamW` optimizer provided by the `galore-torch` Python package:
 
-.youtube.com/watch?v=4n71-tZ94yk
+> “GaLore: Memory-Efficient LLM Training by Gradient Low-Rank Projection” (2024) by Zhao et al., https://arxiv.org/abs/2403.03507 GaLore code repository, https://github.com/jiaweizzhao/GaLore The following papers and resources share openly available, large-scale pretraining datasets for LLMs that consist of hundreds of gigabytes to terabytes of text data:
 
-> Understanding Onehot Encoding and Cross Entropy in PyTorch, https://
+> “Dolma: An Open Corpus of Three Trillion Tokens for LLM Pretraining Research” (2024) by Soldaini et al., https://arxiv.org/abs/2402.00159 “The Pile: An 800GB Dataset of Diverse Text for Language Modeling” (2020) by Gao et al., https://arxiv.org/abs/2101.00027 “The RefinedWeb Dataset for Falcon LLM: Outperforming Curated Corpora with Web Data, and Web Data Only,” (2023) by Penedo et al., https://arxiv.org/ abs/2306.01116 “RedPajama,” by Together AI, https://mng.bz/d6nw The FineWeb Dataset, which includes more than 15 trillion tokens of cleaned and deduplicated English web data sourced from CommonCrawl, https:// mng.bz/rVzy The paper that originally introduced top-k sampling is “Hierarchical Neural Story Generation” (2018) by Fan et al., https://arxiv.org/ abs/1805.04833 An alternative to top-k sampling is top-p sampling (not covered in chapter 5), which selects from the smallest set of top tokens whose cumulative probability exceeds a threshold p, while top-k sampling picks from the top k tokens by probability:
 
+> Top-p sampling, https://en.wikipedia.org/wiki/Top-p_sampling Beam search (not covered in chapter 5) is an alternative decoding algorithm that generates output sequences by keeping only the top-scoring partial sequences at each step to balance efficiency and quality:
 
-mng.bz/o05v
-
-The following two papers detail the dataset, hyperparameter, and architecture details used for pretraining LLMs:
-
-> “Pythia: A Suite for Analyzing Large Language Models Across Training and
-
-
-Scaling” (2023) by Biderman et al., https://arxiv.org/abs/2304.01373
-
-> “OLMo: Accelerating the Science of Language Models” (2024) by Groeneveld
-
-
-et al., https://arxiv.org/abs/2402.00838
-
-The following supplementary code available for this book contains instructions for preparing 60,000 public domain books from Project Gutenberg for LLM training:
-
-> Pretraining GPT on the Project Gutenberg Dataset, https://mng.bz/Bdw2
-
-
-Chapter 5 discusses the pretraining of LLMs, and appendix D covers more advanced training functions, such as linear warmup and cosine annealing. The following paper finds that similar techniques can be successfully applied to continue pretraining already pretrained LLMs, along with additional tips and insights:
-
-> “Simple and Scalable Strategies to Continually Pre-train Large Language Mod-
-
-
-els” (2024) by Ibrahim et al., https://arxiv.org/abs/2403.08763
-
-BloombergGPT is an example of a domain-specific LLM created by training on both general and domain-specific text corpora, specifically in the field of finance:
-
-> “BloombergGPT: A Large Language Model for Finance” (2023) by Wu et al.,
-
-
-https://arxiv.org/abs/2303.17564
-
-GaLore is a recent research project that aims to make LLM pretraining more efficient. The required code change boils down to just replacing PyTorch’s `AdamW` optimizer in the training function with the `GaLoreAdamW` optimizer provided by the `galore-torch` Python package:
-
-> “GaLore: Memory-Efficient LLM Training by Gradient Low-Rank Projection”
-
-
-(2024) by Zhao et al., https://arxiv.org/abs/2403.03507
-
-> GaLore code repository, https://github.com/jiaweizzhao/GaLore
-
-
-The following papers and resources share openly available, large-scale pretraining datasets for LLMs that consist of hundreds of gigabytes to terabytes of text data:
-
-> “Dolma: An Open Corpus of Three Trillion Tokens for LLM Pretraining
-
-
-Research” (2024) by Soldaini et al., https://arxiv.org/abs/2402.00159
-
-> “The Pile: An 800GB Dataset of Diverse Text for Language Modeling” (2020) by
-
-
-Gao et al., https://arxiv.org/abs/2101.00027
-
-> “The RefinedWeb Dataset for Falcon LLM: Outperforming Curated Corpora
-
-
-with Web Data, and Web Data Only,” (2023) by Penedo et al., https://arxiv.org/ abs/2306.01116
-
-> “RedPajama,” by Together AI, https://mng.bz/d6nw
-
-
-> The FineWeb Dataset, which includes more than 15 trillion tokens of cleaned
-
-
-and deduplicated English web data sourced from CommonCrawl, https:// mng.bz/rVzy
-
-The paper that originally introduced top-k sampling is
-
-> “Hierarchical Neural Story Generation” (2018) by Fan et al., https://arxiv.org/
-
-
-abs/1805.04833
-
-An alternative to top-k sampling is top-p sampling (not covered in chapter 5), which selects from the smallest set of top tokens whose cumulative probability exceeds a threshold p, while top-k sampling picks from the top k tokens by probability:
-
-> Top-p sampling, https://en.wikipedia.org/wiki/Top-p_sampling
-
-
-Beam search (not covered in chapter 5) is an alternative decoding algorithm that generates output sequences by keeping only the top-scoring partial sequences at each step to balance efficiency and quality:
-
-> “Diverse Beam Search: Decoding Diverse Solutions from Neural Sequence
-
-
-Models” (2016) by Vijayakumar et al., https://arxiv.org/abs/1610.02424
+> “Diverse Beam Search: Decoding Diverse Solutions from Neural Sequence Models” (2016) by Vijayakumar et al., https://arxiv.org/abs/1610.02424
 
 <a id="chapter-6"></a>
 ## Chapter 6
 
 Additional resources that discuss the different types of fine-tuning are
 
-> “Using and Finetuning Pretrained Transformers,” https://mng.bz/VxJG
+> “Using and Finetuning Pretrained Transformers,” https://mng.bz/VxJG “Finetuning Large Language Models,” https://mng.bz/x28X Additional experiments, including a comparison of fine-tuning the first output token versus the last output token, can be found in the supplementary code material on GitHub:
 
+> Additional spam classification experiments, https://mng.bz/AdJx For a binary classification task, such as spam classification, it is technically possible to use only a single output node instead of two output nodes, as I discuss in the following article:
 
-> “Finetuning Large Language Models,” https://mng.bz/x28X
+> “Losses Learned—Optimizing Negative Log-Likelihood and Cross-Entropy in PyTorch,” https://mng.bz/ZEJA You can find additional experiments on fine-tuning different layers of an LLM in the following article, which shows that fine-tuning the last transformer block, in addition to the output layer, improves the predictive performance substantially:
 
+> “Finetuning Large Language Models,” https://mng.bz/RZJv Readers can find additional resources and information for dealing with imbalanced classification datasets in the imbalanced-learn documentation:
 
-Additional experiments, including a comparison of fine-tuning the first output token versus the last output token, can be found in the supplementary code material on GitHub:
+> “Imbalanced-Learn User Guide,” https://mng.bz/2KNa For readers interested in classifying spam emails rather than spam text messages, the following resource provides a large email spam classification dataset in a convenient CSV format similar to the dataset format used in chapter 6:
 
-> Additional spam classification experiments, https://mng.bz/AdJx
+> Email Spam Classification Dataset, https://mng.bz/1GEq GPT-2 is a model based on the decoder module of the transformer architecture, and its primary purpose is to generate new text. As an alternative, encoder-based models such as BERT and RoBERTa can be effective for classification tasks:
 
+> “BERT: Pre-training of Deep Bidirectional Transformers for Language Under- standing” (2018) by Devlin et al., https://arxiv.org/abs/1810.04805 “RoBERTa: A Robustly Optimized BERT Pretraining Approach” (2019) by Liu et al., https://arxiv.org/abs/1907.11692 “Additional Experiments Classifying the Sentiment of 50k IMDB Movie Reviews,” https://mng.bz/PZJR Recent papers are showing that the classification performance can be further improved by removing the causal mask during classification fine-tuning alongside other modifications:
 
-For a binary classification task, such as spam classification, it is technically possible to use only a single output node instead of two output nodes, as I discuss in the following article:
-
-> “Losses Learned—Optimizing Negative Log-Likelihood and Cross-Entropy in
-
-
-PyTorch,” https://mng.bz/ZEJA
-
-You can find additional experiments on fine-tuning different layers of an LLM in the following article, which shows that fine-tuning the last transformer block, in addition to the output layer, improves the predictive performance substantially:
-
-> “Finetuning Large Language Models,” https://mng.bz/RZJv
-
-
-Readers can find additional resources and information for dealing with imbalanced classification datasets in the imbalanced-learn documentation:
-
-> “Imbalanced-Learn User Guide,” https://mng.bz/2KNa
-
-
-For readers interested in classifying spam emails rather than spam text messages, the following resource provides a large email spam classification dataset in a convenient CSV format similar to the dataset format used in chapter 6:
-
-> Email Spam Classification Dataset, https://mng.bz/1GEq
-
-
-GPT-2 is a model based on the decoder module of the transformer architecture, and its primary purpose is to generate new text. As an alternative, encoder-based models such as BERT and RoBERTa can be effective for classification tasks:
-
-> “BERT: Pre-training of Deep Bidirectional Transformers for Language Under-
-
-
-standing” (2018) by Devlin et al., https://arxiv.org/abs/1810.04805
-
-> “RoBERTa: A Robustly Optimized BERT Pretraining Approach” (2019) by Liu
-
-
-et al., https://arxiv.org/abs/1907.11692
-
-> “Additional Experiments Classifying the Sentiment of 50k IMDB Movie Reviews,”
-
-
-https://mng.bz/PZJR
-
-Recent papers are showing that the classification performance can be further improved by removing the causal mask during classification fine-tuning alongside other modifications:
-
-> “Label Supervised LLaMA Finetuning” (2023) by Li et al., https://arxiv.org/
-
-
-abs/2310.01208
-
-> “LLM2Vec: Large Language Models Are Secretly Powerful Text Encoders”
-
-
-(2024) by BehnamGhader et al., https://arxiv.org/abs/2404.05961
+> “Label Supervised LLaMA Finetuning” (2023) by Li et al., https://arxiv.org/ abs/2310.01208 “LLM2Vec: Large Language Models Are Secretly Powerful Text Encoders” (2024) by BehnamGhader et al., https://arxiv.org/abs/2404.05961
 
 <a id="chapter-7"></a>
 ## Chapter 7
 
 The Alpaca dataset for instruction fine-tuning contains 52,000 instruction–response pairs and is one of the first and most popular publicly available datasets for instruction fine-tuning:
 
-> “Stanford Alpaca: An Instruction-Following Llama Model,” https://github
+> “Stanford Alpaca: An Instruction-Following Llama Model,” https://github .com/tatsu-lab/stanford_alpaca Additional publicly accessible datasets suitable for instruction fine-tuning include LIMA, https://huggingface.co/datasets/GAIR/lima – For more information, see “LIMA: Less Is More for Alignment,” Zhou et al., https://arxiv.org/abs/2305.11206 UltraChat, https://huggingface.co/datasets/openchat/ultrachat-sharegpt – A large-scale dataset consisting of 805,000 instruction–response pairs; for more information, see “Enhancing Chat Language Models by Scaling Highquality Instructional Conversations,” by Ding et al., https://arxiv.org/abs/ 2305.14233 Alpaca GPT4, https://mng.bz/Aa0p – An Alpaca-like dataset with 52,000 instruction–response pairs generated with GPT-4 instead of GPT-3.5 Phi-3 is a 3.8-billion-parameter model with an instruction-fine-tuned variant that is reported to be comparable to much larger proprietary models, such as GPT-3.5:
 
+> “Phi-3 Technical Report: A Highly Capable Language Model Locally on Your Phone” (2024) by Abdin et al., https://arxiv.org/abs/2404.14219 Researchers propose a synthetic instruction data generation method that generates 300,000 high-quality instruction-response pairs from an instruction fine-tuned Llama3 model. A pretrained Llama 3 base model fine-tuned on these instruction examples performs comparably to the original instruction fine-tuned Llama-3 model:
 
-.com/tatsu-lab/stanford_alpaca
+> “Magpie: Alignment Data Synthesis from Scratch by Prompting Aligned LLMs with Nothing” (2024) by Xu et al., https://arxiv.org/abs/2406.08464 Research has shown that not masking the instructions and inputs in instruction finetuning effectively improves performance on various NLP tasks and open-ended generation benchmarks, particularly when trained on datasets with lengthy instructions and brief outputs or when using a small number of training examples:
 
-Additional publicly accessible datasets suitable for instruction fine-tuning include
+> “Instruction Tuning with Loss Over Instructions” (2024) by Shi, https:// arxiv.org/abs/2405.14394 Prometheus and PHUDGE are openly available LLMs that match GPT-4 in evaluating long-form responses with customizable criteria. We don’t use these because at the time of this writing, they are not supported by Ollama and thus cannot be executed efficiently on a laptop:
 
-> LIMA, https://huggingface.co/datasets/GAIR/lima
+> “Prometheus: Inducing Finegrained Evaluation Capability in Language Mod- els” (2023) by Kim et al., https://arxiv.org/abs/2310.08491 “PHUDGE: Phi-3 as Scalable Judge” (2024) by Deshwal and Chawla, “https:// arxiv.org/abs/2405.08029 “Prometheus 2: An Open Source Language Model Specialized in Evaluating Other Language Models” (2024), by Kim et al., https://arxiv.org/abs/2405 .01535 The results in the following report support the view that large language models primarily acquire factual knowledge during pretraining and that fine-tuning mainly enhances their efficiency in using this knowledge. Furthermore, this study explores how fine-tuning large language models with new factual information affects their ability to use preexisting knowledge, revealing that models learn new facts more slowly and their introduction during fine-tuning increases the model’s tendency to generate incorrect information:
 
+> “Does Fine-Tuning LLMs on New Knowledge Encourage Hallucinations?” (2024) by Gekhman, https://arxiv.org/abs/2405.05904 Preference fine-tuning is an optional step after instruction fine-tuning to align the LLM more closely with human preferences. The following articles by the author provide more information about this process:
 
-– For more information, see “LIMA: Less Is More for Alignment,” Zhou et al.,
+> “LLM Training: RLHF and Its Alternatives,” https://mng.bz/ZVPm “Tips for LLM Pretraining and Evaluating Reward Models,” https://mng.bz/ RNXj
 
-https://arxiv.org/abs/2305.11206
-
-> UltraChat, https://huggingface.co/datasets/openchat/ultrachat-sharegpt
-
-
-– A large-scale dataset consisting of 805,000 instruction–response pairs; for
-
-more information, see “Enhancing Chat Language Models by Scaling Highquality Instructional Conversations,” by Ding et al., https://arxiv.org/abs/ 2305.14233
-
-> Alpaca GPT4, https://mng.bz/Aa0p
-
-
-– An Alpaca-like dataset with 52,000 instruction–response pairs generated with
-
-GPT-4 instead of GPT-3.5
-
-Phi-3 is a 3.8-billion-parameter model with an instruction-fine-tuned variant that is reported to be comparable to much larger proprietary models, such as GPT-3.5:
-
-> “Phi-3 Technical Report: A Highly Capable Language Model Locally on Your
-
-
-Phone” (2024) by Abdin et al., https://arxiv.org/abs/2404.14219
-
-Researchers propose a synthetic instruction data generation method that generates 300,000 high-quality instruction-response pairs from an instruction fine-tuned Llama3 model. A pretrained Llama 3 base model fine-tuned on these instruction examples performs comparably to the original instruction fine-tuned Llama-3 model:
-
-> “Magpie: Alignment Data Synthesis from Scratch by Prompting Aligned LLMs
-
-
-with Nothing” (2024) by Xu et al., https://arxiv.org/abs/2406.08464
-
-Research has shown that not masking the instructions and inputs in instruction finetuning effectively improves performance on various NLP tasks and open-ended generation benchmarks, particularly when trained on datasets with lengthy instructions and brief outputs or when using a small number of training examples:
-
-> “Instruction Tuning with Loss Over Instructions” (2024) by Shi, https://
-
-
-arxiv.org/abs/2405.14394
-
-Prometheus and PHUDGE are openly available LLMs that match GPT-4 in evaluating long-form responses with customizable criteria. We don’t use these because at the time of this writing, they are not supported by Ollama and thus cannot be executed efficiently on a laptop:
-
-> “Prometheus: Inducing Finegrained Evaluation Capability in Language Mod-
-
-
-els” (2023) by Kim et al., https://arxiv.org/abs/2310.08491
-
-> “PHUDGE: Phi-3 as Scalable Judge” (2024) by Deshwal and Chawla, “https://
-
-
-arxiv.org/abs/2405.08029
-
-> “Prometheus 2: An Open Source Language Model Specialized in Evaluating
-
-
-Other Language Models” (2024), by Kim et al., https://arxiv.org/abs/2405 .01535
-
-The results in the following report support the view that large language models primarily acquire factual knowledge during pretraining and that fine-tuning mainly enhances their efficiency in using this knowledge. Furthermore, this study explores
-
-how fine-tuning large language models with new factual information affects their ability to use preexisting knowledge, revealing that models learn new facts more slowly and their introduction during fine-tuning increases the model’s tendency to generate incorrect information:
-
-> “Does Fine-Tuning LLMs on New Knowledge Encourage Hallucinations?” (2024)
-
-
-by Gekhman, https://arxiv.org/abs/2405.05904
-
-Preference fine-tuning is an optional step after instruction fine-tuning to align the LLM more closely with human preferences. The following articles by the author provide more information about this process:
-
-> “LLM Training: RLHF and Its Alternatives,” https://mng.bz/ZVPm
-
-
-> “Tips for LLM Pretraining and Evaluating Reward Models,” https://mng.bz/
-
-
-RNXj
-
-Appendix A
+### Appendix A
 
 While appendix A should be sufficient to get you up to speed, if you are looking for more comprehensive introductions to deep learning, I recommend the following books:
 
-> Machine Learning with PyTorch and Scikit-Learn (2022) by Sebastian Raschka,
+> Machine Learning with PyTorch and Scikit-Learn (2022) by Sebastian Raschka, Hayden Liu, and Vahid Mirjalili. ISBN 978-1801819312 Deep Learning with PyTorch (2021) by Eli Stevens, Luca Antiga, and Thomas Vieh- mann. ISBN 978-1617295263 For a more thorough introduction to the concepts of tensors, readers can find a 15minute video tutorial that I recorded:
 
+> “Lecture 4.1: Tensors in Deep Learning,” https://www.youtube.com/watch?v= JXfDlgrfOBY If you want to learn more about model evaluation in machine learning, I recommend my article “Model Evaluation, Model Selection, and Algorithm Selection in Machine Learning” (2018) by Sebastian Raschka, https://arxiv.org/abs/1811.12808 For readers who are interested in a refresher or gentle introduction to calculus, I’ve written a chapter on calculus that is freely available on my website:
 
-Hayden Liu, and Vahid Mirjalili. ISBN 978-1801819312
+> “Introduction to Calculus,” by Sebastian Raschka, https://mng.bz/WEyW Why does PyTorch not call `optimizer.zero_grad()` automatically for us in the background? In some instances, it may be desirable to accumulate the gradients, and PyTorch will leave this as an option for us. If you want to learn more about gradient accumulation, please see the following article:
 
-> Deep Learning with PyTorch (2021) by Eli Stevens, Luca Antiga, and Thomas Vieh-
+> “Finetuning Large Language Models on a Single GPU Using Gradient Accumu- lation” by Sebastian Raschka, https://mng.bz/8wPD This appendix covers DDP, which is a popular approach for training deep learning models across multiple GPUs. For more advanced use cases where a single model doesn’t fit onto the GPU, you may also consider PyTorch’s Fully Sharded Data Parallel (FSDP) method, which performs distributed data parallelism and distributes large layers across different GPUs. For more information, see this overview with further links to the API documentation:
 
+> “Introducing PyTorch Fully Sharded Data Parallel (FSDP) API,” https://mng .bz/EZJR
 
-mann. ISBN 978-1617295263
-
-For a more thorough introduction to the concepts of tensors, readers can find a 15minute video tutorial that I recorded:
-
-> “Lecture 4.1: Tensors in Deep Learning,” https://www.youtube.com/watch?v=
-
-
-JXfDlgrfOBY
-
-If you want to learn more about model evaluation in machine learning, I recommend my article
-
-> “Model Evaluation, Model Selection, and Algorithm Selection in Machine
-
-
-Learning” (2018) by Sebastian Raschka, https://arxiv.org/abs/1811.12808
-
-For readers who are interested in a refresher or gentle introduction to calculus, I’ve written a chapter on calculus that is freely available on my website:
-
-> “Introduction to Calculus,” by Sebastian Raschka, https://mng.bz/WEyW
-
-
-Why does PyTorch not call `optimizer.zero_grad()` automatically for us in the background? In some instances, it may be desirable to accumulate the gradients, and PyTorch will leave this as an option for us. If you want to learn more about gradient accumulation, please see the following article:
-
-> “Finetuning Large Language Models on a Single GPU Using Gradient Accumu-
-
-
-lation” by Sebastian Raschka, https://mng.bz/8wPD
-
-This appendix covers DDP, which is a popular approach for training deep learning models across multiple GPUs. For more advanced use cases where a single model doesn’t fit onto the GPU, you may also consider PyTorch’s Fully Sharded Data Parallel (FSDP) method, which performs distributed data parallelism and distributes large layers across different GPUs. For more information, see this overview with further links to the API documentation:
-
-> “Introducing PyTorch Fully Sharded Data Parallel (FSDP) API,” https://mng
-
-
-.bz/EZJR
-
-appendix C Exercise solutions
+## Appendix C: Exercise solutions
 
 The complete code examples for the exercises’ answers can be found in the supplementary GitHub repository at https://github.com/rasbt/LLMs-from-scratch.
 
 <a id="chapter-2-2"></a>
 ## Chapter 2
 
-Exercise 2.1
+#### Exercise 2.1
 
 You can obtain the individual token IDs by prompting the encoder with one string at a time:
 
@@ -11675,7 +9339,7 @@ This returns
 'Akwirw ier'
 ```
 
-Exercise 2.2
+#### Exercise 2.2
 
 The code for the data loader with `max_length=2` `and` `stride=2`:
 
@@ -11714,7 +9378,7 @@ tensor([[   40,   367,  2885,  1464,  1807,  3619,   402,   271],
 <a id="chapter-3-2"></a>
 ## Chapter 3
 
-Exercise 3.1
+#### Exercise 3.1
 
 The correct weight assignment is
 
@@ -11724,7 +9388,7 @@ sa_v1.W_key = torch.nn.Parameter(sa_v2.W_key.weight.T)
 sa_v1.W_value = torch.nn.Parameter(sa_v2.W_value.weight.T)
 ```
 
-Exercise 3.2
+#### Exercise 3.2
 
 To achieve an output dimension of 2, similar to what we had in single-head attention, we need to change the projection dimension `d_out` to 1.
 
@@ -11733,7 +9397,7 @@ d_out = 1
 mha = MultiHeadAttentionWrapper(d_in, d_out, block_size, 0.0, num_heads=2)
 ```
 
-Exercise 3.3
+#### Exercise 3.3
 
 The initialization for the smallest GPT-2 model is
 
@@ -11747,7 +9411,7 @@ mha = MultiHeadAttention(d_in, d_out, block_size, 0.0, num_heads)
 <a id="chapter-4-2"></a>
 ## Chapter 4
 
-Exercise 4.1
+#### Exercise 4.1
 
 We can calculate the number of parameters in the feed forward and attention modules as follows:
 
@@ -11756,9 +9420,7 @@ block = TransformerBlock(GPT_CONFIG_124M)
 ```
 
 total_params = sum(p.numel() for p in block.ff.parameters())
-print(f"Total number of parameters in feed forward module: {total_params:,}")
-
-total_params = sum(p.numel() for p in block.att.parameters())
+print(f"Total number of parameters in feed forward module: {total_params:,}") total_params = sum(p.numel() for p in block.att.parameters())
 print(f"Total number of parameters in attention module: {total_params:,}")
 
 As we can see, the feed forward module contains approximately twice as many parameters as the attention module:
@@ -11768,7 +9430,7 @@ Total number of parameters in feed forward module: 4,722,432
 Total number of parameters in attention module: 2,360,064
 ```
 
-Exercise 4.2
+#### Exercise 4.2
 
 To instantiate the other GPT model sizes, we can modify the configuration dictionary as follows (here shown for GPT-2 XL):
 
@@ -11789,7 +9451,7 @@ Number of trainable parameters considering weight tying: 1,557,380,800
 Total size of the model: 6247.68 MB
 ```
 
-Exercise 4.3
+#### Exercise 4.3
 
 There are three distinct places in chapter 4 where we used dropout layers: the embedding layer, shortcut layer, and multi-head attention module. We can control the dropout rates for each of the layers by coding them separately in the config file and then modifying the code implementation accordingly.
 
@@ -11867,7 +9529,7 @@ Dropout for embedding layer
 <a id="chapter-5-2"></a>
 ## Chapter 5
 
-Exercise 5.1
+#### Exercise 5.1
 
 We can print the number of times the token (or word) “pizza” is sampled using the
 
@@ -11877,7 +9539,7 @@ The “pizza” token is sampled 0x if the temperature is 0 or 0.1, and it is sa
 
 The actual probability is 4.3% and is contained in the rescaled softmax probability tensor (`scaled_probas[2][6]`).
 
-Exercise 5.2
+#### Exercise 5.2
 
 Top-k sampling and temperature scaling are settings that have to be adjusted based on the LLM and the desired degree of diversity and randomness in the output.
 
@@ -11887,7 +9549,7 @@ Applications for such low k and temperature settings include generating formal d
 
 On the other hand, larger top-k values (e.g., values in the range of 20 to 40) and temperature values above 1 are useful when using LLMs for brainstorming or generating creative content, such as fiction.
 
-Exercise 5.3
+#### Exercise 5.3
 
 There are multiple ways to force deterministic behavior with the `generate` function:
 
@@ -11895,7 +9557,7 @@ There are multiple ways to force deterministic behavior with the `generate` func
 
 2 Setting `top_k=1`
 
-Exercise 5.4
+#### Exercise 5.4
 
 In essence, we have to load the model and optimizer that we saved in the main chapter:
 
@@ -11909,7 +9571,7 @@ optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
 Then, call the `train_simple_function` with `num_epochs=1` to train the model for another epoch.
 
-Exercise 5.5
+#### Exercise 5.5
 
 We can use the following code to calculate the training and validation set losses of the GPT model:
 
@@ -11931,7 +9593,7 @@ The main observation is that the training and validation set performances are in
 
 2 “The Verdict” was part of GPT-2’s training dataset. In this case, we can’t tell whether the model is overfitting the training data because the validation set would have been used for training as well. To evaluate the degree of overfitting, we’d need a new dataset generated after OpenAI finished training GPT-2 to make sure that it couldn’t have been part of the pretraining.
 
-Exercise 5.6
+#### Exercise 5.6
 
 In the main chapter, we experimented with the smallest GPT-2 model, which has only 124-million parameters. The reason was to keep the resource requirements as low as possible. However, you can easily experiment with larger models with minimal code changes. For example, instead of loading the 1,558 million instead of 124 million model weights in chapter 5, the only two lines of code that we have to change are the following:
 
@@ -11950,7 +9612,7 @@ model_name = "gpt2-xl (1558M)"
 <a id="chapter-6-2"></a>
 ## Chapter 6
 
-Exercise 6.1
+#### Exercise 6.1
 
 We can pad the inputs to the maximum number of tokens the model supports by setting the max length to `max_length` `=` `1024` when initializing the datasets:
 
@@ -11962,7 +9624,7 @@ test_dataset = SpamDataset(..., max_length=1024, ...)
 
 However, the additional padding results in a substantially worse test accuracy of 78.33% (vs. the 95.67% in the main chapter).
 
-Exercise 6.2
+#### Exercise 6.2
 
 Instead of fine-tuning just the final transformer block, we can fine-tune the entire model by removing the following lines from the code:
 
@@ -11973,7 +9635,7 @@ for param in model.parameters():
 
 This modification results in a 1% improved test accuracy of 96.67% (vs. the 95.67% in the main chapter).
 
-Exercise 6.3
+#### Exercise 6.3
 
 Rather than fine-tuning the last output token, we can fine-tune the first output token by changing `model(input_batch)[:,` `-1,` `:]` to `model(input_batch)[:,` `0,` `:]` everywhere in the code.
 
@@ -11982,7 +9644,7 @@ As expected, since the first token contains less information than the last token
 <a id="chapter-7-2"></a>
 ## Chapter 7
 
-Exercise 7.1
+#### Exercise 7.1
 
 The Phi-3 prompt format, which is shown in figure 7.4, looks like the following for a given example input:
 
@@ -12011,11 +9673,9 @@ New: Adjust ###Response to <|assistant|>
 
 Fine-tuning the model with the Phi-3 template is approximately 17% faster since it results in shorter model inputs. The score is close to 50, which is in the same ballpark as the score we previously achieved with the Alpaca-style prompts.
 
-Exercise 7.2
+#### Exercise 7.2
 
-To mask out the instructions as shown in figure 7.13, we need to make slight modifications to the `InstructionDataset` class and `custom_collate_fn` function. We can modify the `InstructionDataset` class to collect the lengths of the instructions, which
-
-we will use in the collate function to locate the instruction content positions in the targets when we code the collate function, as follows:
+To mask out the instructions as shown in figure 7.13, we need to make slight modifications to the `InstructionDataset` class and `custom_collate_fn` function. We can modify the `InstructionDataset` class to collect the lengths of the instructions, which we will use in the collate function to locate the instruction content positions in the targets when we code the collate function, as follows:
 
 Separate list for instruction lengths
 
@@ -12072,7 +9732,7 @@ Masks all input and instruction tokens in the targets
 
 When evaluating a model fine-tuned with this instruction masking method, it performs slightly worse (approximately 4 points using the Ollama Llama 3 method from chapter 7). This is consistent with observations in the “Instruction Tuning With Loss Over Instructions” paper (https://arxiv.org/abs/2405.14394).
 
-Exercise 7.3
+#### Exercise 7.3
 
 To fine-tune the model on the original Stanford Alpaca dataset (https://github.com/ tatsu-lab/stanford_alpaca), we just have to change the file URL from
 
@@ -12094,7 +9754,7 @@ Thus, it’s highly recommended that the training be run on a GPU. If you encoun
 
 Below are a few examples from the Alpaca dataset, including the generated model responses:
 
-Exercise 7.4
+#### Exercise 7.4
 
 To instruction fine-tune the model using LoRA, use the relevant classes and functions from appendix E:
 
@@ -12122,9 +9782,9 @@ model.to(device)
 
 Note that, on an Nvidia L4 GPU, the fine-tuning with LoRA takes 1.30 min to run on an L4. On the same GPU, the original code takes 1.80 minutes to run. So, LoRA is approximately 28% faster in this case. The score, evaluated with the Ollama Llama 3 method from chapter 7, is around 50, which is in the same ballpark as the original model.
 
-Appendix A
+### Appendix A
 
-Exercise A.1
+### Exercise A.1
 
 The network has two inputs and two outputs. In addition, there are two hidden layers with 30 and 20 nodes, respectively. Programmatically, we can calculate the number of parameters as follows:
 
@@ -12142,18 +9802,9 @@ This returns
 
 We can also calculate this manually:
 
-> First hidden layer—2 inputs times 30 hidden units plus 30 bias units
+> First hidden layer—2 inputs times 30 hidden units plus 30 bias units Second hidden layer—30 incoming units times 20 nodes plus 20 bias units Output layer—20 incoming nodes times 2 output nodes plus 2 bias units Then, adding all the parameters in each layer results in 2 × 30 + 30 + 30 × 20 + 20 + 20 × 2 + 2 = 752.
 
-
-> Second hidden layer—30 incoming units times 20 nodes plus 20 bias units
-
-
-> Output layer—20 incoming nodes times 2 output nodes plus 2 bias units
-
-
-Then, adding all the parameters in each layer results in 2 × 30 + 30 + 30 × 20 + 20 + 20 × 2 + 2 = 752.
-
-Exercise A.2
+### Exercise A.2
 
 The exact run-time results will be specific to the hardware used for this experiment. In my experiments, I observed significant speedups even for small matrix multiplications as the following one when using a Google Colab instance connected to a V100 GPU:
 
@@ -12184,7 +9835,7 @@ the result was
 
 In this case, on a V100, the computation was approximately four times faster.
 
-Exercise A.3
+### Exercise A.3
 
 The network has two inputs and two outputs. In addition, there are 2 hidden layers with 30 and 20 nodes, respectively. Programmatically, we can calculate the number of parameters as follows:
 
@@ -12202,18 +9853,9 @@ This returns
 
 We can also calculate this manually as follows:
 
-> First hidden layer: 2 inputs times 30 hidden units plus 30 bias units
+> First hidden layer: 2 inputs times 30 hidden units plus 30 bias units Second hidden layer: 30 incoming units times 20 nodes plus 20 bias units Output layer: 20 incoming nodes times 2 output nodes plus 2 bias units Then, adding all the parameters in each layer results in 2×30+30 + 30×20+20 + 20×2+2 = 752.
 
-
-> Second hidden layer: 30 incoming units times 20 nodes plus 20 bias units
-
-
-> Output layer: 20 incoming nodes times 2 output nodes plus 2 bias units
-
-
-Then, adding all the parameters in each layer results in 2×30+30 + 30×20+20 + 20×2+2 = 752.
-
-Exercise A.4
+### Exercise A.4
 
 The exact run-time results will be specific to the hardware used for this experiment. In my experiments, I observed significant speed-ups even for small matrix multiplications when using a Google Colab instance connected to a V100 GPU:
 
@@ -12244,9 +9886,7 @@ The result was
 
 In this case, on a V100, the computation was approximately four times faster.
 
-appendix D Adding bells and whistles
-
-to the training loop
+## Appendix D: Adding bells and whistles to the training loop
 
 In this appendix, we enhance the training function for the pretraining and finetuning processes covered in chapters 5 to 7. In particular, it covers learning rate warmup, cosine decay, and gradient clipping. We then incorporate these techniques into the training function and pretrain an LLM.
 
@@ -12322,7 +9962,7 @@ val_loader = create_dataloader_v1(
     num_workers=0
 )
 
-D.1 Learning rate warmup
+### D.1 Learning rate warmup
 
 Implementing a learning rate warmup can stabilize the training of complex models such as LLMs. This process involves gradually increasing the learning rate from a very low initial value (`initial_lr`) to a maximum value specified by the user (`peak_lr`). Starting the training with smaller weight updates decreases the risk of the model encountering large, destabilizing updates during its training phase.
 
@@ -12358,9 +9998,7 @@ Applies the
 
 calculated
 
-Updates the learning rate if we are still in the warmup phase
-
-learning rate to the
+Updates the learning rate if we are still in the warmup phase learning rate to the
 
 optimizer
 
@@ -12386,7 +10024,7 @@ Figure D.1 The learning rate warmup increases the learning rate for the first 20
 
 Next, we will modify the learning rate further so that it decreases after reaching the maximum learning rate, which further helps improve the model training.
 
-D.2 Cosine decay
+### D.2 Cosine decay
 
 Another widely adopted technique for training complex deep neural networks and LLMs is cosine decay. This method modulates the learning rate throughout the training epochs, making it follow a cosine curve after the warmup stage.
 
@@ -12435,13 +10073,11 @@ The resulting learning rate plot shows that the learning rate starts with a line
 
 Figure D.2 The first 20 steps of linear learning rate warmup are followed by a cosine decay, which reduces the learning rate in a halfcosine cycle until it reaches its minimum point at the end of training.
 
-D.3 Gradient clipping
+### D.3 Gradient clipping
 
 Gradient clipping is another important technique for enhancing stability during LLM training. This method involves setting a threshold above which gradients are downscaled to a predetermined maximum magnitude. This process ensures that the updates to the model’s parameters during backpropagation stay within a manageable range.
 
-For example, applying the `max_norm=1.0` setting within PyTorch’s `clip_grad_`
-
-`norm_` function ensures that the norm of the gradients does not surpass 1.0. Here, the term “norm” signifies the measure of the gradient vector’s length, or magnitude, within the model’s parameter space, specifically referring to the L2 norm, also known as the Euclidean norm.
+For example, applying the `max_norm=1.0` setting within PyTorch’s `clip_gradnorm_` function ensures that the norm of the gradients does not surpass 1.0. Here, the term “norm” signifies the measure of the gradient vector’s length, or magnitude, within the model’s parameter space, specifically referring to the L2 norm, also known as the Euclidean norm.
 
 In mathematical terms, for a vector v composed of components v = [v1, v2, ..., vn], the L2 norm is
 
@@ -12499,7 +10135,7 @@ The largest gradient value after applying the gradient clipping with the max nor
 tensor(0.0185)
 ```
 
-D.4 The modified training function
+### D.4 The modified training function
 
 Finally, we improve the `train_model_simple` training function (see chapter 5) by adding the three concepts introduced herein: linear warmup, cosine decay, and gradient clipping. Together, these methods help stabilize LLM training.
 
@@ -12586,11 +10222,11 @@ Like pretraining, the model begins to overfit after a few epochs since it is a v
 
 Readers are encouraged to train the model on a larger text dataset and compare the results obtained with this more sophisticated training function to the results that can be obtained with the `train_model_simple` function.
 
-appendix E Parameter-efficient fine-tuning with LoRA
+## Appendix E: Parameter-efficient fine-tuning with LoRA
 
 Low-rank adaptation (LoRA) is one of the most widely used techniques for parameterefficient fine-tuning. The following discussion is based on the spam classification finetuning example given in chapter 6. However, LoRA fine-tuning is also applicable to the supervised instruction fine-tuning discussed in chapter 7.
 
-E.1 Introduction to LoRA
+### E.1 Introduction to LoRA
 
 LoRA is a technique that adapts a pretrained model to better suit a specific, often smaller dataset by adjusting only a small subset of the model’s weight parameters. The “low-rank” aspect refers to the mathematical concept of limiting model adjustments to a smaller dimensional subspace of the total weight parameter space. This effectively captures the most influential directions of the weight parameter changes during training. The LoRA method is useful and popular because it enables efficient fine-tuning of large models on task-specific data, significantly cutting down on the computational costs and resources usually required for fine-tuning.
 
@@ -12686,7 +10322,11 @@ Keeping the LoRA weights separate is very useful in practice because it enables 
 
 Next, let’s see how LoRA can be used to fine-tune an LLM for spam classification, similar to the fine-tuning example in chapter 6.
 
-E.2 Preparing the dataset Before applying LoRA to the spam classification example, we must load the dataset and pretrained model we will work with. The code here repeats the data preparation from chapter 6. (Instead of repeating the code, we could open and run the chapter 6 notebook and insert the LoRA code from section E.4 there.)
+### E.2 Preparing the dataset
+
+Before applying LoRA to the spam classification example, we must load the dataset and pretrained model we will work with.
+
+The code here repeats the data preparation from chapter 6. (Instead of repeating the code, we could open and run the chapter 6 notebook and insert the LoRA code from section E.4 there.)
 
 First, we download the dataset and save it as CSV files.
 
@@ -12704,17 +10344,11 @@ url = \
 "https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip"
 zip_path = "sms_spam_collection.zip"
 extracted_path = "sms_spam_collection"
-data_file_path = Path(extracted_path) / "SMSSpamCollection.tsv"
-
-download_and_unzip_spam_data(url, zip_path, extracted_path, data_file_path)
-
-df = pd.read_csv(
+data_file_path = Path(extracted_path) / "SMSSpamCollection.tsv" download_and_unzip_spam_data(url, zip_path, extracted_path, data_file_path) df = pd.read_csv(
     data_file_path, sep="\t", header=None, names=["Label", "Text"]
 )
 balanced_df = create_balanced_dataset(df)
-balanced_df["Label"] = balanced_df["Label"].map({"ham": 0, "spam": 1})
-
-train_df, validation_df, test_df = random_split(balanced_df, 0.7, 0.1)
+balanced_df["Label"] = balanced_df["Label"].map({"ham": 0, "spam": 1}) train_df, validation_df, test_df = random_split(balanced_df, 0.7, 0.1)
 train_df.to_csv("train.csv", index=None)
 
 validation_df.to_csv("validation.csv", index=None)
@@ -12808,7 +10442,7 @@ In this case, we have the following number of batches per dataset:
 38 test batches
 ```
 
-E.3 Initializing the model
+### E.3 Initializing the model
 
 We repeat the code from chapter 6 to load and prepare the pretrained GPT model. We begin by downloading the model weights and loading them into the `GPTModel` class.
 
@@ -12913,7 +10547,7 @@ Validation accuracy: 45.00%
 Test accuracy: 48.75%
 ```
 
-E.4 Parameter-efficient fine-tuning with LoRA
+### E.4 Parameter-efficient fine-tuning with LoRA
 
 Next, we modify and fine-tune the LLM using LoRA. We begin by initializing a LoRA- Layer that creates the matrices A and B, along with the `alpha` scaling factor and the
 
@@ -12993,9 +10627,7 @@ This code combines a standard `Linear` layer with the `LoRALayer`. The `forward`
 
 Since the weight matrix B (`self.B` in `LoRALayer`) is initialized with zero values, the product of matrices A and B results in a zero matrix. This ensures that the multiplication does not alter the original weights, as adding zero does not change them.
 
-To apply LoRA to the earlier defined `GPTModel`, we introduce a `replace_linear_`
-
-`with_lora` function. This function will swap all existing `Linear` layers in the model with the newly created `LinearWithLoRA` layers:
+To apply LoRA to the earlier defined `GPTModel`, we introduce a `replace_linearwith_lora` function. This function will swap all existing `Linear` layers in the model with the newly created `LinearWithLoRA` layers:
 
 Replaces the Linear layer with LinearWithLoRA
 
@@ -13186,9 +10818,7 @@ from chapter06 import train_classifier_simple
 
 start_time = time.time()
 torch.manual_seed(123)
-optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5, weight_decay=0.1)
-
-num_epochs = 5
+optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5, weight_decay=0.1) num_epochs = 5
 train_losses, val_losses, train_accs, val_accs, examples_seen = \
     train_classifier_simple(
         model, train_loader, val_loader, optimizer, device,
@@ -13235,9 +10865,7 @@ from chapter06 import plot_values
 ```
 
 epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
-examples_seen_tensor = torch.linspace(0, examples_seen, len(train_losses))
-
-plot_values(
+examples_seen_tensor = torch.linspace(0, examples_seen, len(train_losses)) plot_values(
     epochs_tensor, examples_seen_tensor,
     train_losses, val_losses, label="loss"
 )
@@ -13270,19 +10898,17 @@ Test accuracy: 98.00%
 
 These results show that the model performs well across training, validation, and test datasets. With a training accuracy of 100%, the model has perfectly learned the training data. However, the slightly lower validation and test accuracies (96.64% and 97.33%, respectively) suggest a small degree of overfitting, as the model does not generalize quite as well on unseen data compared to the training set. Overall, the results are very impressive, considering we fine-tuned only a relatively small number of model weights (2.7 million LoRA weights instead of the original 124 million model weights).
 
-index
+## Index
 
-Symbols
+### Symbols
 
 problem with modeling long sequences 52 self-attention mechanism 55–64 attention scores 57 attention weights, computing step by step
 
 [BOS] (beginning of sequence) token 32 [EOS] (end of sequence) token 32 [PAD] (padding) token 32 @ operator 261 %timeit command 282 <|endoftext|> token 34 <|unk|> tokens 29–31, 34 == comparison operator 277
 
-65–70 attn_scores 71 autograd engine 264 automatic differentiation 263–265
+65–70 attn_scores 71 autograd engine 264 automatic differentiation 263–265 engine 252 partial derivatives and gradients 263 autoregressive model 13 Axolotl 249
 
-engine 252 partial derivatives and gradients 263 autoregressive model 13 Axolotl 249
-
-Numerics
+### Numerics
 
 04_preference-tuning-with-dpo folder 247 124M parameter 161 355M parameter 227
 
@@ -13292,47 +10918,17 @@ backpropagation 137 .backward() method 112, 318 Bahdanau attention mechanism 54 
 
 A
 
-AdamW optimizer 148, 294 AI (artificial intelligence) 252 allowed_max_length 224, 233, 309 Alpaca dataset 233, 296 alpha scaling factor 328 architectures, transformer 7–10 argmax function 134, 152–155, 190, 277 arXiv 248 assign utility function 165 attention mechanisms
-
-transformers) 8 BPE (byte pair encoding) 32–35
+AdamW optimizer 148, 294 AI (artificial intelligence) 252 allowed_max_length 224, 233, 309 Alpaca dataset 233, 296 alpha scaling factor 328 architectures, transformer 7–10 argmax function 134, 152–155, 190, 277 arXiv 248 assign utility function 165 attention mechanisms transformers) 8 BPE (byte pair encoding) 32–35
 
 C
 
-calc_accuracy_loader function 192 calc_loss_batch function 145, 193–194 calc_loss_loader function 144, 194 calculating, training and validation 140, 142 CausalAttention class 80–81, 86, 90
-
-causal 74–82 coding 50, 54 implementing self-attention with trainable
-
-weights 64–74 multi-head attention 82–91
-
-module 83–84 object 86
-
-causal attention mask 190 causal attention mechanism 74–82 cfg dictionary 115, 119 classification
+calc_accuracy_loader function 192 calc_loss_batch function 145, 193–194 calc_loss_loader function 144, 194 calculating, training and validation 140, 142 CausalAttention class 80–81, 86, 90 causal 74–82 coding 50, 54 implementing self-attention with trainable weights 64–74 multi-head attention 82–91 module 83–84 object 86 causal attention mask 190 causal attention mechanism 74–82 cfg dictionary 115, 119 classification
 
 datasets
 
-downloading 207 preparing 324 utilizing large 10 DDP (DistributedDataParallel) strategy 282 ddp_setup function 286 decode method 27, 33–34 decoder 52 decoding strategies to control randomness
+downloading 207 preparing 324 utilizing large 10 DDP (DistributedDataParallel) strategy 282 ddp_setup function 286 decode method 27, 33–34 decoder 52 decoding strategies to control randomness fine-tuning categories of 170 preparing dataset 172–175 fine-tuning for adding classification head 183–190 calculating classification loss and
 
-fine-tuning
-
-categories of 170 preparing dataset 172–175 fine-tuning for
-
-adding classification head 183–190 calculating classification loss and
-
-151–159 modifying text generation function 157 temperature scaling 152–155 top-k sampling 155 deep learning 253
-
-accuracy 190–194 supervised data 195–200 using LLM as spam classifier 200 tasks 7 classify_review function 200 clip_grad_norm_ function 317 clipping, gradient 317 code for data loaders 301 coding
-
-library 252 destroy_process_group function 284 device variable 224 dim parameter 101–102 DistributedDataParallel class 284 DistributedSampler 283–284 Dolma: An Open Corpus of Three Trillion Tokens
-
-attention mechanisms 54 GPT model 117–122 collate function 211 computation graphs 261 compute_accuracy function 277–278 computing gradients 258 connections, shortcut 109–113 context, adding special tokens 29–32 context_length 47, 95 context vectors 57, 64, 85 conversational performance 236 converting tokens into token IDs 24–29 cosine decay 313, 316 create_dataloader_v1 function 39 cross_entropy function 138–139 CUDA_VISIBLE_DEVICES environment
-
-for LLM Pretraining Research (Soldaini et al.) 11 dot products 58 d_out argument 90, 301 download_and_load_gpt2 function 161, 163, 182 drop_last parameter 273 dropout
-
-defined 78 layers 276 drop_rate 95 .dtype attribute 259 DummyGPTClass 98 DummyGPTModel 95, 97–98, 117 DummyLayerNorm 97, 99, 117
-
-variable 286 custom_collate_draft_1 215 custom_collate_draft_2 218 custom_collate_fn function 224, 308
-
-placeholder 100 DummyTransformerBlock 97, 117
+151–159 modifying text generation function 157 temperature scaling 152–155 top-k sampling 155 deep learning 253 accuracy 190–194 supervised data 195–200 using LLM as spam classifier 200 tasks 7 classify_review function 200 clip_grad_norm_ function 317 clipping, gradient 317 code for data loaders 301 coding library 252 destroy_process_group function 284 device variable 224 dim parameter 101–102 DistributedDataParallel class 284 DistributedSampler 283–284 Dolma: An Open Corpus of Three Trillion Tokens attention mechanisms 54 GPT model 117–122 collate function 211 computation graphs 261 compute_accuracy function 277–278 computing gradients 258 connections, shortcut 109–113 context, adding special tokens 29–32 context_length 47, 95 context vectors 57, 64, 85 conversational performance 236 converting tokens into token IDs 24–29 cosine decay 313, 316 create_dataloader_v1 function 39 cross_entropy function 138–139 CUDA_VISIBLE_DEVICES environment for LLM Pretraining Research (Soldaini et al.) 11 dot products 58 d_out argument 90, 301 download_and_load_gpt2 function 161, 163, 182 drop_last parameter 273 dropout defined 78 layers 276 drop_rate 95 .dtype attribute 259 DummyGPTClass 98 DummyGPTModel 95, 97–98, 117 DummyLayerNorm 97, 99, 117 variable 286 custom_collate_draft_1 215 custom_collate_draft_2 218 custom_collate_fn function 224, 308 placeholder 100 DummyTransformerBlock 97, 117
 
 E
 
@@ -13340,9 +10936,7 @@ emb_dim 95 Embedding layer 161 embedding size 46 emergent behavior 14 encode met
 
 D
 
-data, sampling with sliding window 35–41 DataFrame 173 data list 207, 209 DataLoader class 38, 211, 224, 270–272 data loaders 175–181
-
-code for 301 creating for instruction dataset
+data, sampling with sliding window 35–41 DataFrame 173 data list 207, 209 DataLoader class 38, 211, 224, 270–272 data loaders 175–181 code for 301 creating for instruction dataset
 
 224–226 efficient 270–274 Dataset class 38, 177, 270–272, 274
 
@@ -13350,39 +10944,21 @@ F
 
 __getitem__ method 271 Google Colab 257 GPT-2 94
 
-feedforward layer 267 FeedForward module 107–108, 113 feed forward network, implementing with GELU
+feedforward layer 267 FeedForward module 107–108, 113 feed forward network, implementing with GELU model 230 tokenizer 176 gpt2-medium355M-sft.pth file 238 GPT-3 11, 94 GPT-4 239 GPT_CONFIG_124M dictionary 95, 97, 107, activations 105–109 find_highest_gradient function 318 fine-tuning
 
-model 230 tokenizer 176 gpt2-medium355M-sft.pth file 238 GPT-3 11, 94 GPT-4 239 GPT_CONFIG_124M dictionary 95, 97, 107,
+116–117, 120, 127, 130 GPTDatasetV1 class 38–39 gpt_download.py Python module 161 GPT (Generative Pre-trained Transformer) 8, dataset 224–226 evaluating fine-tuned LLMs 238–247 extracting and saving responses 233–238 for classification 169
 
-activations 105–109 find_highest_gradient function 318 fine-tuning
-
-116–117, 120, 127, 130 GPTDatasetV1 class 38–39 gpt_download.py Python module 161 GPT (Generative Pre-trained Transformer) 8,
-
-dataset 224–226 evaluating fine-tuned LLMs 238–247 extracting and saving responses 233–238 for classification 169
-
-18, 93 architecture 12–14 coding 117–122 coding architecture 93–99 implementing feed forward network with GELU
-
-adding classification head 183–190 calculating classification loss and
-
-accuracy 190–194 data loaders 175–181 fine-tuning model on supervised data
-
-activations 105–109 implementing from scratch, shortcut
+18, 93 architecture 12–14 coding 117–122 coding architecture 93–99 implementing feed forward network with GELU adding classification head 183–190 calculating classification loss and accuracy 190–194 data loaders 175–181 fine-tuning model on supervised data activations 105–109 implementing from scratch, shortcut
 
 195–200 initializing model with pretrained
 
-connections 109–113 implementing from scratch to generate text
-
-weights 181 preparing dataset 172–175 using LLM as spam classifier 200 instruction data 230–233 instruction fine-tuning, overview 205 LLMs, to follow instructions 204 organizing data into training batches 211–223 supervised instruction fine-tuning, preparing
+connections 109–113 implementing from scratch to generate text weights 181 preparing dataset 172–175 using LLM as spam classifier 200 instruction data 230–233 instruction fine-tuning, overview 205 LLMs, to follow instructions 204 organizing data into training batches 211–223 supervised instruction fine-tuning, preparing
 
 92, 122 implementing model from scratch 99–105,
 
 113–116 GPTModel 119, 121–122, 133, 146, 182, 330
 
-class 122, 130, 182, 326 code 141 implementation 166 instance 131, 159, 164–167 GPUs (graphics processing units), optimizing
-
-dataset for 207–211 FineWeb Dataset 295 first_batch variable 39 format_input function 209–210, 242, 307 forward method 97, 109, 267, 330 foundation model 7 fully connected layer 267 functools standard library 224
-
-training performance with 279–288 .grad attribute 318 grad_fn value 268 grad function 264 gradient clipping 313, 317 gradients 263 greedy decoding 125, 152
+class 122, 130, 182, 326 code 141 implementation 166 instance 131, 159, 164–167 GPUs (graphics processing units), optimizing dataset for 207–211 FineWeb Dataset 295 first_batch variable 39 format_input function 209–210, 242, 307 forward method 97, 109, 267, 330 foundation model 7 fully connected layer 267 functools standard library 224 training performance with 279–288 .grad attribute 318 grad_fn value 268 grad function 264 gradient clipping 313, 317 gradients 263 greedy decoding 125, 152
 
 G
 
@@ -13390,9 +10966,7 @@ I
 
 GELU (Gaussian error linear unit) 105, 107, 293
 
-activation function 104, 111 GenAI (generative AI) 3 generate_and_print_sample function 147–148,
-
-information leakage 76 __init__ constructor 71, 81, 119, 266–267, 271 initializing model 326 initial_lr 314 init_process_group function 284 input_chunk tensor 38 input_embeddings 47 'input' object 208 instruction data, fine-tuning LLMs on 230–233 instruction dataset 205 InstructionDataset class 212, 224, 308
+activation function 104, 111 GenAI (generative AI) 3 generate_and_print_sample function 147–148, information leakage 76 __init__ constructor 71, 81, 119, 266–267, 271 initializing model 326 initial_lr 314 init_process_group function 284 input_chunk tensor 38 input_embeddings 47 'input' object 208 instruction data, fine-tuning LLMs on 230–233 instruction dataset 205 InstructionDataset class 212, 224, 308
 
 151, 154 generate function 157, 159, 167, 228, 234–235,
 
@@ -13406,9 +10980,7 @@ LoRALayer class 329–330 LoRA (low-rank adaptation) 247, 322
 
 instruction following, creating data loaders for
 
-instruction dataset 224–226 'instruction' object 208 instruction–response pairs 207 loading pretrained LLMs 226–229 overview 205
-
-parameter-efficient fine-tuning 324, 326 loss.backward() function 112 losses 140, 142 loss metric 132 lr (learning rate) 275
+instruction dataset 224–226 'instruction' object 208 instruction–response pairs 207 loading pretrained LLMs 226–229 overview 205 parameter-efficient fine-tuning 324, 326 loss.backward() function 112 losses 140, 142 loss metric 132 lr (learning rate) 275
 
 K
 
@@ -13420,17 +10992,7 @@ L
 
 LayerNorm 103, 115, 117, 119 layer normalization 99–105 learning rate warmup 313–314 __len__ method 271 LIMA dataset 296 Linear layers 95, 107, 329–330, 332–333 Linear layer weights 330 LinearWithLoRA layer 330–331, 333 LitGPT 249 LLama 2 model 141 Llama 3 model 238 llama.cpp library 238 LLMs (large language models) 17–18
 
-159 Module base class 265 mps device 224 mp.spawn() call 286 multi-head attention 80, 82–91
-
-applications of 4 building and using 5–7, 14 coding architecture 93–99 coding attention mechanisms, causal attention
-
-mechanism 74–82 fine-tuning 230–233, 238–247, 295 fine-tuning for classification 183–194, 200 implementing GPT model, implementing feed
-
-implementing with weight splits 86–91 stacking multiple single-head attention
-
-layers 82–85 MultiHeadAttention class 86–87, 90–91, 292 MultiHeadAttentionWrapper class 83–87, 90 multilayer neural networks, implementing
-
-forward network with GELU activations 105–109 instruction fine-tuning, loading pretrained
+159 Module base class 265 mps device 224 mp.spawn() call 286 multi-head attention 80, 82–91 applications of 4 building and using 5–7, 14 coding architecture 93–99 coding attention mechanisms, causal attention mechanism 74–82 fine-tuning 230–233, 238–247, 295 fine-tuning for classification 183–194, 200 implementing GPT model, implementing feed implementing with weight splits 86–91 stacking multiple single-head attention layers 82–85 MultiHeadAttention class 86–87, 90–91, 292 MultiHeadAttentionWrapper class 83–87, 90 multilayer neural networks, implementing forward network with GELU activations 105–109 instruction fine-tuning, loading pretrained
 
 265–269 multinomial function 153–155 multiprocessing.spawn function 284 multiprocessing submodule 284
 
@@ -13448,9 +11010,7 @@ GELU activations 105–109 implementing multilayer neural networks
 
 265–269 NEW_CONFIG dictionary 164 n_heads 95
 
-nn.Linear layers 72 nn.Module 71, 97 numel() method 120 num_heads dimension 88 num_tokens dimension 88
-
-decoding strategies to control randomness
+nn.Linear layers 72 nn.Module 71, 97 numel() method 120 num_heads dimension 88 num_tokens dimension 88 decoding strategies to control randomness
 
 151–159 loading and saving model weights in
 
@@ -13460,9 +11020,7 @@ PyTorch 159 loading pretrained weights from OpenAI
 
 O
 
-Ollama application 238, 241 Ollama Llama 3 method 309 ollama run command 242 ollama run llama3 command 240–241 ollama serve command 239–242 OLMo 294 one-dimensional tensor (vector) 259 OpenAI, loading pretrained weights from
-
-and Torch 256 automatic differentiation 263–265 computation graphs 261 data loaders 210 dataset objects 325 efficient data loaders 270–274 implementing multilayer neural networks
+Ollama application 238, 241 Ollama Llama 3 method 309 ollama run command 242 ollama run llama3 command 240–241 ollama serve command 239–242 OLMo 294 one-dimensional tensor (vector) 259 OpenAI, loading pretrained weights from and Torch 256 automatic differentiation 263–265 computation graphs 261 data loaders 210 dataset objects 325 efficient data loaders 270–274 implementing multilayer neural networks
 
 Overview 293 optimizer.step() method 276 optimizer.zero_grad() method 276 out_head 97 output layer nodes 183 'output' object 208
 
@@ -13474,9 +11032,7 @@ parameter-efficient fine-tuning 322
 
 LoRA (low-rank adaptation) 322 preparing dataset 324 parameters 129
 
-GPUs 279–288 overview 251–257 saving and loading models 278 training loops 274–278 understanding tensors 258–261 with a NumPy-like API 258
-
-calculating 302 params dictionary 162, 164–165 partial derivatives 263 partial function 224 peak_lr 314 perplexity 139 Phi-3 model 297 PHUDGE model 297 pip installer 33 plot_losses function 232 plot_values function 199 pos_embeddings 47 Post-LayerNorm 115 preference fine-tuning 298 Pre-LayerNorm 115 pretokenizes 212 pretrained weights, initializing model with 181 pretraining 7
+GPUs 279–288 overview 251–257 saving and loading models 278 training loops 274–278 understanding tensors 258–261 with a NumPy-like API 258 calculating 302 params dictionary 162, 164–165 partial derivatives 263 partial function 224 peak_lr 314 perplexity 139 Phi-3 model 297 PHUDGE model 297 pip installer 33 plot_losses function 232 plot_values function 199 pos_embeddings 47 Post-LayerNorm 115 preference fine-tuning 298 Pre-LayerNorm 115 pretokenizes 212 pretrained weights, initializing model with 181 pretraining 7
 
 Q
 
@@ -13484,9 +11040,7 @@ qkv_bias 95 Q query matrix 88 query_llama function 243 query_model function 242�
 
 R
 
-random_split function 175 rank argument 286 raw text 6 register_buffer 81 re library 22 ReLU (rectified linear unit) 100, 105 .replace() method 235 replace_linear_with_lora function 330, 332
-
-calculating text generation loss 132 calculating training and validation set losses
+random_split function 175 rank argument 286 raw text 6 register_buffer 81 re library 22 ReLU (rectified linear unit) 100, 105 .replace() method 235 replace_linear_with_lora function 330, 332 calculating text generation loss 132 calculating training and validation set losses
 
 140, 142
 
@@ -13498,47 +11052,19 @@ target_chunk tensor 38 targets tensor 139 temperature scaling 151–152, 154–1
 
 S
 
-saving and loading models 278 scalars 258–261 scaled dot-product attention 64 scaled_dot_product function 292 scale parameter 103 sci_mode parameter 102 SelfAttention class 90 self-attention mechanism 55–64
+saving and loading models 278 scalars 258–261 scaled dot-product attention 64 scaled_dot_product function 292 scale parameter 103 sci_mode parameter 102 SelfAttention class 90 self-attention mechanism 55–64 common tensor operations 260 scalars, vectors, matrices, and tensors 258–261 tensor data types 259 three-dimensional tensor 259 two-dimensional tensor 259 test_data set 246 test_loader 272 test_set dictionary 237–238 text completion 205 text data 17 computing attention weights for all input tokens 61–64 implementing with trainable weights 64–74 without trainable weights 56–61 SelfAttention_v1 class 71, 73 SelfAttention_v2 class 73 self.out_proj layer 90 self.register_buffer() call 81 self.use_shortcut attribute 111 Sequential class 267 set_printoptions method 277 settings dictionary 162, 164 SGD (stochastic gradient descent) 275 .shape attribute 260, 271 shift parameter 103 shortcut connections 109–113 SimpleTokenizerV1 class 27 SimpleTokenizerV2 class 29, 31, 33 single-head attention, stacking multiple layers adding special context tokens 29–32 converting tokens into token IDs 24–29 creating token embeddings 42–43 encoding word positions 43–47 sliding window 35–41 tokenization, byte pair encoding 33–35 word embeddings 18–20 text_data 314 text generation 122 using GPT to generate text 130 text generation function, modifying 157 text generation loss 132 text_to_token_ids function 131 tiktoken package 176, 178 .T method 261 .to() method 259, 280 token_embedding_layer 46–47 token embeddings 42–43 token IDs 24–29 token_ids_to_text function 131 tokenization, byte pair encoding 33–35 tokenizing text 21–24 top-k sampling 151, 155–156 torch.argmax function 125 torchaudio library 255 torch.manual_seed(123) 272 torch.nn.Linear layers 267 torch.no_grad() context manager 269 torch.save function 159 torch.sum method 277 torch.tensor function 258 torchvision library 255
 
-common tensor operations 260 scalars, vectors, matrices, and tensors 258–261 tensor data types 259 three-dimensional tensor 259 two-dimensional tensor 259 test_data set 246 test_loader 272 test_set dictionary 237–238 text completion 205 text data 17
-
-computing attention weights for all input
-
-tokens 61–64 implementing with trainable weights 64–74 without trainable weights 56–61 SelfAttention_v1 class 71, 73 SelfAttention_v2 class 73 self.out_proj layer 90 self.register_buffer() call 81 self.use_shortcut attribute 111 Sequential class 267 set_printoptions method 277 settings dictionary 162, 164 SGD (stochastic gradient descent) 275 .shape attribute 260, 271 shift parameter 103 shortcut connections 109–113 SimpleTokenizerV1 class 27 SimpleTokenizerV2 class 29, 31, 33 single-head attention, stacking multiple layers
-
-adding special context tokens 29–32 converting tokens into token IDs 24–29 creating token embeddings 42–43 encoding word positions 43–47 sliding window 35–41 tokenization, byte pair encoding 33–35 word embeddings 18–20 text_data 314 text generation 122
-
-using GPT to generate text 130 text generation function, modifying 157 text generation loss 132 text_to_token_ids function 131 tiktoken package 176, 178 .T method 261 .to() method 259, 280 token_embedding_layer 46–47 token embeddings 42–43 token IDs 24–29 token_ids_to_text function 131 tokenization, byte pair encoding 33–35 tokenizing text 21–24 top-k sampling 151, 155–156 torch.argmax function 125 torchaudio library 255 torch.manual_seed(123) 272 torch.nn.Linear layers 267 torch.no_grad() context manager 269 torch.save function 159 torch.sum method 277 torch.tensor function 258 torchvision library 255
-
-82–85 sliding window 35–41 softmax function 269, 276 softmax_naive function 60 SpamDataset class 176, 178 spawn function 286 special context tokens 29–32 state_dict 160, 279 stride setting 39 strip() function 229 supervised data, fine-tuning model on 195–200 supervised instruction fine-tuning 205
-
-preparing dataset for 207–211 supervised learning 253 SwiGLU (Swish-gated linear unit) 105
-
-total_loss variable 145 ToyDataset class 271 tqdm progress bar utility 242 train_classifier_simple function 197, 200 train_data subset 143 training, optimizing performance with GPUs
-
-unlabeled data, decoding strategies to control
-
-randomness 151–159
+82–85 sliding window 35–41 softmax function 269, 276 softmax_naive function 60 SpamDataset class 176, 178 spawn function 286 special context tokens 29–32 state_dict 160, 279 stride setting 39 strip() function 229 supervised data, fine-tuning model on 195–200 supervised instruction fine-tuning 205 preparing dataset for 207–211 supervised learning 253 SwiGLU (Swish-gated linear unit) 105 total_loss variable 145 ToyDataset class 271 tqdm progress bar utility 242 train_classifier_simple function 197, 200 train_data subset 143 training, optimizing performance with GPUs unlabeled data, decoding strategies to control randomness 151–159
 
 V
 
 val_data subset 143 variable-length inputs 142 vectors 258–261 .view method 87 vocab_size 95 v vector 317
 
-279–288 PyTorch computations on GPU devices 279 selecting available GPUs on multi-GPU
-
-machine 286–288 single-GPU training 280 training with multiple GPUs 282–288 training batches, organizing data into 211–223 training function 319–321
+279–288 PyTorch computations on GPU devices 279 selecting available GPUs on multi-GPU machine 286–288 single-GPU training 280 training with multiple GPUs 282–288 training batches, organizing data into 211–223 training function 319–321
 
 W
 
-.weight attribute 129, 161 weight_decay parameter 200 weight parameters 66, 129 weights
-
-enhancing 313 modified 319–321 training loops 274–278
-
-cosine decay 316 gradient clipping 317 learning rate warmup 314 train_loader 272 train_model_simple function 147, 149, 160, 195 train_ratio 142 train_simple_function 305 transformer architecture 3, 7–10, 55 TransformerBlock class 115 transformer blocks 93, 185
-
-initializing model with pretrained weights 181 loading pretrained weights from OpenAI 160–167 weight splits 86–91 Wk matrix 65, 71 Word2Vec 19 word embeddings 18–20 word positions, encoding 43–47 Wq matrix 65, 71, 88 Wv matrix 65, 71
-
-connecting attention and linear layers in
+.weight attribute 129, 161 weight_decay parameter 200 weight parameters 66, 129 weights enhancing 313 modified 319–321 training loops 274–278 cosine decay 316 gradient clipping 317 learning rate warmup 314 train_loader 272 train_model_simple function 147, 149, 160, 195 train_ratio 142 train_simple_function 305 transformer architecture 3, 7–10, 55 TransformerBlock class 115 transformer blocks 93, 185 initializing model with pretrained weights 181 loading pretrained weights from OpenAI 160–167 weight splits 86–91 Wk matrix 65, 71 Word2Vec 19 word embeddings 18–20 word positions, encoding 43–47 Wq matrix 65, 71, 88 Wv matrix 65, 71 connecting attention and linear layers in
 
 113–116 .transpose method 87 tril function 75
 
@@ -13646,9 +11172,7 @@ Th e most understandable and comprehensive explanation of language models yet!
 
 Build a Large Language Model (From Scratch) is a practical and eminently-satisfying hands-on journey into the foundations of generative AI. Without relying on any existing LLM libraries, you’ll code a base model, evolve it into a text classifi er, and ultimately create a chatbot that can follow your conversational instructions. And you’ll really understand it because you built it yourself!
 
-get any other way.” —Cameron Wolfe Senior Scientist, Netfl ix “
-
-for making complex ideas
+get any other way.” —Cameron Wolfe Senior Scientist, Netfl ix “ for making complex ideas
 
 What’s Inside
 
