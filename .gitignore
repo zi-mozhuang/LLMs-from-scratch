@@ -351,3 +351,4 @@ cython_debug/
 .pixi
 *.egg-info
 
+pdf_to_md/extracted_images
