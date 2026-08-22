@@ -44,7 +44,7 @@ from pathlib import Path
 import fitz  # PyMuPDF
 
 sys.path.insert(0, str(Path(__file__).parent))
-from extract_images import collect_element_rects  # reuse P0 geometry
+from p0_extract_images import collect_element_rects  # reuse P0 geometry
 
 
 # Top-zone fraction of the element-union height used by the MED rule.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-P2: post-processing of the P1 text stream (pdf_text_stream.py output).
+P2: post-processing of the P1 text stream (p1_text_stream.py output).
 
 Pipeline order is FIXED (pdf-to-md-plan.md §3.1 / handoff doc):
   header removal (done in P1) -> paragraph merge (done in P1) -> THIS module:
@@ -130,6 +130,82 @@ def load_figure_map(manifest_path: str) -> dict[str, str]:
 FIG_RE = re.compile(r"^Figure (\d+\.\d+)\b")
 
 
+FIG_LINE_RE = re.compile(r"^!\[Fig [^\]]+\]\(([^)]+)\)$")
+
+
+def dedupe_figures(lines: list[str]) -> list[str]:
+    """Drop duplicate figure-reference lines.
+
+    Some PDF pages render the same figure (e.g. in the body and again in a
+    repeated footer/margin note), so ``insert_figures`` can emit the same
+    ``![Fig X.X](...)`` line more than once. Render it only once, keeping the
+    surrounding caption/body text of every occurrence.
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for line in lines:
+        m = FIG_LINE_RE.match(line)
+        if m:
+            path = m.group(1)
+            if path in seen:
+                continue
+            seen.add(path)
+        out.append(line)
+    return out
+
+
+def fix_text_noise(text: str) -> str:
+    """Fix a handful of extraction artifacts introduced by the PDF text layer.
+
+    * Publisher wordmark letters are spaced out (``M A N N I N G``).
+    * Author names with a combining acute accent are mis-encoded
+      (``Dragosavljevic´`` -> ``Dragosavljević``).
+    * ASCII ``--`` used as an em dash.
+    """
+    # Publisher wordmark.
+    text = text.replace("M A N N I N G", "MANNING")
+    # Mis-encoded author name (combining acute -> precomposed c-with-acute).
+    text = text.replace("Dragosavljevic´", "Dragosavljević")
+    # Em dash: space-surrounded "--" becomes "—".
+    text = text.replace(" -- ", " — ")
+    # Em dash inside prose: "word--word" -> "word—word". Restricted to
+    # letter-to-letter so code/token output like "'--'" is left untouched.
+    text = re.sub(r"(\w)--(\w)", r"\1—\2", text)
+    return text
+
+
+LIST_MARKER_RE = re.compile(r"^[–•]\s+(.*)$")
+
+
+def normalize_list_markers(lines: list[str]) -> list[str]:
+    """Normalize list markers and keep blockquote lists properly fenced.
+
+    * En-dash / bullet list markers (``– ``, ``• ``) become ``- ``.
+    * A list item that belongs to a preceding blockquote (its previous
+      non-empty line starts with ``> ``) gets the ``> `` prefix restored, so it
+      renders inside the quote instead of breaking out of it.
+    """
+    out: list[str] = []
+    in_blockquote = False
+    for line in lines:
+        if line.lstrip().startswith(">"):
+            in_blockquote = True
+            out.append(line)
+            continue
+        m = LIST_MARKER_RE.match(line)
+        if m:
+            if in_blockquote:
+                out.append("> - " + m.group(1).strip())
+            else:
+                out.append("- " + m.group(1).strip())
+            continue
+        if line.strip():
+            # A normal paragraph ends the blockquote list context.
+            in_blockquote = False
+        out.append(line)
+    return out
+
+
 def insert_figures(lines: list[str], fig_map: dict[str, str]) -> list[str]:
     out = []
     for line in lines:
@@ -196,6 +272,10 @@ def rebalance_fences(lines: list[str]) -> list[str]:
         else:
             out.append(line)
             i += 1
+    # Close a dangling open fence at EOF (PDF extraction sometimes drops the
+    # trailing ``` of the last code block on a page).
+    if open_lang is not None:
+        out.append("```")
     return out
 
 
@@ -281,6 +361,9 @@ def p2_clean(text: str, manifest_path: str) -> str:
     fig_map = load_figure_map(manifest_path)
     lines = insert_figures(lines, fig_map)
 
+    # 4b. drop duplicate figure-reference lines
+    lines = dedupe_figures(lines)
+
     # 5. fence rebalance + merge
     lines = rebalance_fences(lines)
 
@@ -289,6 +372,27 @@ def p2_clean(text: str, manifest_path: str) -> str:
 
     # 7. exercise paragraphs -> #### headings
     lines = format_exercises(lines)
+
+    # 8. publisher wordmark / author-name / em-dash noise.
+    # Skip *code* fences (python/bash/...), but still process `text` fences,
+    # which often contain prose excerpts where "--" is meant as an em dash.
+    in_code_fence = False
+    cleaned: list[str] = []
+    for line in lines:
+        m = FENCE_RE.match(line)
+        if m:
+            lang = (m.group(1) or "").strip().lower()
+            if line.strip().startswith("```"):
+                opening = not line.strip().endswith("```")  # not a one-liner
+                if opening:
+                    in_code_fence = lang not in ("", "text")
+            cleaned.append(line)
+            continue
+        cleaned.append(line if in_code_fence else fix_text_noise(line))
+    lines = cleaned
+
+    # 9. normalize list markers (en-dash/bullet -> "-", keep blockquote lists)
+    lines = normalize_list_markers(lines)
 
     return "\n".join(lines)
 

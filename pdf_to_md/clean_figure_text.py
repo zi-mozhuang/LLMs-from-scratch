@@ -2,7 +2,7 @@
 
 Background
 ----------
-P1 (``pdf_text_stream.py`` + ``figure_text_detect.py``) removes ~1149 blocks of
+P1 (``p1_text_stream.py`` + ``figure_text_detect.py``) removes ~1149 blocks of
 text that are geometrically *inside* a figure rectangle.  Additional residual
 blocks survive into the final ``llms-from-scratch.md`` because:
 

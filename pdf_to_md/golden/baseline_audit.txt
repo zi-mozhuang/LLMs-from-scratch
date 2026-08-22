@@ -1,0 +1,184 @@
+
+======================================================================
+## 1. 代码围栏
+======================================================================
+围栏总数: 1206 (奇数=不配对: False)
+语言标注分布: {'python': 339, '': 603, 'text': 264}
+
+======================================================================
+## 2. 标题结构
+======================================================================
+标题总数: 170, 级别分布: {1: 1, 2: 27, 3: 115, 4: 27}
+小写开头标题 0 个: []
+裸编号标题: []
+Chapter 标题: [(8869, 'Chapter 1'), (8926, 'Chapter 2'), (8959, 'Chapter 3'), (9000, 'Chapter 4'), (9057, 'Chapter 5'), (9132, 'Chapter 6'), (9179, 'Chapter 7'), (9279, 'Chapter 2'), (9348, 'Chapter 3'), (9381, 'Chapter 4'), (9505, 'Chapter 5'), (9584, 'Chapter 6'), (9620, 'Chapter 7')]
+重复标题 7 个: {'Summary': 8, 'Chapter 2': 2, 'Chapter 3': 2, 'Chapter 4': 2, 'Chapter 5': 2, 'Chapter 6': 2, 'Chapter 7': 2}
+
+======================================================================
+## 3. 目录(TOC)完整性
+======================================================================
+TOC 链接数: 126, 显式锚点数: 169
+TOC 无法解析的链接 0 个:
+正文有但 TOC 缺失的标题 42 个:
+  - Who should read this book
+  - How this book is organized: A roadmap
+  - About the code
+  - LiveBook discussion forum
+  - Other online resources
+  - Summary
+  - Summary
+  - Summary
+  - Summary
+  - Summary
+  - Summary
+  - Summary
+  - Summary
+  - Exercise A.2
+  - Exercise A.3
+  - Exercise A.4
+  - Symbols
+  - Numerics
+  - A
+  - B
+  - C
+  - D
+  - E
+  - F
+  - G
+  - I
+  - K
+  - L
+  - M
+  - N
+  - O
+  - P
+  - Q
+  - R
+  - S
+  - T
+  - U
+  - V
+  - W
+  - X
+  - Z
+  - Hands-on projects for learning your way
+
+======================================================================
+## 4. 残留特殊字符与 HTML
+======================================================================
+含 PUA 字符的行: 0
+HTML 标签统计: {'a': 338, 'unk': 1, 'EmbeddingBackward': 2, 'MmBackward': 2, 'SoftmaxBackward': 2, 'MulBackward': 2, 'DivBackward': 2, 'MaskedFillBackward': 1, 'CatBackward': 1, 'ViewBackward': 1, 'UnsafeViewBackward': 2, 'ReluBackward': 1, 'MeanBackward': 4, 'VarBackward': 4, 'AddmmBackward': 5, 'ipython': 1, 'cell': 1, 'user': 1, 'assistant': 1}
+控制字符: 0 个: Counter()
+
+======================================================================
+## 5. 图片链接
+======================================================================
+图片链接总数: 132
+图片文件缺失: 0 []
+未被引用的图片: 34
+  - extracted_images/embedded/p370_xref14261.png
+  - extracted_images/embedded/p002_xref4610.jpeg
+  - extracted_images/embedded/p027_xref650.png
+  - extracted_images/embedded/p001_xref14209.png
+  - extracted_images/embedded/p305_xref8534.png
+  - extracted_images/embedded/p366_xref13642.jpeg
+  - extracted_images/embedded/p305_xref8536.png
+  - extracted_images/embedded/p027_xref648.png
+  - extracted_images/embedded/p367_xref13593.jpeg
+  - extracted_images/embedded/p305_xref8531.png
+
+======================================================================
+## 6. Figure/Listing/Table 标题
+======================================================================
+加粗 Figure 标题: 127; 未加粗 Figure 行: 14
+  L1615: Figure 3.7 shows an input sequence, denoted as x, consisting of T elements repre
+  L1645: Figure 3.8 illustrates how we calculate the intermediate attention scores betwee
+  L2428: Figure 3.23 summarizes what we have accomplished so far. We have focused on the 
+  L2448: Figure 3.24 illustrates the structure of a multi-head attention module, which co
+  L3175: Figure 4.12 shows that a shortcut connection creates an alternative, shorter pat
+  L3295: Figure 4.13 shows a transformer block that combines several components, includin
+  L3545: Figure 4.16 illustrates the step-by-step process by which a GPT model generates 
+  L3750: Figure 5.3 illustrates a three-step text generation process using a GPT model. F
+  L3793: Figure 5.4 illustrates the overall flow from input text to LLM-generated text us
+  L3795: Figure 5.4 outlines the text generation process with a small seven-token vocabul
+加粗 Listing: 45; 未加粗 Listing 行: 0
+
+======================================================================
+## 7. 引用块与列表
+======================================================================
+引用块行数: 374
+列表符号用法: {'- ': 436, '  - ': 271, '    - ': 27}
+
+======================================================================
+## 8. 断词与行内断句
+======================================================================
+行尾连字符断词: 1
+  L4698: ... with random-
+疑似行中断句(以功能词结尾): 101
+  L763: The output is
+  L839: '" It\' s the last he painted, you know," Mrs. Gisburn said with
+  L940: The output is
+  L943: Hello, do you like tea? <|endoftext|> In the sunlit terraces of
+  L968: The output is
+  L971: <|unk|>, do you like tea? <|endoftext|> In the sunlit terraces of
+  L1044: Hello, do you like tea? <|endoftext|> In the sunlit terraces of
+  L1349: The returned embedding vector is
+  L1472: The output of the print statement is
+  L1485: The print output is
+  L1539:  in figure 3.2. These different attention variants build on each other, and the goal is to
+  L1655: The computed attention scores are
+  L1740: The results of this computation are
+  L1834: The result is
+  L1967: The result for the unnormalized attention score is
+
+======================================================================
+## 9. 反引号平衡
+======================================================================
+行内反引号数为奇数的行: 0
+
+======================================================================
+## 10. 残留页眉/页脚/重复内容
+======================================================================
+重复≥4次的短行 106 种:
+  x181: ')'
+  x41: 'torch.manual_seed(123)'
+  x22: 'The output is'
+  x19: 'super().__init__()'
+  x17: '}'
+  x15: 'This prints'
+  x15: 'else:'
+  x15: 'with torch.no_grad():'
+  x15: 'model.eval()'
+  x14: 'def forward(self, x):'
+  x13: '...'
+  x12: 'The result is'
+  x11: 'model=model,'
+  x10: 'import torch'
+  x10: 'batch_size=batch_size,'
+  x10: 'torch.Size([2, 256]) torch.Size([2, 256])'
+  x10: 'model.to(device)'
+  x9: 'tokenizer = tiktoken.get_encoding("gpt2")'
+  x9: 'model = GPTModel(GPT_CONFIG_124M)'
+  x8: 'batch_size=2,'
+
+======================================================================
+## 11. 空行与排版
+======================================================================
+标题后无空行: 0
+连续3+空行处: 0
+
+======================================================================
+## 12. 已知缺失内容验证
+======================================================================
+出现 '5.4' 标题: True
+出现 '7.4' 标题: True
+出现 '1.6' 标题: True
+'Weight sharing' 内容(4.5附近): False
+
+======================================================================
+## 13. 数学表达式
+======================================================================
+$...$ 行内公式数: 3
+裸上标 ^ 出现 6 次(示例: ['^1', '^2', '^3', '^4', '^5'])
+
+审计完成。

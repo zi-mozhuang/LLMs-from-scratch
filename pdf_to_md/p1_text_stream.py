@@ -208,12 +208,101 @@ def inline_code_wrap_line(line: dict, cfg: StreamConfig, page_height: float) -> 
 # ---------------------------------------------------------------------------
 # Main conversion
 # ---------------------------------------------------------------------------
+def _build_toc_chapter_map(doc, toc_skip: set[int]) -> dict[str, str]:
+    """Build a mapping ``{normalized_title: chapter_label}`` from the PDF's own
+    table-of-contents pages.
+
+    On the TOC pages each top-level entry looks like::
+
+        ``3``
+        ``■``
+        ``Coding attention mechanisms``   (may wrap across several lines)
+        ``50``                            (page number)
+
+    We record the *normalized* title (all whitespace removed, lower-cased) so it
+    can be matched against a body heading later, even when the body heading is
+    wrapped or spaced differently. ``chapter_label`` is the raw chapter token,
+    e.g. ``"3"`` or ``"A"``.
+    """
+    chapter_map: dict[str, str] = {}
+    bullet = "■"
+    for pno in toc_skip:
+        page = doc[pno]
+        d = page.get_text("dict")
+        for block in d.get("blocks", []):
+            if "lines" not in block:
+                continue
+            lines = []
+            for ln in block["lines"]:
+                txt = "".join(s["text"] for s in ln["spans"]).strip()
+                lines.append(txt)
+            # Find the bullet marker that separates the chapter number from title.
+            for i, t in enumerate(lines):
+                if t != bullet:
+                    continue
+                num = lines[i - 1].strip() if i > 0 else ""
+                if not re.match(r"^[0-9A-Za-z]$", num):
+                    continue
+                # Title spans the following lines until a pure page-number line.
+                title_parts: list[str] = []
+                j = i + 1
+                while j < len(lines) and not re.match(r"^\d+$", lines[j]):
+                    if lines[j]:
+                        title_parts.append(lines[j])
+                    j += 1
+                title = "".join(title_parts).strip()
+                if title:
+                    key = re.sub(r"\s+", "", title).lower()
+                    chapter_map[key] = num
+    return chapter_map
+
+
+def _upgrade_top_heading(text: str, chapter_map: dict[str, str]) -> str | None:
+    """If ``text`` is a top-level chapter/appendix title, return the corrected
+    Markdown heading (e.g. ``"## 3 Coding attention mechanisms"`` or
+    ``"## Appendix A Introduction to PyTorch"``). Otherwise return ``None``.
+
+    Two cases are handled:
+
+    * A body heading that lost its chapter prefix during extraction (e.g.
+      ``"Coding attention mechanisms"``) is restored using ``chapter_map``.
+    * A body heading that still carries a prefix but in the wrong case
+      (e.g. ``"appendix A Introduction to PyTorch"``) is normalized.
+    """
+    # Case A: "appendix A <title>" / "chapter 3 <title>" style (case-insensitive).
+    m = re.match(r"^(appendix|chapter)\s+([0-9A-Za-z]+)\s+(.*)$", text.strip(), re.I)
+    if m:
+        kind = m.group(1).lower()
+        label = m.group(2).upper()
+        title = m.group(3).strip()
+        if kind == "appendix":
+            return f"## Appendix {label} {title}"
+        # chapter: collapse "Chapter 3 Foo" -> "## 3 Foo"
+        return f"## {label} {title}"
+
+    # Case B: prefix-less body heading -> look it up in the TOC chapter map.
+    key = re.sub(r"\s+", "", text).lower()
+    if key in chapter_map:
+        label = chapter_map[key]
+        if label.isdigit():
+            return f"## {label} {text.strip()}"
+        return f"## Appendix {label} {text.strip()}"
+    return None
+
+
 def pdf_to_text_stream(
     pdf_path: str, cfg: StreamConfig | None = None, page_filter=None
 ) -> str:
     cfg = cfg or StreamConfig()
     doc = fitz.open(pdf_path)
     page_heights = {p: doc[p].rect.height for p in range(len(doc))}
+
+    # Pre-parse the TOC pages so body chapter titles can be renumbered. This is
+    # done regardless of `page_filter` (which only controls which pages are
+    # *emitted*), because the chapter map is needed to renumber body headings
+    # even when the TOC pages themselves are skipped.
+    toc_skip = _detect_toc_pages(doc)
+    chapter_map = _build_toc_chapter_map(doc, toc_skip)
 
     out: list[str] = []
     pending_prose: str | None = None
@@ -252,6 +341,23 @@ def pdf_to_text_stream(
             pending_code_lang = "text"
 
     _FIG_RE = re.compile(r"^\*{0,2}Figure\s+\d+\.\d+\b")
+
+    _CHAPTER_LABEL_RE = re.compile(
+        r"^(appendix|chapter)\s+[0-9A-Za-z]+$", re.I
+    )
+
+    def _is_chapter_label_then_title(prev: str, cur: str) -> bool:
+        """True when `prev` is a bare 'appendix A' / 'chapter 3' label and `cur`
+        is the chapter title on the following line (e.g. 'Introduction to
+        PyTorch'). The PDF sets these as two separate blocks; together they form
+        one top-level heading."""
+        if not prev or not cur:
+            return False
+        if not _CHAPTER_LABEL_RE.match(prev.strip()):
+            return False
+        # Title line: starts with a capital letter, reasonably short.
+        cur = cur.strip()
+        return bool(cur) and cur[0].isupper() and len(cur) < 80
 
     def _should_merge_prose(prev: str, cur: str) -> bool:
         """True when `cur` is clearly a sentence continuation of `prev`, so the
@@ -459,6 +565,12 @@ def pdf_to_text_stream(
 
             # Heading: a single short line matching the heading regex.
             if len(line_texts) == 1:
+                upgraded = _upgrade_top_heading(line_texts[0], chapter_map)
+                if upgraded is not None:
+                    flush_pending()
+                    out.append(upgraded)
+                    out.append("")
+                    continue
                 h = classify_heading(line_texts[0])
                 if h and len(line_texts[0]) < 80:
                     flush_pending()
@@ -469,6 +581,17 @@ def pdf_to_text_stream(
             if cfg.merge_paragraphs:
                 para = " ".join(line_texts)
                 para = re.sub(r"\s+", " ", para).strip()
+                # A whole block whose merged text is exactly a top-level chapter
+                # or appendix title (e.g. two lines "appendix A" / "Introduction
+                # to PyTorch" inside one block) must be emitted as a heading,
+                # not buffered as prose.
+                if len(para) < 120:
+                    upgraded = _upgrade_top_heading(para, chapter_map)
+                    if upgraded is not None:
+                        flush_pending()
+                        out.append(upgraded)
+                        out.append("")
+                        continue
                 # Cross-block paragraph merge: the PDF often splits one logical
                 # paragraph across multiple text blocks (e.g. because a figure or
                 # formula sits between two halves). P1 only merged physical lines
@@ -484,7 +607,18 @@ def pdf_to_text_stream(
                     pending_prose, para
                 ):
                     # Two-line chapter title wrapped across blocks -> one heading.
-                    out.append("### " + pending_prose + " " + para)
+                    merged = (pending_prose + " " + para).strip()
+                    upgraded = _upgrade_top_heading(merged, chapter_map)
+                    out.append(upgraded if upgraded is not None else "### " + merged)
+                    out.append("")
+                    pending_prose = None
+                elif pending_prose is not None and _is_chapter_label_then_title(
+                    pending_prose, para
+                ):
+                    # "appendix A" label on its own line + title on the next.
+                    merged = (pending_prose + " " + para).strip()
+                    upgraded = _upgrade_top_heading(merged, chapter_map)
+                    out.append(upgraded if upgraded is not None else "## " + merged)
                     out.append("")
                     pending_prose = None
                 elif pending_prose is not None and _should_merge_prose(
@@ -510,6 +644,42 @@ def pdf_to_text_stream(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+def _detect_toc_pages(doc) -> set[int]:
+    """Return set of 0-based page indices that are PDF table-of-contents pages.
+
+    Uses the PDF's own TOC to locate 'brief contents' and 'contents' entries,
+    then marks every page from the first TOC page up to (but not including)
+    the next real front-matter section (preface, acknowledgments, etc.).
+    """
+    toc = doc.get_toc()
+    toc_keywords = {"brief contents", "contents", "table of contents",
+                    " sommaire", "inhoud"}
+    skip_titles: list[tuple[int, str]] = []  # (0-based page, norm title)
+    for _lvl, title, pg in toc:
+        tn = title.strip().lower()
+        if tn in toc_keywords:
+            skip_titles.append((pg - 1, tn))
+
+    if not skip_titles:
+        return set()
+
+    first_toc = min(p for p, _ in skip_titles)
+
+    # Find the page of the first real section after TOC
+    after_toc = len(doc)  # default: no limit
+    stop_kw = {"preface", "acknowledgments", "about this book", "about the author",
+               "foreword", "introduction", "1 understanding"}
+    for _lvl, title, pg in toc:
+        if pg - 1 <= first_toc:
+            continue
+        tn = title.strip().lower()
+        if any(tn.startswith(k) or tn == k for k in stop_kw):
+            after_toc = pg - 1
+            break
+
+    return set(range(first_toc, after_toc))
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -524,15 +694,24 @@ if __name__ == "__main__":
     if args.no_merge:
         cfg.merge_paragraphs = False
 
+    # Detect TOC pages to skip
+    _doc = fitz.open(args.pdf)
+    toc_skip = _detect_toc_pages(_doc)
+    _doc.close()
+    if toc_skip:
+        print(f"[info] skipping {len(toc_skip)} TOC pages: "
+              f"{sorted(p+1 for p in toc_skip)}")
+
     if args.pages:
         m = re.match(r"(\d+)-(\d+)", args.pages)
         if not m:
             raise SystemExit("--pages must be like 24-30")
         lo, hi = int(m.group(1)), int(m.group(2))
-        pf = lambda pno: (lo - 1) <= pno <= (hi - 1)  # noqa: E731
+        pf = lambda pno: (lo - 1) <= pno <= (hi - 1) and pno not in toc_skip  # noqa: E731
         text = pdf_to_text_stream(args.pdf, cfg, page_filter=pf)
     else:
-        text = pdf_to_text_stream(args.pdf, cfg)
+        pf = (lambda pno: pno not in toc_skip) if toc_skip else None
+        text = pdf_to_text_stream(args.pdf, cfg, page_filter=pf)
 
     Path(args.output).write_text(text, encoding="utf-8")
     print(f"Written {len(text.splitlines())} lines -> {args.output}")

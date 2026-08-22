@@ -10,9 +10,9 @@ Pipeline (each stage independently tested):
   3. build_figure_region     : grow figure region from seeds + label blocks
 
 Usage:
-  python3 extract_images.py test-candidates   # stage 1 self-test
-  python3 extract_images.py test-validate     # stage 2 self-test
-  python3 extract_images.py                   # full run + V1-V3 verification
+  python3 p0_extract_images.py test-candidates   # stage 1 self-test
+  python3 p0_extract_images.py test-validate     # stage 2 self-test
+  python3 p0_extract_images.py                   # full run + V1-V3 verification
 """
 import json
 import re

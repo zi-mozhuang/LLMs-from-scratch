@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pymupdf
 
-from extract_images import (
+from p0_extract_images import (
     CAPTION_RE, HEADER_Y, PDF_PATH, OUT_DIR, _overlaps, _body_column,
     collect_element_rects, find_caption_candidates, validate_candidates)
 

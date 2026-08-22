@@ -1,0 +1,10 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+[V1] dropped figure-text blocks: 2314  -> PASS
+[V2] dropped blocks ending with sentence punctuation: 321 -> PASS
+[V3] glossary terms retained: 5/5 -> PASS
+[V4] figure labels (digit/&) removed: 5/5 -> PASS
+[V5] P5 standalone labels removed: 3/3 -> PASS
+[V6] key body sentences preserved: 5/5 -> PASS
+[V7] code lines preserved: 6/6 -> PASS
+[V8] code fences balanced: 1206 fences -> PASS
+OVERALL: PASS

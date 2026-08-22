@@ -23,8 +23,8 @@ from pathlib import Path
 
 FENCE_RE = re.compile(r"^\s*```")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
-CHAPTER_RE = re.compile(r"^Chapter\s+(\d+)", re.I)
-APPENDIX_RE = re.compile(r"^appendix\s+([A-Z])", re.I)
+CHAPTER_RE = re.compile(r"^(\d+)\s")
+APPENDIX_RE = re.compile(r"^Appendix\s+([A-Z])")
 SECTION_RE = re.compile(r"^(\d+)\.(\d+)\b")
 
 
@@ -68,9 +68,13 @@ def assign_anchors(heads):
 
 def heading_sort_key(idx, level, text, order):
     """Logical order: Chapter N (##) first, then sections N.M (###) grouped
-    under their chapter, sorted numerically. Headings without a chapter context
-    (e.g. a stray 'N.M' mention in the front matter) sort by their N.M number
-    under a synthetic chapter."""
+    under their chapter, sorted numerically. Appendices (A..E) come after all
+    chapters. Non-structural headings (e.g. Preface) sort to the front by
+    occurrence."""
+    ap = APPENDIX_RE.match(text)
+    if ap:
+        # Appendices after every chapter; sort A, B, C, ...
+        return (1000 + (ord(ap.group(1)) - ord("A")), 0, order)
     ch = CHAPTER_RE.match(text)
     if ch:
         return (int(ch.group(1)), 0, order)
