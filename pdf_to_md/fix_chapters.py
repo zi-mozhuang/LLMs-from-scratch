@@ -298,11 +298,11 @@ def fix_chapter_covers(lines: list[str], chapter_data: list[dict]) -> int:
 
             if not fragment_lines:
                 # No fragments to remove, just replace the heading
-                lines[i] = "This chapter covers:"
+                lines[i] = "**This chapter covers**"
                 insert_at = i + 1
             else:
                 # Build replacement: "This chapter covers:" + bullets + blank
-                lines[i] = "This chapter covers:"
+                lines[i] = "**This chapter covers**"
                 bullet_text = []
                 for bullet in bullets:
                     bullet_text.append(f"- {bullet}")

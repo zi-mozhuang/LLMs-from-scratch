@@ -225,6 +225,44 @@ def bold_captions(lines: list[str]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# 7. Exercise headings
+# ---------------------------------------------------------------------------
+EXERCISE_RE = re.compile(r"^Exercise (\d+)\.(\d+)\b\s*(.*)$")
+
+
+def format_exercises(lines: list[str]) -> list[str]:
+    """Render 'Exercise N.N ...' paragraphs as a blockquote so they are visually
+    distinct from body prose.
+
+    In the PDF the exercise title (FranklinGothic-Demi, 10.5pt) and its
+    description (FranklinGothic-Book, 9.5pt) are different fonts but get merged
+    into one paragraph by P1. We render both as a blockquote:
+      > **Exercise N.N**
+      >
+      > <original description text>
+
+    The short title phrase (e.g. 'Byte pair encoding of unknown words') is
+    preserved as the first words of the description, so no text is lost.
+    Because the exercise is no longer a Markdown heading, P3's heading/anchor
+    scan ignores it; exercises are also excluded from the TOC by is_structural,
+    so the TOC subset invariant still holds.
+    """
+    out = []
+    for line in lines:
+        m = EXERCISE_RE.match(line)
+        if m:
+            num = f"{m.group(1)}.{m.group(2)}"
+            desc = m.group(3).strip()
+            out.append(f"> **Exercise {num}**")
+            if desc:
+                out.append(">")
+                out.append(f"> {desc}")
+        else:
+            out.append(line)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
 def p2_clean(text: str, manifest_path: str) -> str:
@@ -248,6 +286,9 @@ def p2_clean(text: str, manifest_path: str) -> str:
 
     # 6. bold captions
     lines = bold_captions(lines)
+
+    # 7. exercise paragraphs -> #### headings
+    lines = format_exercises(lines)
 
     return "\n".join(lines)
 

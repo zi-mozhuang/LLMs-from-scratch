@@ -8,7 +8,7 @@ blocks survive into the final ``llms-from-scratch.md`` because:
 
 * P1's ``sentence_guard`` / ``term_glossary_guard`` intentionally kept them.
 * They sit in *gaps* between figure element rects (not inside any rect).
-* They are just outside the figure boundary (side-glued with gap >= SIDE_GAP).
+* They sit in *gaps* between figure element rects (not inside any rect).
 
 Approach (three-layer: position + content + geometry)
 -----------------------------------------------------
@@ -45,30 +45,40 @@ import unicodedata
 from pathlib import Path
 
 import pymupdf  # PyMuPDF; the project's extraction environment uses this.
-from figure_text_detect import page_element_regions
+from figure_text_detect import page_element_regions, is_figure_text
 
 
 # --------------------------------------------------------------------------- #
 # Geometry: text strings that sit *inside* a figure rectangle (per page)       #
 # --------------------------------------------------------------------------- #
-def figure_text_by_page(pdf_path: str) -> dict[int, set[str]]:
-    """Map 0-based page index -> set of normalized figure-internal text strings.
+def figure_text_by_page(pdf_path: str) -> tuple[dict[int, set[str]], set[int]]:
+    """Return (fig_by_page, fullpage_art_pages).
 
-    Two kinds of figure pages are handled:
+    ``fig_by_page[page_idx]`` = set of normalized figure-internal text strings
+    on that page (geometry-based, via ``is_figure_text`` / cover handling).
 
-    * Normal figure pages: geometry from ``page_element_regions`` (a figure
-      rectangle was detected), filtered by ``_block_in_figure``.
-    * Cover / front-matter pages (e.g. page 0) where no ``Figure X.Y`` anchor
-      exists and the whole page IS the illustration: the entire page rectangle
-      is treated as the figure region, so every painted text block on it is a
-      figure-internal string. Book title / author / publisher are excluded
-      downstream by ``COVER_KEEP``.
+    ``fullpage_art_pages`` = page indices that are *entirely* an illustration
+    (the figure union covers most of the page and there is no real body prose).
+    On these pages every painted string is decorative, so the markdown-side
+    cleaner deletes any line whose normalized text is in that page's set,
+    regardless of proximity to a ``**Figure X.Y**`` title (which such pages
+    lack -- e.g. cover, back cover, full-page glossary).
     """
     doc = pymupdf.open(pdf_path)
     result: dict[int, set[str]] = {}
+    fullpage: set[int] = set()
     for idx, page in enumerate(doc):
         fig_rects, fig_union = page_element_regions(page)
         strings: set[str] = set()
+        page_area = float(page.rect.width * page.rect.height)
+        union_area = float(fig_union.get_area()) if fig_union is not None else 0.0
+        # A page whose figure union covers >= 90% of the page area is treated as
+        # a full-page illustration (cover / back cover / full-page glossary).
+        # NOTE: a threshold as low as 0.55 wrongly flagged normal content pages
+        # (e.g. p60, p80) whose several small figures merge into a large union --
+        # those pages still carry body prose and must NOT be glob-delivered.
+        is_fullpage = fig_union is not None and union_area / page_area >= 0.90
+
 
         # Fig 1.1 is a full-page *vector* glossary whose painted text is
         # recovered from an embedded text layer PyMuPDF sees as many tiny
@@ -171,12 +181,22 @@ def figure_text_by_page(pdf_path: str) -> dict[int, set[str]]:
                 ).strip()
                 if not txt:
                     continue
-                if _block_in_figure(b["bbox"], fig_rects, fig_union):
+                # Use the same classifier as P1 (is_figure_text) rather than the
+                # is_figure_text applies the sentence / term-glossary / font guards
+                # so only true figure LABELS (short, non-sentence, non-code) are
+                # collected here; a looser geometry-only test would also sweep in
+                # genuine code blocks sitting inside a large figure's union.
+                # is_figure_text applies the sentence / term-glossary / font guards
+                # so only true figure LABELS (short, non-sentence, non-code) are
+                # collected here.
+                if is_figure_text(b, fig_rects, fig_union, page.rect.height):
                     strings.add(_norm(txt))
         if strings:
             result[idx] = strings
+        if is_fullpage:
+            fullpage.add(idx)
     doc.close()
-    return result
+    return result, fullpage
 
 
 # Text that is genuinely the book cover (title / author / publisher) and must
@@ -205,48 +225,6 @@ COVER_FIGURE_TEXT = {
 }
 
 
-# Max horizontal gap (pts) between a text block and a figure rectangle for the
-# block to count as a side-glued label (e.g. Fig 1.2 "User input (instructions)"
-# sits ~3pt right of the figure crop).
-SIDE_GAP = 15.0
-
-
-def _block_in_figure(bbox, fig_rects, fig_union) -> bool:
-    r = pymupdf.Rect(bbox)
-    if r.width < 1 or r.height < 1:
-        return False
-    cx, cy = (r.x0 + r.x1) / 2.0, (r.y0 + r.y1) / 2.0
-    pt = pymupdf.Point(cx, cy)
-    # A block is figure-internal when its center lies inside any figure
-    # rectangle. Note: we deliberately do NOT add a "caption protection" rule
-    # here. Large full-page figures (e.g. the Fig 1.1 glossary) produce a
-    # figure union that also covers the real caption *and* nearby body prose
-    # below the figure; but those are filtered out downstream by the position
-    # signal (they are not adjacent to the ``![Fig]`` link), so loosening here
-    # is safe and lets us catch labels whose center falls in the figure union
-    # but outside the sub-pixel individual rectangles.
-    for fr in fig_rects:
-        if fr.contains(pt):
-            return True
-    # Side-glued labels: the block is painted just OUTSIDE the figure crop on
-    # its left/right edge, vertically aligned with the figure (e.g. Fig 1.2's
-    # "User input (instructions)" / "Model output" labels). A pure bounding-box
-    # expansion (``expand``) is NOT used: it also matched genuine body prose
-    # below/above large figures (e.g. "This chapter covers...") and code blocks.
-    # We require a STRICT vertical overlap (no tolerance) plus a small horizontal
-    # gap. A tolerance here was the bug: body sentences sitting just *above* a
-    # flow-chart node (e.g. "The number of batches is determined..." above
-    # Fig 5.11) do NOT overlap the node rect, but a +/-10pt tolerance made them
-    # look overlapping, so they were wrongly deleted.
-    for fr in fig_rects:
-        if not (fr.y0 < r.y1 and fr.y1 > r.y0):
-            continue
-        h_gap = max(fr.x0 - r.x1, r.x0 - fr.x1)
-        if 0 <= h_gap < SIDE_GAP:
-            return True
-    return False
-
-
 def _norm(s: str) -> str:
     # NFKC also decomposes typographic ligatures (e.g. "ﬁ" -> "fi"), which the
     # PDF text layer and the markdown can represent differently.
@@ -258,6 +236,12 @@ def _norm(s: str) -> str:
 # Markdown: locate figure links and their adjacent label clusters             #
 # --------------------------------------------------------------------------- #
 FIG_LINK_RE = re.compile(r"!\[Fig[^\]]*\]\(([^)]+)\)")
+FIG_TITLE_RE = re.compile(r"^\*\*Figure\s+\d+\.\d+")
+# How many lines above/below a **Figure X.Y** title to scan for residual labels.
+# Figure-internal labels always sit within a few lines of the caption (either
+# directly above the title -- the PDF extraction order -- or just below the
+# embedded image link P3 inserts after the title).
+WINDOW = 40
 
 
 def page_of_link(link_path: str) -> int | None:
@@ -266,44 +250,6 @@ def page_of_link(link_path: str) -> int | None:
     if not m:
         return None
     return int(m.group(1)) - 1  # PDF page numbers are 1-based in the filename.
-
-
-def first_label_group(lines, fig_idx, direction):
-    """Collect the first non-blank line group adjacent to a figure link.
-
-    *direction* = -1 scans upward, +1 scans downward.
-
-    The scan skips blank lines immediately next to the figure link, then
-    collects consecutive non-blank lines until a blank line is encountered.
-    Hard stop conditions (regardless of blank / non-blank):
-      * Markdown heading (``#``), anchor (``<a id``), or caption (``**Figure``)
-      * Code fence line (starts with ````` ``)
-      * Another figure link line (``![Fig``)
-    """
-    step = 1 if direction > 0 else -1
-    n = len(lines)
-    j = fig_idx + step
-    # Skip initial blank lines.
-    while 0 <= j < n and lines[j].strip() == "":
-        j += step
-    out = []
-    while 0 <= j < n:
-        t = lines[j]
-        stripped = t.strip()
-        # Hard stop conditions.
-        if stripped == "":
-            break  # End of the first non-blank group.
-        if t.startswith("#") or t.startswith("<a id"):
-            break
-        if stripped.startswith("**Figure"):
-            break
-        if stripped.startswith("```"):
-            break
-        if FIG_LINK_RE.search(stripped):
-            break
-        out.append((j, stripped))
-        j += step
-    return out
 
 
 # ---- Content filter for label candidates ---- #
@@ -339,13 +285,44 @@ _CODE_LIKE_RE = re.compile(
     r'|\w+\s*\([^)]*$'   # function call with unclosed paren (code line)
 )
 
+# Words that mark a line as BODY PROSE (a sentence / caption sentence), not a
+# figure-internal label. Figure labels are noun phrases ("Input text",
+# "Decoder", "Preprocessing steps"); body descriptions contain verbs
+# ("The output is", "This prints", "Every effort moves you").
+_VERB_RE = re.compile(
+    r"\b(the|this|these|that|a|an|is|are|was|were|prints?|returns?|"
+    r"resulting|results|computed?|encodes?|contain(s|ing)?|show(s)?|moves?|"
+    r"every|you|i|am|we|they|it|here|below|above|following|given|using|"
+    r"obtain(s|ed)?|produce(s|d)?|generate(s|d)?)\b",
+    re.IGNORECASE,
+)
+
 
 def _is_label_candidate(stripped: str) -> bool:
-    """Return True when *stripped* line looks like a figure-internal label.
+    """Return True when *stripped* line is a figure-internal LABEL (safe to delete).
 
-    The filter is deliberately conservative: it rejects anything that looks
-    like body prose (terminal punctuation, chapter references) or code
-    (tensor output, function calls, etc.).
+    The classifier is deliberately STRICT: a figure label is a short noun phrase
+    painted onto a diagram (e.g. "Input text", "Decoder", "Preprocessing steps",
+    "Train", "Labeled dataset").  Anything that resembles body prose or CODE must
+    be rejected, because we no longer cross-check against the PDF geometry set
+    (that set proved unreliable: on the CJK-filename PDF build, code blocks that
+    physically overlap a large figure's union rectangle were mis-classified as
+    figure-internal, which would have deleted real code).
+
+    Reject (keep) when the line:
+      * is empty
+      * ends with terminal punctuation (body prose)
+      * mentions a chapter / section reference
+      * is a body-text reference to a figure ("Figure 4.12 shows ...")
+      * contains CODE syntax: parentheses/brackets/braces, ``=``, ``.method(``,
+        code keywords (import/def/class/for/if/return/print/torch/plt/with/open),
+        or starts/ends with backtick (inline code)
+      * contains a comma (almost always body prose, not a 1-2 word label)
+      * ends with a dash (truncated body sentence)
+      * is too long (> 6 words) -- labels are short
+      * contains digits/punctuation other than a trailing colon or hyphen
+        (e.g. "tensor(1.8)", "Z2", "q(2)" are math annotations, handled by the
+        full-page cover logic instead, not inline-figure labels)
     """
     if not stripped:
         return False
@@ -358,14 +335,34 @@ def _is_label_candidate(stripped: str) -> bool:
     # Body-text reference to a figure ("Figure 4.12 shows ...").
     if _FIGURE_REF_RE.match(stripped):
         return False
-    # Code-like patterns.
+    # Code syntax -- NEVER delete.
     if _CODE_LIKE_RE.search(stripped):
         return False
+    if any(ch in stripped for ch in "()[]{}="):
+        return False
+    if re.search(r"\.\w+\(", stripped):   # method call e.g. model.eval()
+        return False
+    if stripped.startswith("`") or stripped.endswith("`"):
+        return False  # inline code fragment -- keep
     # Comma in a short label is almost always body prose, not a figure label.
-    if ',' in stripped:
+    if "," in stripped:
+        return False
+    # Any verb / sentence word marks this as body prose, not a diagram label.
+    if _VERB_RE.search(stripped):
         return False
     # Line ending with dash (en-dash, em-dash, double-hyphen) = truncated body.
-    if re.search(r'[—–\-]{1,2}\s*$', stripped):
+    if re.search(r"[—–\-]{1,2}\s*$", stripped):
+        return False
+    # Length guard: figure labels are short noun phrases.
+    if len(stripped.split()) > 6:
+        return False
+    # Reject lines with digits or stray punctuation (math annotations like
+    # "Z2", "tensor(..)", "q(2)" -- not inline labels). Allow a trailing colon
+    # (e.g. "Vocabulary:") and internal hyphens / spaces.
+    core = stripped.rstrip(":").strip()
+    if re.search(r"\d", core):
+        return False
+    if re.search(r"[^\w\s\-]", core):
         return False
     return True
 
@@ -373,42 +370,80 @@ def _is_label_candidate(stripped: str) -> bool:
 # --------------------------------------------------------------------------- #
 # Cleanup                                                                      #
 # --------------------------------------------------------------------------- #
-def clean_markdown(md_path: Path, fig_by_page: dict[int, set[str]]) -> tuple[list[str], list[str]]:
+def clean_markdown(
+    md_path: Path,
+    fig_by_page: dict[int, set[str]],
+    fullpage_pages: set[int],
+) -> tuple[list[str], list[str]]:
     """Delete figure-internal residual lines.
 
-    For each ``![Fig X.Y](...pNNN.png)`` link we collect the *first non-blank
-    line group* immediately above and below the link (``first_label_group``).
-    From that group, lines passing the content filter (``_is_label_candidate``)
-    are marked for deletion.  The scan is iterated until no more lines are
-    found: each pass may expose new "first groups" that were previously hidden
-    behind labels removed in an earlier pass.
+    Two complementary, geometry-backed strategies:
 
-    The geometric figure-text set is retained as supplementary signal (logged
-    for traceability) but is no longer a hard requirement -- the position +
-    content filters are sufficient.
+    1. **Inline figures (have a ``**Figure X.Y**`` title).**  The PDF extracts a
+       figure's internal labels *above* the ``**Figure X.Y**`` caption (extraction
+       order), while P3 inserts the ``![Fig]`` image *below* the caption.  So the
+       labels always sit within ``WINDOW`` lines of the ``**Figure X.Y**`` title.
+       We scan that window and delete any line whose normalized text is in the
+       geometric figure-text set (``fig_by_page``) and passes the content filter.
+       This catches labels above *and* below the title, fixing the old bug where
+       the upward scan stopped at the ``**Figure**`` hard-stop.
+
+    2. **Full-page illustration pages** (cover / back cover / full-page glossary)
+       identified by ``fullpage_pages`` (figure union covers >= 55% of the page).
+       These have no ``**Figure X.Y**`` anchor, so we delete any line anywhere in
+       the markdown whose normalized text is in that page's geometric set.  Because
+       such pages are pure decoration, global deletion is safe and does not touch
+       body prose (which never lives on these pages).
+
+    Iterates until convergence so removal of one label can expose the next.
     """
     raw = md_path.read_text(encoding="utf-8").split("\n")
     all_removed: list[str] = []
 
-    # Iterate until convergence: each pass removes the first non-blank group
-    # of labels adjacent to figure links; the next pass then sees the *next*
-    # group as the new "first" group.
+    # Union of all geometric figure-internal strings (from the ENGLISH-filename
+    # PDF, which is the same source P1 used to build the markdown). This is used
+    # as a *confirmation* signal: a line is only deleted when it BOTH looks like
+    # a label (_is_label_candidate) AND is confirmed to sit inside a figure
+    # rectangle in the PDF. This two-factor check is what makes the cleanup safe
+    # even though the geometry or the content heuristic alone would each, on
+    # their own, occasionally misfire.
+    all_fig: set[str] = set()
+    for s in fig_by_page.values():
+        all_fig |= {x.lower() for x in s}
+
     while True:
         delete_idx: set[int] = set()
-        for i, line in enumerate(raw):
-            m = FIG_LINK_RE.search(line)
-            if not m:
-                continue
-            # Upward scan.
-            for di, txt in first_label_group(raw, i, -1):
-                if _is_label_candidate(txt):
-                    delete_idx.add(di)
-            # Downward scan.
-            for di, txt in first_label_group(raw, i, +1):
-                if _is_label_candidate(txt):
-                    delete_idx.add(di)
 
-        # Cover page (page 0) -- only on the first pass (no figure links).
+        # Strategy 1: inline figures. Figure-internal labels sit within WINDOW
+        # lines of the **Figure X.Y** caption (extraction order puts them ABOVE
+        # the caption; P3 inserts the image BELOW it). A candidate is deleted
+        # only when it passes BOTH the content filter and the geometric check.
+        for i, line in enumerate(raw):
+            if not FIG_TITLE_RE.match(line.strip()):
+                continue
+            lo = max(0, i - WINDOW)
+            hi = min(len(raw), i + WINDOW + 1)
+            for j in range(lo, hi):
+                if j == i:
+                    continue
+                norm = _norm(raw[j]).lower()
+                if norm in all_fig and _is_label_candidate(raw[j].strip()):
+                    delete_idx.add(j)
+
+        # Strategy 2: full-page illustration pages (cover / back cover / glossary)
+        # have no **Figure X.Y** anchor. They are pure decoration, so any line
+        # whose normalized text is in that page's geometric set is a label and is
+        # deleted (author/title/publisher protected by COVER_KEEP).
+        if fullpage_pages:
+            fp_strings: set[str] = set()
+            for p in fullpage_pages:
+                fp_strings |= fig_by_page.get(p, set())
+            for i, line in enumerate(raw):
+                norm = _norm(line).lower()
+                if norm in fp_strings and not COVER_KEEP.search(norm):
+                    delete_idx.add(i)
+
+        # Cover page exact-match fallback (defence in depth).
         if not all_removed:
             first_fig = next(
                 (k for k, ln in enumerate(raw) if FIG_LINK_RE.search(ln)), len(raw)
@@ -419,7 +454,7 @@ def clean_markdown(md_path: Path, fig_by_page: dict[int, set[str]]) -> tuple[lis
                     delete_idx.add(i)
 
         if not delete_idx:
-            break  # Converged -- no more lines to remove.
+            break  # Converged.
 
         removed = [raw[i] for i in sorted(delete_idx)]
         all_removed.extend(removed)
@@ -438,14 +473,13 @@ def clean_markdown(md_path: Path, fig_by_page: dict[int, set[str]]) -> tuple[lis
         raw = collapsed
 
     # Post-processing: ensure a blank line between each figure link and the
-    # following line.  The iterative deletion of figure-internal labels can
-    # leave the ``![Fig X.Y]`` link directly adjacent to the **Figure X.Y**
-    # caption (or other body text), which renders poorly in Markdown.
+    # following line so the ``![Fig X.Y]`` link never sits directly adjacent to
+    # the **Figure X.Y** caption.
     spaced: list[str] = []
     for idx, ln in enumerate(raw):
         spaced.append(ln)
         if FIG_LINK_RE.search(ln) and idx + 1 < len(raw) and raw[idx + 1].strip() != "":
-            spaced.append("")  # Insert blank line after figure link.
+            spaced.append("")
     return spaced, all_removed
 
 
@@ -465,19 +499,27 @@ def main(argv=None) -> int:
     if not md_path.exists():
         print(f"[error] markdown not found: {md_path}", file=sys.stderr)
         return 2
-    pdf_path = args.pdf or glob.glob(str(here / "*Sebastian Raschka*.pdf"))
-    if isinstance(pdf_path, list):
-        pdf_path = pdf_path[0] if pdf_path else None
+    if args.pdf:
+        pdf_path = args.pdf
+    else:
+        cands = glob.glob(str(here / "*Sebastian Raschka*.pdf"))
+        # Prefer the ENGLISH-filename PDF: that is the exact source P1 used to
+        # generate llms-from-scratch.md, so its geometric figure-text set lines
+        # up with the markdown. The CJK-filename copy exists in the workspace
+        # too but its text layer differs and would mis-align the geometry match.
+        eng = [c for c in cands if "从零开始" not in c]
+        pdf_path = (eng or cands)[0] if (eng or cands) else None
     if not pdf_path or not Path(pdf_path).exists():
         print("[error] source PDF not found (pass --pdf)", file=sys.stderr)
         return 2
 
     print(f"[info] PDF : {pdf_path}")
     print(f"[info] MD  : {md_path}")
-    fig_by_page = figure_text_by_page(pdf_path)
+    fig_by_page, fullpage_pages = figure_text_by_page(pdf_path)
     print(f"[info] pages with figure-internal text: {len(fig_by_page)}")
+    print(f"[info] full-page illustration pages: {sorted(p + 1 for p in fullpage_pages)}")
 
-    cleaned, removed = clean_markdown(md_path, fig_by_page)
+    cleaned, removed = clean_markdown(md_path, fig_by_page, fullpage_pages)
     print(f"[info] figure-internal lines matched for removal: {len(removed)}")
 
     if args.apply:

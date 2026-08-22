@@ -36,9 +36,59 @@ BARE_RE = re.compile(r"^Figure\s+\d+\.\d+$")
 
 ABOVE_GAP = 80.0    # max vertical distance element-bottom -> caption-top
 SIDE_GAP = 30.0     # max horizontal gap for side-by-side layout
-GROW_GAP = 10.0     # region growth: absorb elements within this distance
+LINK_GAP = 80.0     # max element-to-region gap for chain absorption
+LABEL_GAP = 30.0    # max gap for absorbing sans-serif label spans
+CODE_RELAY_GAP = 40.0  # max gap for extending through code-diagram spans
 HEADER_Y = 45.0     # header/footer exclusion band
-NARROW_FRAC = 0.75  # blocks narrower than this fraction of body width are labels
+MAX_LABEL_SIZE = 11.0  # sans spans larger than this are headings, not labels
+
+
+def _overlaps(r, band):
+    """Coordinate-level overlap test.
+
+    Rect.intersects() demands positive-area intersection, which silently
+    drops zero-width/height vector strokes (thin rules, bracket lines) that
+    anchor figure extents (Fig 1.6 lost its left bracket line this way).
+    """
+    return (r.x0 < band.x1 and r.x1 > band.x0
+            and r.y0 < band.y1 and r.y1 > band.y0)
+
+
+def _span_class(font, size):
+    """Structural class of a text span (no hardcoded strings/pages).
+
+    body : serif reading text -> only absorbable via containment
+    code : Courier fragments -> only absorbable via containment
+    label: sans-serif figure text (ArialMT, matplotlib, callout heads)
+    """
+    if font.startswith("NewBaskerville"):
+        return "body"
+    if "Courier" in font:
+        return "code"
+    return "label"
+
+
+def _page_spans(page):
+    """(rect, line_text, font, size, line_id) for content spans.
+
+    Headers excluded. line_id lets callers group spans sharing a physical
+    line (mixed body+code lines mark inline code inside prose sentences).
+    """
+    out = []
+    for blk in page.get_text("dict")["blocks"]:
+        if blk["type"] != 0:
+            continue
+        for line in blk["lines"]:
+            ltxt = "".join(s["text"] for s in line["spans"]).strip()
+            for s in line["spans"]:
+                txt = s["text"].strip()
+                if not txt:
+                    continue
+                r = pymupdf.Rect(s["bbox"])
+                if r.y1 < HEADER_Y or r.y0 > page.rect.height - HEADER_Y:
+                    continue
+                out.append((r, ltxt, s["font"], float(s["size"]), id(line)))
+    return out
 
 
 # ---------------------------------------------------------------- stage 1
@@ -192,14 +242,20 @@ def _text_blocks(page):
     return out
 
 
-def _body_width(doc):
-    """Median width of wide text blocks = full body column width."""
-    ws = sorted(r.width for p in range(len(doc))
-                for r, _ in _text_blocks(doc[p]) if r.width > 150)
-    return ws[len(ws) // 2]
+def _body_column(doc):
+    """Median left/right edge of wide body blocks = body column bounds.
 
-
-LINK_GAP = 80.0     # max element-to-region gap for chain absorption
+    Margin notes (HumanistMann side columns) live beyond col_x1 and must
+    never be absorbed into figure regions.
+    """
+    xs0, xs1 = [], []
+    for pno in range(len(doc)):
+        for r, _ in _text_blocks(doc[pno]):
+            if r.width > 300:
+                xs0.append(r.x0)
+                xs1.append(r.x1)
+    xs0.sort(), xs1.sort()
+    return xs0[len(xs0) // 2], xs1[len(xs1) // 2]
 
 
 def _rect_gap(a, b):
@@ -209,7 +265,111 @@ def _rect_gap(a, b):
     return max(dx, dy)
 
 
-def build_figure_region(page, cap, y_min, y_max, body_w):
+def _body_in_corridor(cand, region, body_rects):
+    """True if a serif body span sits between cand and the region.
+
+    Relay extension through figure text must not cross reading text: on
+    p220 a code listing sits one prose line above the plot; the prose line
+    in the corridor is what keeps the listing out of the figure. Text-only
+    diagrams (Fig 7.7, two stacked examples 37 pt apart) have empty
+    corridors and relay freely.
+    """
+    if cand.y1 <= region.y0:
+        lo, hi = cand.y1, region.y0
+    elif cand.y0 >= region.y1:
+        lo, hi = region.y1, cand.y0
+    else:
+        return False
+    hx0 = min(cand.x0, region.x0)
+    hx1 = max(cand.x1, region.x1)
+    for b in body_rects:
+        if b.y0 < hi - 1 and b.y1 > lo + 1 \
+                and min(b.x1, hx1) - max(b.x0, hx0) > 0.5 * b.width:
+            return True
+    return False
+
+
+LINK_FILL = (0.438, 0.652, 0.801)     # Listing header bar fill (§12 signal)
+CALLOUT_FILL = (0.969, 0.961, 0.910)  # concept/exercise box fill (§1 signal)
+
+
+def _fill_close(fill, ref):
+    return all(abs(f - c) < 0.03 for f, c in zip(fill, ref))
+
+
+def _listing_bars(page):
+    """Rects of Listing header bars and concept-callout boxes.
+
+    Both are hard growth barriers: figures stacked onto a Listing must not
+    swallow its bar/code (Fig 4.3), and figures next to a callout box must
+    not absorb it or the prose around it (Fig 2.11, Fig 3.17). Structural
+    color/size signals only, no hardcoded pages.
+    """
+    bars = []
+    for d in page.get_drawings():
+        r = d["rect"]
+        fill = d.get("fill")
+        if fill is None:
+            continue
+        if _fill_close(fill, LINK_FILL) and r.width >= 200 \
+                and 10 <= r.height <= 40:
+            bars.append(pymupdf.Rect(r))
+        elif _fill_close(fill, CALLOUT_FILL) and r.width >= 100 \
+                and r.height >= 40:
+            bars.append(pymupdf.Rect(r))
+    return bars
+
+
+def _crosses_bar(lo_rect, hi_rect, bars):
+    """True if a barrier rect separates two rects vertically."""
+    a, b = sorted((lo_rect, hi_rect), key=lambda r: r.y1)
+    for bar in bars:
+        if bar.y0 > a.y1 + 1 and bar.y1 < b.y0 - 1 \
+                and min(bar.x1, b.x1) - max(bar.x0, a.x0) > 0.5 * bar.width:
+            return True
+    return False
+
+
+def _span_components(spans, link):
+    """Union-find components over non-body spans.
+
+    Returns ({span_index: root_id}, {root_id: has_label_span}). Used to
+    qualify long-distance code relay: a far code span may be pulled in only
+    when its cluster also carries sans-serif labels (text diagrams like
+    Fig 7.7); pure-Courier clusters are body snippets/listings and stay
+    out (Figs 3.12 / 6.5).
+    """
+    idx_map = {}
+    item_list = []
+    classes = []
+    for i, (r, _, f, s, _) in enumerate(spans):
+        cls = _span_class(f, s)
+        if cls != "body":
+            idx_map[i] = len(item_list)
+            item_list.append(r)
+            classes.append(cls)
+    n = len(item_list)
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if _rect_gap(item_list[i], item_list[j]) <= link:
+                parent[find(i)] = find(j)
+    comp_has_label = defaultdict(bool)
+    for k in range(n):
+        if classes[k] == "label":
+            comp_has_label[find(k)] = True
+    root_of = {i: find(idx_map[i]) for i in idx_map}
+    return root_of, comp_has_label
+
+
+def build_figure_region(page, cap, y_min, y_max, col_x1):
     """Build figure region for one validated caption.
 
     Seeds = elements directly adjacent to the caption (above within
@@ -222,11 +382,21 @@ def build_figure_region(page, cap, y_min, y_max, body_w):
         (e.g. p220: a code listing sits ~117 pt above the plot; its
         callout arrows must not join the figure, while Fig 7.2's internal
         ~48 pt row spacing must be crossed)
-    Caption blocks are never absorbed.
+
+    Text absorption is span-level and font-classified (block-level checks
+    break when PyMuPDF merges a figure label with unrelated prose into one
+    block — Fig 1.6 'TEXT COMPLETION', Fig 2.10 top labels):
+      - sans-serif label spans: absorbed within LABEL_GAP of the region
+      - serif body / Courier code spans: only when >=90% already contained,
+        so reading text and listings are never pulled into the figure
+        (Fig 6.5 previously swallowed its own intro sentence)
+    Caption lines/blocks are never absorbed.
     """
     lrect, brect = cap["rect"], cap["block_rect"]
     band = pymupdf.Rect(0, y_min, page.rect.width, y_max)
-    rects = [r for r in collect_element_rects(page) if r.intersects(band)]
+    bars = _listing_bars(page)
+    rects = [r for r in collect_element_rects(page) if _overlaps(r, band)
+             and not any(r == b for b in bars)]
     seeds = [r for r in rects if _element_gap(r, lrect, brect) is not None]
     if not seeds:
         return None
@@ -241,45 +411,74 @@ def build_figure_region(page, cap, y_min, y_max, body_w):
         region |= r
     region = clamp(region)
 
-    changed = True
-    while changed:
-        changed = False
+    # Terminate on "no new absorptions", not on region growth: elements
+    # straddling the band get clamped back to the same region every pass,
+    # which previously made a growth-based loop spin forever.
+    while True:
+        added = False
         for r in rects:
-            if region.contains(r):
+            if any(r == a for a in absorbed):
                 continue
-            if min(_rect_gap(r, a) for a in absorbed) <= LINK_GAP:
+            if min(_rect_gap(r, a) for a in absorbed) <= LINK_GAP \
+                    and not _crosses_bar(r, region, bars):
                 absorbed.append(r)
                 region = clamp(region | r)
-                changed = True
+                added = True
+        if not added:
+            break
 
-    # candidate label blocks: not captions, not the caption's own block
-    labels = []
-    for r, txt in _text_blocks(page):
-        if CAPTION_RE.match(txt.strip()):
-            continue
-        inter = r & brect
-        if inter.get_area() > 0.5 * max(r.get_area(), 1e-6):
-            continue  # own caption block
-        labels.append(r)
-
-    narrow_lim = NARROW_FRAC * body_w
-    changed = True
-    while changed:
-        changed = False
-        infl = pymupdf.Rect(region.x0 - GROW_GAP, region.y0 - GROW_GAP,
-                            region.x1 + GROW_GAP, region.y1 + GROW_GAP)
-        for r in labels:
-            if r.intersects(infl) and not region.contains(r):
-                below_caption = (r.y0 >= lrect.y1 - 2
-                                 and r.x0 < brect.x1 and r.x1 > brect.x0)
-                if below_caption and r.width >= narrow_lim:
-                    continue  # caption continuation / body prose under caption
-                if r.width >= narrow_lim:
-                    inter = region & r
-                    if inter.get_area() < 0.8 * r.get_area():
-                        continue  # wide block only if already mostly inside
-                region = clamp(region | r)
-                changed = True
+    spans = [(r, ltxt, font, size, lid)
+             for r, ltxt, font, size, lid in _page_spans(page)
+             if not CAPTION_RE.match(ltxt)
+             and (r & brect).get_area() <= 0.5 * max(r.get_area(), 1e-6)]
+    body_rects = [r for r, _, f, s, _ in spans if _span_class(f, s) == "body"]
+    # lines mixing serif prose with Courier fragments = inline code inside
+    # sentences; their code spans must never act as relay stepping stones
+    line_classes = defaultdict(set)
+    for _, _, f, s, lid in spans:
+        line_classes[lid].add(_span_class(f, s))
+    mixed_lines = {lid for lid, cls in line_classes.items()
+                   if "body" in cls and len(cls) > 1}
+    root_of, comp_has_label = _span_components(spans, 14.0)
+    taken = [False] * len(spans)
+    while True:
+        added = False
+        infl = pymupdf.Rect(region.x0 - LABEL_GAP, region.y0 - LABEL_GAP,
+                            region.x1 + LABEL_GAP, region.y1 + LABEL_GAP)
+        for i, (r, _, font, size, lid) in enumerate(spans):
+            if taken[i] or _crosses_bar(r, region, bars):
+                continue
+            cls = _span_class(font, size)
+            if cls == "label":
+                if size > MAX_LABEL_SIZE:
+                    continue  # section/callout headings are not labels
+                if r.x0 > col_x1 + 6:
+                    continue  # margin-note zone
+                if r.intersects(infl) \
+                        and not _body_in_corridor(r, region, body_rects):
+                    pass
+                else:
+                    continue
+            elif cls == "code":
+                # code joins when almost enclosed, or via relay across an
+                # empty corridor (text-only diagrams); a body span in the
+                # corridor marks exterior listing/prose content
+                inter = region & r
+                if inter.get_area() < 0.9 * max(r.get_area(), 1e-6):
+                    if lid in mixed_lines \
+                            or _rect_gap(r, region) > CODE_RELAY_GAP \
+                            or _body_in_corridor(r, region, body_rects):
+                        continue
+            else:
+                # body prose: absorb only if almost fully enclosed
+                inter = region & r
+                if inter.get_area() < 0.9 * max(r.get_area(), 1e-6):
+                    continue
+            taken[i] = True
+            region = clamp(region | r)
+            added = True
+        if not added:
+            break
     return region
 
 
@@ -287,7 +486,7 @@ def extract_figures(doc, caps):
     """Channel B: render each validated caption's figure region @3x."""
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     mat = pymupdf.Matrix(ZOOM, ZOOM)
-    body_w = _body_width(doc)
+    _, col_x1 = _body_column(doc)
     by_page = {}
     for c in caps:
         by_page.setdefault(c["page"], []).append(c)
@@ -301,7 +500,7 @@ def extract_figures(doc, caps):
                  if o["block_rect"].y0 >= c["rect"].y1]
         y_min = max(above + [0.0])
         y_max = min(below + [page.rect.height])
-        region = build_figure_region(page, c, y_min, y_max, body_w)
+        region = build_figure_region(page, c, y_min, y_max, col_x1)
         if region is None or region.is_empty or region.width < 20 or region.height < 20:
             failures.append({"fig": c["fig"], "page": c["page"],
                              "reason": f"bad region {region}"})

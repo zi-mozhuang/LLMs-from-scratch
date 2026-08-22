@@ -131,12 +131,16 @@ def detect_code_lang(block_text: str) -> str:
 SECTION_RE = re.compile(r"^\d+\.\d+\s+[A-Z][a-zA-Z]")
 CHAPTER_RE = re.compile(r"^(Chapter|Appendix)\s+\d+", re.I)
 PART_RE = re.compile(r"^Part\s+[IVX]+", re.I)
+# Section summary headings ("Summary") used as subsection titles in the book.
+SUMMARY_RE = re.compile(r"^Summary\s*$")
 
 
 def classify_heading(text: str) -> str | None:
     if CHAPTER_RE.match(text) or PART_RE.match(text):
         return "## "
     if SECTION_RE.match(text):
+        return "### "
+    if SUMMARY_RE.match(text):
         return "### "
     return None
 
@@ -212,7 +216,143 @@ def pdf_to_text_stream(
     page_heights = {p: doc[p].rect.height for p in range(len(doc))}
 
     out: list[str] = []
-    prev_was_code = False
+    pending_prose: str | None = None
+    pending_code: list[str] | None = None
+    pending_code_lang: str = "text"
+
+    def flush_pending() -> None:
+        """Emit any buffered pending prose paragraph (with a trailing blank line)."""
+        nonlocal pending_prose
+        if pending_prose is not None:
+            out.append(pending_prose)
+            out.append("")
+            pending_prose = None
+
+    def flush_code() -> None:
+        """Emit any buffered multi-block code run as ONE fenced block.
+
+        The PDF frequently emits a single logical code listing as several
+        separate text blocks (PyMuPDF splits long listings). Those code blocks
+        are contiguous in reading order -- nothing but image/header/figure
+        blocks (which carry no body text and are dropped) sits between them.
+        We therefore accumulate consecutive Courier blocks here and flush them
+        as a single fenced block. This is far more reliable than trying to merge
+        at the text level in P2, because a code line that PyMuPDF sets as a
+        slightly-different-font span would otherwise be misclassified as prose
+        and break the run. Merging at the block level (before prose classification)
+        keeps the whole listing intact.
+        """
+        nonlocal pending_code, pending_code_lang
+        if pending_code is not None:
+            out.append(f"```{pending_code_lang}")
+            out.append("\n".join(pending_code).rstrip())
+            out.append("```")
+            out.append("")
+            pending_code = None
+            pending_code_lang = "text"
+
+    _FIG_RE = re.compile(r"^\*{0,2}Figure\s+\d+\.\d+\b")
+
+    def _should_merge_prose(prev: str, cur: str) -> bool:
+        """True when `cur` is clearly a sentence continuation of `prev`, so the
+        two prose blocks (split by the PDF into separate text blocks) belong to
+        one paragraph.
+
+        Handles three continuation shapes the PDF produces:
+          (1) ordinary prose: prev does not end with sentence-final punctuation
+              and cur starts lowercase (the original, conservative rule);
+          (2) inline-code continuation: prev ends with an unclosed backtick or an
+              open delimiter (`(`, `[`, `{`, `"`, `'`), or cur starts with a
+              backtick -> the two blocks are one inline-code word/token split
+              across blocks (e.g. `create_` / `dataloader_v1`);
+          (3) open-word continuation: prev ends with a sentence-connecting word
+              (article/preposition/conjunction) and cur continues the sentence.
+
+        Figure captions ("Figure X.Y ...") MUST stay on their own line so that
+        P2's `insert_figures` can detect them and inject the `![Fig X.Y]` link;
+        we therefore never merge a caption with a neighbouring paragraph.
+        A length floor guards against folding short chapter-outline list items
+        set as separate lines after "This chapter covers".
+        """
+        if not prev or not cur:
+            return False
+        # Figure captions must remain standalone lines (P2 injects ![Fig] there).
+        if _FIG_RE.match(prev) or _FIG_RE.match(cur):
+            return False
+        # Previous block must NOT end with sentence-final punctuation or a
+        # closing quote (which also marks a sentence boundary).
+        if prev[-1] in ".!?\"'”’":
+            return False
+
+        # (2) inline-code / unclosed-delimiter continuation -> merge regardless
+        # of length (code tokens split across blocks are short by nature).
+        if cur.startswith("`"):
+            return True
+        if prev[-1] == "`":
+            return True
+        for o in ("(", "[", "{", '"', "'"):
+            if prev.count(o) > prev.count(_CLOSE.get(o, o)):
+                return True
+
+        # (3) open-word continuation (e.g. "with", "such as", "the").
+        last_word = prev.split()[-1].strip("\"'()[]{}").lower()
+        if last_word in _PROSE_OPENERS:
+            # cur is a continuation; only merge when cur is not a new sentence
+            # opener (capitalized common noun is allowed for code identifiers).
+            return True
+
+        # (4) hyphenated word split across blocks (defensive; P2 also fixes).
+        if prev.rstrip().endswith("-"):
+            return True
+
+        # (1) ordinary prose continuation: conservative length floor + lowercase.
+        if len(prev) < 40 or len(cur) < 40:
+            return False
+        if not cur[0].islower():
+            return False
+        return True
+
+    _CLOSE = {")": ")", "]": "]", "}": "}", '"': '"', "'": "'"}
+    _PROSE_OPENERS = {
+        "a", "an", "the", "of", "in", "via", "to", "and", "or", "for", "with",
+        "that", "as", "by", "from", "on", "at", "into", "than", "but", "nor",
+        "so", "because", "while", "using", "when", "if", "is", "are", "was",
+        "were", "be", "been", "being", "this", "these", "those", "it", "its",
+        "we", "you", "they", "our", "your", "their", "such", "which", "where",
+        "what", "how", "why", "who", "each", "every", "both", "all", "any",
+        "between", "among", "within", "without", "during", "before", "after",
+        "above", "below", "over", "under", "about", "against", "through",
+        "across", "onto", "upon", "out", "up", "down",
+    }
+
+    LEADIN_RE = re.compile(
+        r"(covers|include|includes|chapter|derived|follows|discussed|"
+        r"introduced|covering|explores|examines|presents|describes)\s*$",
+        re.I,
+    )
+
+    def _is_two_line_heading(prev: str, cur: str) -> bool:
+        """True when `prev` + `cur` are the two printed lines of one chapter
+        section title that the PDF wrapped across two text blocks (e.g.
+        'Understanding large' / 'language models'). Such titles must become a
+        single '### ' heading line, not two prose lines. We keep this strict:
+        both fragments are short (< 50 chars), the second starts lowercase
+        (genuine wrap), and we exclude lead-in sentences and fragments ending
+        in ')' (which are already-merged 'This chapter covers ...' prose, whose
+        following short phrases are outline list items, not title continuations)."""
+        if not prev or not cur:
+            return False
+        if len(prev) > 50 or len(cur) > 50:
+            return False
+        if prev[-1] in ".!?\"'”’":
+            return False
+        if prev[-1] == ")":
+            return False
+        if not cur[0].islower():
+            return False
+        if LEADIN_RE.search(prev):
+            return False
+        return True
 
     for pno in range(len(doc)):
         if page_filter is not None and not page_filter(pno):
@@ -232,7 +372,9 @@ def pdf_to_text_stream(
 
         for block in blocks_sorted:
             if "lines" not in block:
-                continue  # image / drawing only
+                # image/drawing-only block: does not break a code run (it carries
+                # no text). Only flush code when we actually cross into prose.
+                continue
 
             # Drop blocks that are entirely header/footer spans.
             non_header_lines = [
@@ -251,9 +393,18 @@ def pdf_to_text_stream(
                 continue
 
             courier_frac = block_courier_frac(block, cfg, page_height)
+            is_prose = courier_frac < cfg.courier_code_threshold
 
             # ----- Code block -----
-            if courier_frac >= cfg.courier_code_threshold:
+            if not is_prose:
+                # Accumulate into the pending code run. Consecutive Courier
+                # blocks (a single listing split by the PDF) are flushed together
+                # as ONE fenced block by flush_code(), which is called whenever a
+                # non-code block is encountered (see below) and at end-of-page /
+                # end-of-document. This keeps one logical listing intact instead
+                # of emitting it as multiple fenced blocks that P2 would have to
+                # re-merge (and could not, once a misclassified line broke the run).
+                flush_pending()  # code cannot follow a half-finished prose para
                 lang = detect_code_lang(
                     " ".join(
                         cleaned_line_text(ln, cfg, page_height)
@@ -264,23 +415,19 @@ def pdf_to_text_stream(
                 for ln in non_header_lines:
                     txt = "".join(s["text"] for s in ln["spans"] if not is_header_span(s, page_height, cfg))
                     code_lines.append(txt.rstrip())
-                code = "\n".join(code_lines).rstrip()
-                if prev_was_code:
-                    # merge adjacent code blocks of the same language (P2 also
-                    # merges same-language fences; avoid double blank gaps)
-                    out.append(code)
-                    out.append("")
+                if pending_code is None:
+                    pending_code = []
+                    pending_code_lang = lang
                 else:
-                    out.append(f"```{lang}")
-                    out.append(code)
-                    out.append("```")
-                    out.append("")
-                prev_was_code = True
+                    # A new language in the run is unexpected (same listing); keep
+                    # the first detected language to avoid splitting the fence.
+                    pass
+                pending_code.extend(code_lines)
                 continue
 
-            prev_was_code = False
-
             # ----- Prose / heading block -----
+            # A non-code block ends any pending code run: flush it as one fence.
+            flush_code()
             line_texts = []
             for ln in non_header_lines:
                 txt = cleaned_line_text(ln, cfg, page_height)
@@ -314,6 +461,7 @@ def pdf_to_text_stream(
             if len(line_texts) == 1:
                 h = classify_heading(line_texts[0])
                 if h and len(line_texts[0]) < 80:
+                    flush_pending()
                     out.append(h + line_texts[0])
                     out.append("")
                     continue
@@ -321,11 +469,39 @@ def pdf_to_text_stream(
             if cfg.merge_paragraphs:
                 para = " ".join(line_texts)
                 para = re.sub(r"\s+", " ", para).strip()
-                out.append(para)
-                out.append("")
+                # Cross-block paragraph merge: the PDF often splits one logical
+                # paragraph across multiple text blocks (e.g. because a figure or
+                # formula sits between two halves). P1 only merged physical lines
+                # INSIDE a block, so such splits leaked into the Markdown as two
+                # separate paragraphs with a hard break. Here we fold a following
+                # prose block into the pending one when it is clearly a sentence
+                # continuation: previous block did NOT end with sentence-final
+                # punctuation, and the current block starts lowercase. A length
+                # floor avoids merging short chapter-outline list items (e.g.
+                # "tokenizing text", "approach") that the PDF legitimately sets as
+                # separate lines after "This chapter covers".
+                if pending_prose is not None and _is_two_line_heading(
+                    pending_prose, para
+                ):
+                    # Two-line chapter title wrapped across blocks -> one heading.
+                    out.append("### " + pending_prose + " " + para)
+                    out.append("")
+                    pending_prose = None
+                elif pending_prose is not None and _should_merge_prose(
+                    pending_prose, para
+                ):
+                    pending_prose = pending_prose + " " + para
+                else:
+                    flush_pending()
+                    pending_prose = para
             else:
+                flush_pending()
                 out.extend(line_texts)
                 out.append("")
+
+    # Flush any trailing code run / paragraph at end of document.
+    flush_code()
+    flush_pending()
 
     doc.close()
     return "\n".join(out)
