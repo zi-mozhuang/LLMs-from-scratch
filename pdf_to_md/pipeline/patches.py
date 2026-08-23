@@ -11,7 +11,9 @@
 所有补丁按内容特征定位、幂等可重跑；逻辑与阈值原样保留。
 """
 
+import json
 import re
+from pathlib import Path
 
 import pymupdf
 
@@ -19,27 +21,48 @@ from mdlib import config
 
 ANCHOR_RE = re.compile(r'^<a id="[^"]+"></a>$')
 
+# 内容重建数据与锚点逻辑分离：文案在 patches_data.json（含 PDF 来源页注释），
+# 定位/替换逻辑在本文件。修正重建内容只改数据文件。
+_DATA_PATH = Path(__file__).resolve().parent / "patches_data.json"
+with open(_DATA_PATH, encoding="utf-8") as _f:
+    PATCHES_DATA = json.load(_f)
+
 
 # ===========================================================================
 # 搬运自 fix_missing_sections.py
 # ===========================================================================
-# §7.4 开头段（依据 PDF 物理页 245 原文重建，行内代码已加反引号）。
-SECTION_74_OPENING = (
-    "We have completed several stages to implement an `InstructionDataset` class and a "
-    "`custom_collate_fn` function for the instruction dataset. As shown in figure 7.14, we "
-    "are ready to reap the fruits of our labor by simply plugging both `InstructionDataset` "
-    "objects and the `custom_collate_fn` function into PyTorch data loaders. These loaders"
-)
+# §7.4 开头段与丢失的 device 初始化代码块：文案见 patches_data.json
+# （依据 PDF 物理页 245/246 原文重建，行内代码已加反引号）。
+SECTION_74_OPENING = PATCHES_DATA["section_74_opening"]
+DEVICE_CODE = list(PATCHES_DATA["device_code"])
 
-# §7.4 丢失的 device 初始化代码块（依据 PDF 物理页 246）。
-DEVICE_CODE = [
-    "```python",
-    'device = torch.device("cuda" if torch.cuda.is_available() else "cpu")',
-    "# if torch.backends.mps.is_available():",
-    '#     device = torch.device("mps")',
-    'print("Device:", device)',
-    "```",
-]
+# 截图式代码图（Fig 3.9/3.16/5.7/6.5/6.6）：书版把代码只画进矢量图、
+# 文本层无对应文字，正文引导语悬空。从 PNG 逐字转录重建（2025-08）。
+FIGURE_CODE_REBUILDS = PATCHES_DATA["figure_code_rebuilds"]
+
+
+def fix_figure_code_gaps(lines: list) -> int:
+    """截图式代码图的内容重建：在引导语锚点行后插入图内独有代码围栏
+    （可选 output 段：代码运行输出一并重建）。幂等：锚点后下一非空行
+    已是围栏则跳过；锚点须全书唯一（计数守卫）。"""
+    n = 0
+    for spec in FIGURE_CODE_REBUILDS:
+        anchor, code = spec["anchor"], spec["code"]
+        hits = [i for i, l in enumerate(lines) if anchor in l]
+        if len(hits) != 1:
+            continue  # 锚点不唯一/缺失：放弃（不误插）
+        i = hits[0]
+        j = i + 1
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+        if j < len(lines) and lines[j].strip().startswith("```"):
+            continue  # 已重建
+        insert = ["", "```python"] + code + ["```"]
+        if spec.get("output"):
+            insert += ["", "```text"] + spec["output"] + ["```"]
+        lines[i + 1:i + 1] = insert
+        n += 1
+    return n
 
 
 def fix_54_heading(lines: list) -> int:
@@ -110,38 +133,42 @@ def apply_missing_sections(lines: list) -> list:
     fix_74_heading(lines)
     fix_74_opening(lines)
     fix_74_device_code(lines)
+    fix_figure_code_gaps(lines)
     return lines
 
 
 # ===========================================================================
 # 搬运自 fix_structure.py（run_pseudo 伪标题/损坏区 pass）
 # ===========================================================================
-# --- macOS callout 重建（依据 PDF 物理页 304 原文） ---
-MACOS_CALLOUT = [
-    "> **PyTorch on macOS**",
-    ">",
-    "> On an Apple Mac with an Apple Silicon chip (like the M1, M2, M3, or newer models) "
-    "instead of a computer with an Nvidia GPU, you can change "
-    '`device = torch.device("cuda" if torch.cuda.is_available() else "cpu")` to '
-    '`device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")` '
-    "to take advantage of this chip.",
-]
+# --- macOS callout 重建（依据 PDF 物理页 304 原文；文案见 patches_data.json） ---
+MACOS_CALLOUT = list(PATCHES_DATA["macos_callout"])
 
 
 def fix_macos_callout(lines: list) -> int:
-    """重建被切断的 PyTorch on macOS 引用块，并删除伪标题 'to to take...'。"""
-    if any("to take advantage of this chip" in l and l.startswith(">") for l in lines):
-        return 0
-    start = next((i for i, l in enumerate(lines) if l.strip() == "> **PyTorch on macOS**"), None)
+    """重建被切断/缺内联代码的 PyTorch on macOS 引用块。
+
+    覆盖两种病史形态：
+    - 旧链伪标题形态：引用块后跟 '### to to take advantage of this chip'
+    - 框碎片合并形态（merge_box_fragments）：连续引用块内缺两个 device
+      内联代码跨度（Courier 片段在提取期丢失，正文残留双 'to'）
+    幂等：引用块已含 mps 代码跨度则跳过。"""
+    start = next((i for i, l in enumerate(lines)
+                  if l.strip() == "> **PyTorch on macOS**"), None)
     if start is None:
         return 0
-    end = next((i for i, l in enumerate(lines)
-                if l.startswith("### to to take advantage of this chip")), None)
-    if end is None:
-        return 0
-    # 删除伪标题前的锚点行
-    seg_end = end + 1
-    lines[start:seg_end] = MACOS_CALLOUT
+    end = start + 1
+    while end < len(lines) and lines[end].lstrip().startswith(">"):
+        end += 1
+    segment = lines[start:end]
+    if any('torch.backends.mps.is_available' in l for l in segment):
+        return 0  # 已是完整版（含内联代码），幂等跳过
+    lines[start:end] = list(MACOS_CALLOUT)
+    # 旧链伪标题残留（紧跟空行后）一并删除
+    j = end
+    while j < len(lines) and lines[j].strip() == "":
+        j += 1
+    if j < len(lines) and lines[j].startswith("### to to take advantage"):
+        del lines[end:j + 1]
     return 1
 
 
@@ -195,7 +222,7 @@ def fix_figure_e1_leak(lines: list) -> int:
     start = next((i for i, l in enumerate(lines)
                   if l.startswith("Figure E.1 illustrates")), None)
     end = next((i for i, l in enumerate(lines)
-                if l.strip().startswith(("**Figure E.1", "Figure E.1 A comparison"))), None)
+                if l.strip().startswith(("*Figure E.1", "**Figure E.1", "Figure E.1 A comparison"))), None)
     if start is None or end is None or end <= start:
         return 0
     n = 0
@@ -275,26 +302,13 @@ def fix_evaluation_section(lines: list) -> int:
     rebuilt = [
         lines[s],  # Most importantly, ... 段保留
         "",
-        "- Short-answer and multiple-choice benchmarks, such as Measuring Massive Multitask "
-        "Language Understanding (MMLU; https://arxiv.org/abs/2009.03300), which test the "
-        "general knowledge of a model.",
-        "- Human preference comparison to other LLMs, such as LMSYS chatbot arena "
-        "(https://arena.lmsys.org).",
-        "- Automated conversational benchmarks, where another LLM like GPT-4 is used to "
-        "evaluate the responses, such as AlpacaEval (https://tatsu-lab.github.io/alpaca_eval/).",
+        *PATCHES_DATA["evaluation_bullets"],
         "",
-        "In practice, it can be useful to consider all three types of evaluation methods: "
-        "multiple-choice question answering, human evaluation, and automated metrics that "
-        "measure conversational performance. However, since we are primarily interested in "
-        "assessing conversational performance rather than just the ability to answer "
-        "multiple-choice questions, human evaluation and automated metrics may be more relevant.",
+        PATCHES_DATA["evaluation_in_practice"],
         "",
-        "> **Conversational performance**",
+        f"> {PATCHES_DATA['conversational_quote_title']}",
         ">",
-        "> Conversational performance of LLMs refers to their ability to engage in human-like "
-        "communication by understanding context, nuance, and intent. It encompasses skills "
-        "such as providing relevant and coherent responses, maintaining consistency, and "
-        "adapting to different topics and styles of interaction.",
+        f"> {PATCHES_DATA['conversational_quote_body']}",
     ]
     lines[s:e + 1] = rebuilt
     return 1
@@ -404,7 +418,7 @@ def fix_figure_e_captions(lines: list) -> int:
     for i, l in enumerate(lines):
         m = re.match(r"^Figure (E\.\d) (.+)$", l.strip())
         if m and "illustrates" not in l and "plots" not in l:
-            lines[i] = f"**Figure {m.group(1)}** {m.group(2)}"
+            lines[i] = f"*Figure {m.group(1)}* {m.group(2)}"
             n += 1
     return n
 
@@ -454,25 +468,16 @@ def fix_table_1_1(lines: list) -> int:
     """
     if any(l.startswith("| Dataset name |") for l in lines):
         return 0
-    header = "Dataset name Dataset description Number of tokens Proportion in training data"
+    t11 = PATCHES_DATA["table_1_1"]
     s = next((i for i, l in enumerate(lines)
-              if l.strip() == header), None)
+              if l.strip() == t11["first_row_anchor"]), None)
     if s is None:
         return 0
     e = next((i for i, l in enumerate(lines)
-              if l.strip() == "Wikipedia High-quality text 3 billion 3%"), None)
+              if l.strip() == t11["last_row_anchor"]), None)
     if e is None or e < s:
         return 0
-    table = [
-        "| Dataset name | Dataset description | Number of tokens | Proportion in training data |",
-        "|---|---|---|---|",
-        "| CommonCrawl (filtered) | Web crawl data | 410 billion | 60% |",
-        "| WebText2 | Web crawl data | 19 billion | 22% |",
-        "| Books1 | Internet-based book corpus | 12 billion | 8% |",
-        "| Books2 | Internet-based book corpus | 55 billion | 8% |",
-        "| Wikipedia | High-quality text | 3 billion | 3% |",
-    ]
-    lines[s:e + 1] = table
+    lines[s:e + 1] = list(t11["lines"])
     return 1
 
 
@@ -618,9 +623,15 @@ OUT_DIR = "extracted_images/figures"
 
 
 def _find_captions(doc) -> list:
-    """返回 (页号, 'E.N', caption bbox)。"""
+    """返回 (页号, 'E.N', caption bbox)。
+
+    先用 search_for 做页级预筛（C 侧文本搜索，远快于逐页 get_text("dict")
+    解析；实测全书 2.2s → <0.3s），仅命中的页面再走原 dict 判定，
+    结果与原实现一致。"""
     caps = []
     for pno in range(len(doc)):
+        if not doc[pno].search_for("Figure E."):
+            continue
         for b in doc[pno].get_text("dict")["blocks"]:
             if b["type"] != 0:
                 continue
@@ -654,17 +665,30 @@ def _figure_region(page, cap) -> pymupdf.Rect:
 
 
 def _render_appendix_figures() -> dict:
-    """渲染每个图，返回 {'E.1': 相对路径}（幂等：已存在则跳过渲染）。"""
+    """渲染每个图，返回 {'E.1': 相对路径}。
+
+    幂等两级：目录里 E.1–E.5 PNG 齐全时直接由文件名重建映射返回
+    （省去全 doc caption 扫描 ~2s）；缺哪个才打开 PDF 补渲染。"""
     import os
+    import re as _re
     from pathlib import Path
     outdir = Path(config.PDF_PATH).resolve().parent / OUT_DIR
-    outdir.mkdir(parents=True, exist_ok=True)
+    cached = {}
+    if outdir.exists():
+        for f in outdir.iterdir():
+            m = _re.fullmatch(r"Fig(E[1-5])_p(\d+)\.png", f.name)
+            if m:
+                tag = f"{m.group(1)[0]}.{m.group(1)[1]}"
+                cached.setdefault(tag, f"{OUT_DIR}/{f.name}")
+    need = {f"E.{n}" for n in range(1, 6)} - set(cached)
+    if not need:
+        return cached
     doc = pymupdf.open(str(config.PDF_PATH))
     caps = _find_captions(doc)
     assert len(caps) >= 5, f"caption 发现不足: {len(caps)}"
     mat = pymupdf.Matrix(3, 3)
-    out = {}
-    seen = set()
+    out = dict(cached)
+    seen = set(cached)
     for pno, tag, cap in caps:
         if tag in seen:
             continue

@@ -75,7 +75,7 @@ def scan(lines):
         不是断行缺陷（如 'idx is a (batch...)'、'New tokenized sample'）。"""
         for k in range(max(0, i - 3), min(len(lines), i + 4)):
             s = lines[k].strip()
-            if s.startswith(("```", "**Figure", "**Listing", "**Table", "![")):
+            if s.startswith(("```", "**Figure", "*Figure", "**Listing", "**Table", "![")):
                 return True
         return False
 

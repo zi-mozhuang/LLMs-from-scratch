@@ -4,7 +4,7 @@
 - source : "rendered"（figures/ 区域渲染图）| "embedded"（embedded/ 原生位图）
 - bytes  : 文件字节数
 - md5    : 文件内容哈希（跨路径去重依据）
-- caption: 来自最终 MD 的图注文本（![Fig X.Y] 链接后的 **Figure X.Y** 行）
+- caption: 来自最终 MD 的图注文本（![Fig X.Y] 链接后的斜体 *Figure X.Y* 行，兼容旧加粗形态）
 
 原则：只增不改既有键；无变化不落盘（幂等）；不做任何删除/过滤
 （装饰图标等由 verify 的体积检查报告，不在提取层静默丢弃）。
@@ -33,7 +33,7 @@ def _captions_from_md(md_text: str) -> dict:
             nxt = lines[j].strip()
             if not nxt:
                 continue
-            if nxt.startswith("**Figure ") and "**" in nxt[2:]:
+            if nxt.startswith(("*Figure ", "**Figure ")) and "*" in nxt[1:]:
                 caps[fig_id] = nxt
             break
     return caps

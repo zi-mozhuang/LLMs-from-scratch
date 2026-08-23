@@ -1,0 +1,3 @@
+# md_lint 基线：存量可容忍违规（RULE|detail）。由 --update-baseline 生成。
+R6|Combines heads, where self.d_out = self.num_heads * self.hea
+R8|连续空行>=3

@@ -80,10 +80,34 @@ def _max_size(block: dict) -> float:
 
 
 def is_figure_text(block: dict, rects, union, page_height: float,
-                   page_width: float = None, font_guard: bool = True) -> bool:
-    """Decide whether a text block lives inside a figure (-> drop)."""
-    if not rects:
+                   page_width: float = None, font_guard: bool = True,
+                   burned_rects=None) -> bool:
+    """Decide whether a text block lives inside a figure (-> drop).
+
+    burned_rects：附录 E 图的烘焙区域（由图注锚点生长，与渲染 PNG 同一
+    区域）。中心落在其中的块无条件判图内文字——它们必然已烘进 PNG；
+    不受 glossary/sentence 守卫保护（FigE.1 事故：Outputs/Pretrained/
+    Weight update 等 ≤4 纯字母词标签被 Term-glossary 守卫放行）。
+    """
+    if not rects and not burned_rects:
         return False
+    # 烘焙区判定先行于一切内容守卫（按构造成立，无内容歧义）
+    if burned_rects:
+        bb0 = fitz.Rect(block["bbox"])
+        cx0, cy0 = (bb0.x0 + bb0.x1) / 2, (bb0.y0 + bb0.y1) / 2
+        if any(r.contains(fitz.Point(cx0, cy0)) for r in burned_rects):
+            return True
+        # 近邻分支：轴标签可能落在"区域下缘 ↔ 图注"的间隙里
+        # （实测 E.2 的 Inputs 距区域下缘 29.6pt）。仅限短块（≤30 字符），
+        # 图注/正文引用均超长，不会误伤。
+        raw0 = " ".join(s["text"] for l in block.get("lines", [])
+                        for s in l["spans"]).strip()
+        if len(raw0) <= 30:
+            for r in burned_rects:
+                dx = max(r.x0 - bb0.x1, bb0.x0 - r.x1, 0)
+                dy = max(r.y0 - bb0.y1, bb0.y0 - r.y1, 0)
+                if (dx * dx + dy * dy) ** 0.5 < 30.0:
+                    return True
     # Decorative large text (cover title / author / chapter heading) is never
     # figure-internal art, even if it overlaps a drawn frame.
     if _max_size(block) > MAX_FIGTEXT_SIZE:

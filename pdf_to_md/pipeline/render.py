@@ -1,6 +1,6 @@
 """pipeline.render — 块 → Markdown（从 p2_clean / fix_line_continuity / rebuild_toc / p3_toc 原样搬运）。
 
-渲染顺序（pdf-to-md-plan.md §3）：
+渲染顺序（pdf-to-md-plan.md「文本转换规则速查」）：
 1. 各 kind → 文本行（heading 加 `#`×(level+1)、code 包围栏、concept_box/note/exercise 加 `>`、
    listing_caption 加粗、figure_caption 加粗、bullet 加 `- `）；
 2. 图链接插入：insert_figures + load_figure_map + dedupe_figures；
@@ -32,6 +32,7 @@ PUA_MAP = config.PUA_MAP
 
 FIG_RE = re.compile(r"^Figure (\d+\.\d+)\b")
 FIG_LINE_RE = re.compile(r"^!\[Fig [^\]]+\]\(([^)]+)\)$")
+IMG_MD_LINE_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)$")
 CAP_RE = re.compile(r"^(Figure|Table|Listing) (\d+\.\d+) (.+)$")
 EXERCISE_RE = re.compile(r"^Exercise (\d+)\.(\d+)\b\s*(.*)$")
 LIST_MARKER_RE = re.compile(r"^[–•]\s+(.*)$")
@@ -67,6 +68,23 @@ def insert_figures(lines: list, fig_map: dict) -> list:
             rel = fig_map[m.group(1)]
             out.append(f"![Fig {m.group(1)}](extracted_images/{rel})")
         out.append(line)
+    return out
+
+
+def fix_image_hard_breaks(lines: list) -> list:
+    """图片行后紧跟非空行时补两个空格硬换行（GFM 语义）。
+
+    无硬换行时 `![Fig]` 与下一行（图注/正文）在 CommonMark 下并段渲染成一行。
+    必须在 build(TOC) 之后调用，避免被后续 pass 的 rstrip 抹掉。
+    对应 md_lint R1；见 attachments/md-lint.md。
+    """
+    out = []
+    for i, line in enumerate(lines):
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        if IMG_MD_LINE_RE.match(line) and nxt.strip():
+            out.append(line.rstrip() + "  ")
+        else:
+            out.append(line)
     return out
 
 
@@ -132,23 +150,9 @@ def normalize_list_markers(lines: list) -> list:
     return out
 
 
-def concept_boxes_to_blockquote(lines: list) -> list:
-    out = []
-    buf = []
-    for line in lines:
-        if "\uf0a1" in line:
-            buf.append(line.replace("\uf0a1", "").strip())
-        else:
-            if buf:
-                out.extend("> " + b for b in buf if b)
-                out.append("")
-                buf = []
-            out.append(line)
-    if buf:
-        out.extend("> " + b for b in buf if b)
-        out.append("")
-    return out
-
+# concept_boxes_to_blockquote 已删除：PUA bullet 在上游各 kind 渲染时消净
+# （callout 剥离、concept_box bodies 排除、bullet 去 Wingdings），此行级
+# 兜底为旧链遗迹；A/B 禁用后输出逐字节一致（2025-08 审计）。
 
 def bold_captions(lines: list) -> list:
     out = []
@@ -159,6 +163,9 @@ def bold_captions(lines: list) -> list:
             first_word = rest.split(" ", 1)[0]
             if first_word and first_word[0].islower():
                 out.append(line)
+            elif kind == "Figure":
+                # 图注斜体（出版排版惯例，区别于正文；Table/Listing 保持加粗）
+                out.append(f"*{kind} {num}* {rest}")
             else:
                 out.append(f"**{kind} {num}** {rest}")
         else:
@@ -273,6 +280,10 @@ FIXED_WORDS = {
 
 def _join_split(m: re.Match) -> str:
     """搬运 fix_structure.py 第 838-841 行。"""
+    # 悬挂连字符守卫："X- and Y-" 并列悬挂式是合法原样，不是断词
+    # （与 merge._dehyphen_replace 同规则；time- and / GPT- and / CPU- and）
+    if m.group(2).lower() in ("and", "or", "nor", "to"):
+        return m.group(0)
     if m.group(1) in KEEP_HYPHEN:
         return f"{m.group(1)}-{m.group(2)}"
     return m.group(1) + m.group(2)
@@ -485,9 +496,19 @@ def _block_to_lines(block) -> list:
         lines = []
         if title:
             lines.append(f"> **{title}**")
-            lines.append(">")
-        for b in bodies:
-            lines.append(f"> {b}")
+        for idx, body in enumerate(bodies):
+            if lines:
+                lines.append(">")  # 段间以 ">" 延续引用（整框单一视觉块，不碎裂）
+            # typed body：框内代码 → GFM 引用内围栏（空行用 ">" 保持盒子连续）
+            if isinstance(body, dict) and body.get("t") == "code":
+                lang = body.get("lang") or "python"
+                lines.append(f"> ```{lang}")
+                for cl in body["v"].split("\n"):
+                    lines.append(f"> {cl}" if cl.strip() else ">")
+                lines.append("> ```")
+            else:
+                v = body["v"] if isinstance(body, dict) else body
+                lines.append(f"> {v}")
         if not lines:
             lines.append(f"> {t}")
         lines.append("")
@@ -510,7 +531,17 @@ def _block_to_lines(block) -> list:
         return [f"> {body}", ""]
 
     if k == "exercise":
-        return [f"> **{t}**", ""]
+        # 单一练习框：标题行加粗；同框多段（merge_box_fragments 吸收的
+        # 练习正文）以 ">" 分隔延续同一引用块。行级 format_exercises 只处理
+        # 裸 "^Exercise N.N" 行（补丁注入内容），对 "> " 开头的渲染结果不生效。
+        parts = [p for p in (x.strip() for x in t.split("\n")) if p]
+        head = parts[0] if parts else t.strip()
+        lines = [f"> **{head}**"]
+        for p in parts[1:]:
+            lines.append(">")
+            lines.append(f"> {p}")
+        lines.append("")
+        return lines
 
     if k == "listing_caption":
         # 搬运旧链路径：p1 输出普通行，p2 bold_captions 的 CAP_RE 统一加粗；
@@ -522,6 +553,18 @@ def _block_to_lines(block) -> list:
         # 折叠同块多行为单行（等价旧链 p1 段落合并；bold_captions 依赖单行匹配）
         t = " ".join(t.split("\n")).strip()
         return [f"{t}", ""]
+
+    if k == "summary_list":
+        # 章末 Summary：Wingdings 圆点列表 → Markdown 无序列表（merge_summary_items
+        # 已把折行续块并入 items；一级 "- "，二级两个空格缩进 "  - "）。
+        # 不再走旧链 callout 的 "> " 引用块语义。
+        items = block.meta.get("items") or [[1, t.replace("\uf0a1", "").strip()]]
+        lines = []
+        for lvl, txt in items:
+            pad = "" if lvl == 1 else "  "
+            lines.append(f"{pad}- {txt}")
+        lines.append("")
+        return lines
 
     if k == "bullet":
         # 去掉 Wingdings 字符
@@ -563,9 +606,6 @@ def render(blocks: list, manifest_path) -> str:
     lines = [fix_math(l) for l in lines]
     lines = [fix_text_noise(l) for l in lines]
 
-    # 概念框 blockquote（PUA bullet 已无，但保留调用以兼容可能的残留）
-    lines = concept_boxes_to_blockquote(lines)
-
     # 列表标记归一（断词后）
     lines = normalize_list_markers(lines)
 
@@ -603,6 +643,9 @@ def render(blocks: list, manifest_path) -> str:
     # 步骤 7：TOC + 锚点
     # 使用 rebuild_toc.build（文档顺序，含附录上下文）
     lines = build(lines)
+
+    # 步骤 7.5：图片行硬换行（GFM；TOC 之后执行防被 rstrip 抹掉）
+    lines = fix_image_hard_breaks(lines)
 
     text = "\n".join(lines)
 

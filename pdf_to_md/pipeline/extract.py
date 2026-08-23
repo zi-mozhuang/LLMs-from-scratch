@@ -11,7 +11,10 @@ is_header_span / block_courier_frac / is_figure_text 调用约定。
 """
 
 import fitz
+import hashlib
 import json
+import os
+import pickle
 from collections import defaultdict
 from pathlib import Path
 
@@ -43,6 +46,33 @@ def _manifest_clips():
 
 
 _FIGURE_CAPTION_RE = re.compile(r"^\*{0,2}Figure\s+\d+\.\d+\b")
+
+# 附录 E 图注（patches._render_appendix_figures 同判据：前缀匹配 +
+# 余词大写开头，区分正文引用 "Figure E.1 illustrates/plots..."。
+# 注意不用 \b：实际文本 "Figure E.1A comparison" 数字后紧跟字母无边界）
+_APPENDIX_CAP_RE = re.compile(r"^\*{0,2}Figure (E\.\d)")
+
+
+def _appendix_fig_rects(page) -> list:
+    """检测页内附录 E 图注，返回其上方图形区域的 Rect 列表。
+
+    区域生长逻辑复用 pipeline.patches._figure_region（渲染与剔除必须
+    用同一区域，保证"已烘进 PNG 的文字"判定一致）。
+    """
+    from pipeline.patches import _figure_region
+    rects = []
+    for b in page.get_text("dict")["blocks"]:
+        if b["type"] != 0 or "lines" not in b:
+            continue
+        txt = "".join(s["text"] for ln in b["lines"]
+                      for s in ln["spans"]).strip()
+        m = _APPENDIX_CAP_RE.match(txt)
+        if not m:
+            continue
+        rest = txt[len(m.group(0)):].strip()
+        if rest and rest[0].isupper() and len(rest) > 5:
+            rects.append(_figure_region(page, fitz.Rect(b["bbox"])))
+    return rects
 
 
 def _is_header_span_like(span: dict, page_height: float) -> bool:
@@ -104,13 +134,46 @@ def _detect_toc_pages(doc) -> set:
     return set(range(first_toc, after_toc))
 
 
-def extract_book(pdf_path) -> list:
+def _cache_paths(pdf_path: str) -> tuple:
+    """提取缓存文件与失效键。
+
+    键 = PDF (mtime_ns,size) + manifest 的 clips 相关内容摘要。
+    manifest 不能用 mtime：enrich_manifest 每次运行都补写元数据，
+    会把缓存永久打穿；真正影响提取的只有 figures[].page/clip 字段。"""
+    cache_dir = config.PDF_PATH.parent / ".cache"
+    try:
+        st = os.stat(pdf_path)
+        digest = ""
+        if config.MANIFEST_PATH.exists():
+            data = json.loads(config.MANIFEST_PATH.read_text(encoding="utf-8"))
+            clips = [[e.get("page"), e.get("clip")]
+                     for e in data.get("figures", [])]
+            digest = hashlib.md5(
+                json.dumps(clips, sort_keys=True).encode()).hexdigest()
+        stamp = (st.st_mtime_ns, st.st_size, digest)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return cache_dir / "pages.pkl", None
+    return cache_dir / "pages.pkl", stamp
+
+
+def extract_book(pdf_path, use_cache: bool = True) -> list:
     """打开 PDF 一次，逐页填充 Page/Block。返回 list[Page]。
 
     Page 额外挂载动态属性 .drawings（list of (fill_tuple, fitz.Rect)），
     供 classify 阶段使用（IR 的 Page dataclass 不扩展字段，避免破坏结构）。
-    """
+
+    提取结果按 (PDF mtime/size, manifest mtime/size) 键控 pickle 缓存于
+    .cache/pages.pkl：全书解析 ~5s，命中加载 ~0.1s；PDF 或 manifest 变更、
+    缓存损坏时自动回退全量提取（use_cache=False 强制）。"""
     pdf_path = str(pdf_path)
+    cache_file, stamp = _cache_paths(pdf_path)
+    if use_cache and stamp is not None and cache_file.exists():
+        try:
+            blob = pickle.loads(cache_file.read_bytes())
+            if isinstance(blob, dict) and blob.get("stamp") == stamp:
+                return blob["pages"]
+        except Exception:
+            pass  # 缓存损坏/不兼容 → 全量重提取
     doc = fitz.open(pdf_path)
     page_heights = {p: doc[p].rect.height for p in range(len(doc))}
     toc = doc.get_toc()  # 全文档一次
@@ -146,14 +209,25 @@ def extract_book(pdf_path) -> list:
             for r in fig_rects:
                 fig_union = r if fig_union is None else fig_union | r
             fig_font_guard = False
+            burned_rects = None
         else:
             fig_rects, fig_union = page_element_regions(page)
             fig_rects = [r for r in fig_rects if not r.is_empty and r.width * r.height >= 16.0]
+            # 附录 E 图：patches 渲染、不在 manifest clips 内，但同样"烘进 PNG"。
+            # 检测页内 ^Figure E.N 图注并生长图区域，作为 burned_rects 传入——
+            # 区域内块无条件剔除，不受 glossary/sentence 守卫保护
+            # （FigE.1 事故：Outputs/Pretrained 等单词标签泄漏正文流）。
+            extra = _appendix_fig_rects(page)
+            if extra:
+                burned_rects = extra
+                fig_rects = list(fig_rects) + extra
+            else:
+                burned_rects = None
             fig_union = None
             for r in fig_rects:
                 fig_union = r if fig_union is None else fig_union | r
-            # 无 manifest 图的页面不存在"烘进 PNG 的文字"，
-            # 字体守卫在此纯误杀边注/清单标签（审计三类丢失根源），一并关闭
+            # 字体守卫关闭（审计三类系统性丢失：误杀边注/清单标签）；
+            # 附录 E 页的标签由上方并入的区域按相交规则剔除。
             fig_font_guard = False
 
         p = Page(index=pno, height=page_height)
@@ -183,8 +257,11 @@ def extract_book(pdf_path) -> list:
                 continue
 
             # manifest 模式精判：块内过半行中心落在 clip 内 -> 已烘进 PNG，
-            # 整块剔除（块级中心判定会漏掉跨宽标签块，如 'Model input…'）
-            if pno in manifest_clips and block.get("lines"):
+            # 整块剔除（块级中心判定会漏掉跨宽标签块，如 'Model input…'）。
+            # 图注/图引用块豁免（同 Fig7.8 哲学，见 attachments/extract-robustness.md）：P0 区域生长可能过度包含
+            # （如 Fig6.5 p195 吞掉图注与正文引用、Fig7.11 p241 clip 近整页），
+            # 不能因 clip 覆盖而丢 "Figure X.Y" 文本——它是图文合成锚点+完备性基准。
+            if not is_figcap and pno in manifest_clips and block.get("lines"):
                 _cl = manifest_clips[pno]
                 _in = [ln for ln in block["lines"]
                        if any(r.contains(fitz.Point((ln["bbox"][0] + ln["bbox"][2]) / 2,
@@ -192,9 +269,18 @@ def extract_book(pdf_path) -> list:
                               for r in _cl)]
                 if _in and len(_in) >= max(1, len(block["lines"]) // 2):
                     continue
-            # 剔除图内文字（避免与渲染 PNG 重复）
+            # 剔除图内文字（避免与渲染 PNG 重复）。
+            # 以 Figure E.N 起头的块（图注/正文引用）豁免烘焙区剔除：
+            # 其所在块的 bbox 常上探进图区域使块中心落入区内，整块剔除
+            # 会连图注一起丢（FigE.1 曾因此从 MD 消失）。
+            burned = burned_rects
+            if burned is not None and block.get("lines"):
+                first_txt = "".join(s["text"] for s in block["lines"][0]["spans"]).strip()
+                if _APPENDIX_CAP_RE.match(first_txt):
+                    burned = None
             if is_figure_text(block, fig_rects, fig_union, page_height,
-                              page.rect.width, font_guard=fig_font_guard):
+                              page.rect.width, font_guard=fig_font_guard,
+                              burned_rects=burned):
                 continue
 
             # 把原始行/span 信息存入 Block 的 meta，供 classify 使用。
@@ -250,4 +336,13 @@ def extract_book(pdf_path) -> list:
         pages.append(p)
 
     doc.close()
+    # best-effort 写缓存（use_cache 仅控制读，写入始终尝试以刷新失效缓存）：失败不影响提取结果
+    if stamp is not None:
+        try:
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = cache_file.with_suffix(".pkl.tmp")
+            tmp.write_bytes(pickle.dumps({"stamp": stamp, "pages": pages}))
+            tmp.replace(cache_file)
+        except Exception:
+            pass
     return pages

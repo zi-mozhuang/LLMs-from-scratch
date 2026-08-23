@@ -46,6 +46,9 @@ KNOWN_BREAKS = {
     "post- erior": "posterior",
     "post- processing": "post-processing",
     "re- cur": "recur",
+    # Listing 旁注归位时发现的断词损坏（2025-08，listing callout 审计）
+    "nexttoken": "next-token",
+    "jsonformatted": "json-formatted",
 }
 
 # 句间连接词：行尾出现则下一行为续行（fix_line_continuity.py 第 55-65 行）。

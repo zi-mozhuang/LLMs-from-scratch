@@ -1,0 +1,129 @@
+{
+  "_comment": [
+    "pipeline.patches 的内容重建数据（锚点逻辑在 patches.py，文案在此）。",
+    "依据 PDF 物理页原文逐字核对的一次性重建内容；修正文案只改本文件。",
+    "来源页：section_74=p246、macos_callout=p304、evaluation/conversational=p258、table_1_1=p33。"
+  ],
+  "section_74_opening": "We have completed several stages to implement an `InstructionDataset` class and a `custom_collate_fn` function for the instruction dataset. As shown in figure 7.14, we are ready to reap the fruits of our labor by simply plugging both `InstructionDataset` objects and the `custom_collate_fn` function into PyTorch data loaders. These loaders",
+  "device_code": [
+    "```python",
+    "device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")",
+    "# if torch.backends.mps.is_available():",
+    "#     device = torch.device(\"mps\")",
+    "print(\"Device:\", device)",
+    "```"
+  ],
+  "macos_callout": [
+    "> **PyTorch on macOS**",
+    ">",
+    "> On an Apple Mac with an Apple Silicon chip (like the M1, M2, M3, or newer models) instead of a computer with an Nvidia GPU, you can change `device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")` to `device = torch.device(\"mps\" if torch.backends.mps.is_available() else \"cpu\")` to take advantage of this chip."
+  ],
+  "evaluation_bullets": [
+    "- Short-answer and multiple-choice benchmarks, such as Measuring Massive Multitask Language Understanding (MMLU; https://arxiv.org/abs/2009.03300), which test the general knowledge of a model.",
+    "- Human preference comparison to other LLMs, such as LMSYS chatbot arena (https://arena.lmsys.org).",
+    "- Automated conversational benchmarks, where another LLM like GPT-4 is used to evaluate the responses, such as AlpacaEval (https://tatsu-lab.github.io/alpaca_eval/)."
+  ],
+  "evaluation_in_practice": "In practice, it can be useful to consider all three types of evaluation methods: multiple-choice question answering, human evaluation, and automated metrics that measure conversational performance. However, since we are primarily interested in assessing conversational performance rather than just the ability to answer multiple-choice questions, human evaluation and automated metrics may be more relevant.",
+  "conversational_quote_title": "**Conversational performance**",
+  "conversational_quote_body": "Conversational performance of LLMs refers to their ability to engage in human-like communication by understanding context, nuance, and intent. It encompasses skills such as providing relevant and coherent responses, maintaining consistency, and adapting to different topics and styles of interaction.",
+  "table_1_1": {
+    "first_row_anchor": "Dataset name Dataset description Number of tokens Proportion in training data",
+    "last_row_anchor": "Wikipedia High-quality text 3 billion 3%",
+    "lines": [
+      "| Dataset name | Dataset description | Number of tokens | Proportion in training data |",
+      "|---|---|---|---|",
+      "| CommonCrawl (filtered) | Web crawl data | 410 billion | 60% |",
+      "| WebText2 | Web crawl data | 19 billion | 22% |",
+      "| Books1 | Internet-based book corpus | 12 billion | 8% |",
+      "| Books2 | Internet-based book corpus | 55 billion | 8% |",
+      "| Wikipedia | High-quality text | 3 billion | 3% |"
+    ]
+  },
+  "figure_code_rebuilds": [
+    {
+      "fig": "3.9",
+      "anchor": "achieving this normalization step:",
+      "code": [
+        "attn_weights_2_tmp = attn_scores_2 / attn_scores_2.sum()",
+        "print(\"Attention weights:\", attn_weights_2_tmp)",
+        "print(\"Sum:\", attn_weights_2_tmp.sum())"
+      ],
+      "crop_top": true
+    },
+    {
+      "fig": "3.16",
+      "anchor": "as illustrated in figure 3.16",
+      "code": [
+        "d_k = keys.shape[-1]",
+        "attn_weights_2 = torch.softmax(attn_scores_2 / d_k**0.5, dim=-1)",
+        "print(attn_weights_2)"
+      ],
+      "crop_top": true
+    },
+    {
+      "fig": "5.7",
+      "anchor": "applying the logarithm to the probability scores:",
+      "code": [
+        "log_probas = torch.log(torch.cat((target_probas_1, target_probas_2)))",
+        "print(log_probas)"
+      ],
+      "crop_top": true
+    },
+    {
+      "fig": "6.5",
+      "anchor": "We can load it into a pandas `DataFrame` as follows:",
+      "code": [
+        "import pandas as pd",
+        "df = pd.read_csv(",
+        "    data_file_path, sep=\"\\t\", header=None, names=[\"Label\", \"Text\"]",
+        ")",
+        "df"
+      ],
+      "crop_top": true
+    },
+    {
+      "fig": "6.6",
+      "anchor": "instead of appending the string",
+      "code": [
+        "import tiktoken",
+        "tokenizer = tiktoken.get_encoding(\"gpt2\")",
+        "print(tokenizer.encode(\"<|endoftext|>\", allowed_special={\"<|endoftext|>\"}))"
+      ],
+      "crop_top": true
+    },
+    {
+      "fig": "3.12",
+      "anchor": "instead of only the second one, z(2):",
+      "code": [
+        "attn_scores = torch.empty(6, 6)",
+        "for i, x_i in enumerate(inputs):",
+        "    for j, x_j in enumerate(inputs):",
+        "        attn_scores[i, j] = torch.dot(x_i, x_j)",
+        "print(attn_scores)"
+      ],
+      "crop_top": true
+    },
+    {
+      "fig": "3.22",
+      "anchor": "consisting of 1s for simplicity:",
+      "code": [
+        "torch.manual_seed(123)",
+        "dropout = torch.nn.Dropout(0.5)",
+        "example = torch.ones(6, 6)",
+        "print(dropout(example))"
+      ]
+    },
+    {
+      "fig": "4-mem",
+      "anchor": "in our `GPTModel` object:",
+      "code": [
+        "total_size_bytes = total_params * 4",
+        "total_size_mb = total_size_bytes / (1024 * 1024)",
+        "print(f\"Total size of the model: {total_size_mb:.2f} MB\")"
+      ],
+      "output": [
+        "Total size of the model: 621.83 MB"
+      ]
+    }
+  ]
+}

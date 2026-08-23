@@ -14,8 +14,6 @@ else
     $PY p0_extract_images.py
 fi
 
-echo "=== pipeline: extract → classify → merge → render ==="
-$PY pipeline/run_pipeline.py
-
-echo "=== verify: 完备性对账 ==="
-$PY pipeline/verify.py
+echo "=== pipeline: extract → classify → merge → render → verify ==="
+# --verify：进程内对账（复用页模型 + extract 磁盘缓存，全程只解析一次 PDF）
+$PY pipeline/run_pipeline.py --verify

@@ -6,6 +6,12 @@ KINDS = {"prose", "heading", "code", "callout", "note", "exercise",
          "listing_caption", "figure_caption", "bullet", "concept_box",
          "table", "index", "cover"}
 
+# 同矩形概念框碎片归组（classify._tag_box_membership 打 box_key，
+# merge.merge_box_fragments 合并）：落入同一 CALLOUT_FILL 矩形的相邻块
+# 属于同一视觉容器，允许入组的 kind；heading/code/图注出现即打断归组。
+BOX_GROUP_KINDS = {"concept_box", "callout", "prose", "exercise", "note"}
+BOX_OVERLAP = 0.20  # 与 classify._is_concept_box 同源的重叠阈值
+
 
 @dataclass
 class Block:

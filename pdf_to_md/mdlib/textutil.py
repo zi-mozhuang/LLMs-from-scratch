@@ -10,11 +10,15 @@ import unicodedata
 
 
 def fence_mask(lines: list[str]) -> list[bool]:
-    """Boolean array: True where the line sits inside a fenced code block."""
+    """Boolean array: True where the line sits inside a fenced code block.
+    兼容 GFM 引用内围栏："> ```" 行同样切换状态（CommonMark 语义）。"""
     mask = [False] * len(lines)
     fence = False
     for k, line in enumerate(lines):
-        if line.strip().startswith("```"):
+        s = line.lstrip()
+        if s.startswith(">"):
+            s = s[1:].lstrip()
+        if s.startswith("```"):
             fence = not fence
             continue
         mask[k] = fence

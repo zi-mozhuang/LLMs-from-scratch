@@ -22,7 +22,7 @@ import fitz
 
 from mdlib import config
 from mdlib.textutil import norm, norm_keep_case
-from pipeline.ir import KINDS
+from pipeline.ir import BOX_GROUP_KINDS, BOX_OVERLAP, KINDS
 from pipeline.merge import _should_merge_prose
 
 
@@ -57,6 +57,11 @@ EXERCISE_RE = re.compile(r"^Exercise\s+\d+\.\d+")
 
 # ---- Listing 标题解析（搬运自 collect_listing_headers） ----
 LISTING_HEADER_RE = re.compile(r'(Listing\s+[A-Za-z0-9]+\.\d+)\s*(.*)')
+
+# ---- 同矩形概念框碎片归组（audit_quote_fragmentation 审计结论的结构性修复） ----
+# 落入同一 CALLOUT_FILL 矩形的相邻文本块属于同一视觉容器；
+# PyMuPDF 常把一框切成多 block，逐块渲染会碎成多个分离引用块。
+# kind 集合与重叠阈值：BOX_GROUP_KINDS / BOX_OVERLAP 定义于 ir.py。
 
 
 # --------------------------------------------------------------------------- #
@@ -182,6 +187,106 @@ def _in_covers_rect(block, skip_rects) -> bool:
     return False
 
 
+def _mark_annot_blocks(page_blocks) -> None:
+    """边注/清单注释标签标记：HumanistMann/Arial 小字号块为书旁注本体，
+    禁止被 merge_pending_prose 吸收进无关段落（错位污染治理 P1）。
+    须先于 _mark_listing_callouts 执行（后者依赖 annot 前置条件）。"""
+    for b in page_blocks:
+        sps = (b.meta.get("spans") or [])
+        if b.kind == "prose" and sps:
+            ann = sum(1 for x in sps
+                      if ("HumanistMann" in x["font"] or "Arial" in x["font"])
+                      and x["size"] <= 12.0)
+            if ann >= max(1, len(sps) // 2) and len(b.text) <= 160:
+                b.meta["annot"] = True
+
+
+def _mark_listing_callouts(page_blocks, drawings) -> None:
+    """Listing 旁注标注（Manning 排版：代码旁的 HumanistMann 短语 +
+    指向代码行的箭头图形）。判定三条件（缺一不可，防边注误收）：
+    1. 已是 annot 块（HumanistMann/Arial 小字号短文本）；
+    2. bbox 与同页某 code block 纵向重叠 >5pt；
+    3. 页面存在小尺寸黑色 drawing（箭头三角/连线，宽高 ≤12pt）且其
+       y 中心距块 ≤40pt——组级几何锚定，边注（无指示符）天然排除。
+    打 meta["listing_callout"]=True；由 merge.merge_listing_callouts
+    归位进代码围栏尾部作 `# ` 注释。判定失败者维持散段落现状（无害）。"""
+    codes = [b for b in page_blocks if b.kind == "code"]
+    if not codes:
+        return
+    marker_ys = []
+    for fill, r in drawings or []:
+        if fill is None:
+            continue
+        if tuple(round(v, 2) for v in fill) != (0.0, 0.0, 0.0):
+            continue
+        if r.width <= 12 and r.height <= 12:
+            marker_ys.append((r.y0 + r.y1) / 2)
+    if not marker_ys:
+        return
+    for b in page_blocks:
+        if b.kind != "prose" or not b.meta.get("annot"):
+            continue
+        bx = fitz.Rect(b.bbox)
+        if not any(min(bx.y1, c.bbox[3]) - max(bx.y0, c.bbox[1]) > 5
+                   for c in codes):
+            continue
+        d = min(min(abs(m - bx.y0), abs(m - bx.y1)) for m in marker_ys)
+        if d <= 40:
+            b.meta["listing_callout"] = True
+
+
+def _tag_box_membership(page_blocks, page_index, drawings, skip_rects) -> None:
+    """为本页块标记所属概念框矩形（meta["box_key"]）。
+
+    矩形判定与 _is_concept_box 同源（CALLOUT_FILL + 宽高阈值 + covers 跳过），
+    重叠 ≥ BOX_OVERLAP 即视为框内。仅标记 BOX_GROUP_KINDS 中的 kind；
+    heading/code/figure_caption/listing_caption 不入组（出现即打断归组，
+    保证图链、代码围栏、标题不被并进引用块）。"""
+    rects = []
+    for fill, r in drawings or []:
+        if fill is None:
+            continue
+        if tuple(round(v, 3) for v in fill) != CALLOUT_FILL:
+            continue
+        rr = fitz.Rect(r)
+        if rr.width < 100 or rr.height < 40:
+            continue
+        # covers 整框跳过同源排除
+        if any((rr & fitz.Rect(sr)).get_area() > 0.9 * min(rr.get_area(), fitz.Rect(sr).get_area())
+               for sr in (skip_rects or [])):
+            continue
+        rects.append(rr)
+    if not rects:
+        return
+    for b in page_blocks:
+        if b.kind not in BOX_GROUP_KINDS:
+            # 概念框内代码标记（如 p79 Understanding dot products 框内嵌示例）：
+            # 不入碎片归组链（打断语义保留），仅携带归属信号供
+            # merge.merge_box_code 合成复合引用框（GFM 引用内围栏）
+            if b.kind == "code":
+                bx = fitz.Rect(b.bbox)
+                if bx.get_area() == 0:
+                    continue
+                for rr in rects:
+                    inter = bx & rr
+                    if inter.is_empty:
+                        continue
+                    if inter.get_area() / bx.get_area() >= BOX_OVERLAP:
+                        b.meta["in_concept_box"] = True
+                        break
+            continue
+        bx = fitz.Rect(b.bbox)
+        if bx.get_area() == 0:
+            continue
+        for rr in rects:
+            inter = bx & rr
+            if inter.is_empty:
+                continue
+            if inter.get_area() / bx.get_area() >= BOX_OVERLAP:
+                b.meta["box_key"] = f"p{page_index}:{rr.x0:.0f},{rr.y0:.0f},{rr.x1:.0f},{rr.y1:.0f}"
+                break
+
+
 def _apply_inline_code(block) -> None:
     """搬运 p1_text_stream 的内联代码标记：对 prose 块中 Courier 字体的连续
     span 包反引号（内联代码）。纯 Courier 代码块已由 classify 判为 code 块，
@@ -273,6 +378,11 @@ def classify_pages(pages: list) -> list:
     b_start = appendix_ranges.get("B")
     c_start = appendix_ranges.get("C")
     d_start = appendix_ranges.get("D")
+    # 章末 Summary 区域状态机：heading 文本恰为 "Summary" 进入，
+    # 任一下一级 heading 退出。仅该区域内的 \uf0a1 圆点块判为 summary_list
+    # （列表渲染）；其余区域的 \uf0a1（参考文献、正文 bullet、特殊 token 等）
+    # 维持旧链 callout 语义（引用块），行为不变。
+    in_summary = False
     for page in pages:
         drawings = getattr(page, "drawings", [])        # 预计算本页含 "This chapter covers" 的 CALLOUT_FILL drawing 矩形集合
         # （搬运 collect_concept_boxes 第 54-72 行的整框跳过逻辑）
@@ -300,6 +410,7 @@ def classify_pages(pages: list) -> list:
                     if "This chapter covers" in b.text:
                         skip_rects.append(r)
                         break
+        start_idx = len(blocks_out)
         for block in page.blocks:
             text = block.text.strip()
             # 1) 代码块（最高优先级之一）
@@ -353,7 +464,7 @@ def classify_pages(pages: list) -> list:
                 if _in_covers_rect(block, skip_rects):
                     block.kind = "bullet"
                 elif "\uf0a1" in block.text:
-                    block.kind = "callout"
+                    block.kind = "summary_list" if in_summary else "callout"
                 else:
                     block.kind = "bullet"
                 blocks_out.append(block)
@@ -378,23 +489,22 @@ def classify_pages(pages: list) -> list:
                             and (c_start <= block.page):
                         block.level = 1  # 附录 C：习题解答主节 → ##
                 blocks_out.append(block)
+                # Summary 状态机：进入/退出判定放在 heading 落定之后
+                in_summary = " ".join(block.text.split()).lower() == "summary"
                 continue
             # 其余
             block.kind = "prose"
             blocks_out.append(block)
+        # 同矩形概念框碎片归组标记（供 merge.merge_box_fragments 合并）
+        _tag_box_membership(blocks_out[start_idx:], page.index, drawings, skip_rects)
+        # Listing 旁注标记（供 merge.merge_listing_callouts 归位进代码围栏）
+        _mark_annot_blocks(blocks_out[start_idx:])
+        _mark_listing_callouts(blocks_out[start_idx:], drawings)
 
     # 标题后缀碎片剔除（搬运 fix_structure.fix_chapter_titles Case 2 的删除语义：
     # 章节标题在 PDF 中拆为多块时，首块经 TOC 匹配还原完整标题，其余碎片块删除）
-    # 边注/清单注释标签标记：HumanistMann/Arial 小字号块为书旁注本体，
-    # 禁止被 merge_pending_prose 吸收进无关段落（错位污染治理 P1）
-    for b in blocks_out:
-        sps = (b.meta.get("spans") or [])
-        if b.kind == "prose" and sps:
-            ann = sum(1 for x in sps
-                      if ("HumanistMann" in x["font"] or "Arial" in x["font"])
-                      and x["size"] <= 12.0)
-            if ann >= max(1, len(sps) // 2) and len(b.text) <= 160:
-                b.meta["annot"] = True
+    # （边注/清单注释标签标记已移入页循环内 _mark_annot_blocks，
+    #   供同页的 _mark_listing_callouts 依赖 annot 前置条件）
 
     _drop_heading_suffix_fragments(blocks_out)
     # 章节标题补全：TOC level-1 章节条目若 PDF 未提取到文本（大字/图标题被剔除），

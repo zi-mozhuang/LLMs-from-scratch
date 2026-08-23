@@ -290,8 +290,8 @@ def _body_in_corridor(cand, region, body_rects):
     return False
 
 
-LINK_FILL = (0.438, 0.652, 0.801)     # Listing header bar fill (§12 signal)
-CALLOUT_FILL = (0.969, 0.961, 0.910)  # concept/exercise box fill (§1 signal)
+LINK_FILL = (0.438, 0.652, 0.801)     # Listing header bar fill (special-blocks signal)
+CALLOUT_FILL = (0.969, 0.961, 0.910)  # concept/exercise box fill (decision-table signal)
 
 
 def _fill_close(fill, ref):
@@ -443,9 +443,52 @@ def build_figure_region(page, cap, y_min, y_max, col_x1):
     return region
 
 
+def _shrink_top_text_band(page, clip, margin=20.0):
+    """截图式代码图：收缩 clip 顶部连续文本块带（烧进图里的代码行/正文句）。
+
+    规则（无硬码坐标）：从 clip 顶向下走横向重叠 ≥50% 的文本块，垂直间隙
+    ≤margin 则入带；首个非文本块或间隙超限即停（保护图内标签）。护栏：
+    带高 > clip 高 50% 或带未贴顶则放弃。仅对 figure_code_rebuilds 门控
+    名单生效（代码已确认在正文重建，裁掉不丢内容；Fig 7.7 类"代码属图
+    内容且正文无"自动排除）。"""
+    d = page.get_text("dict", clip=clip)
+    rects = []
+    for blk in d.get("blocks", []):
+        if blk.get("type") != 0:
+            continue
+        r = pymupdf.Rect(blk["bbox"])
+        inter = r & clip
+        if inter.is_empty or inter.get_area() / max(r.get_area(), 1.0) < 0.5:
+            continue
+        rects.append(pymupdf.Rect(r))
+    if not rects:
+        return clip
+    rects.sort(key=lambda r: r.y0)
+    if rects[0].y0 - clip.y0 > margin:
+        return clip  # 顶部非文本带：不裁
+    band_y1 = rects[0].y1
+    for r in rects[1:]:
+        if r.y0 - band_y1 <= margin:
+            band_y1 = max(band_y1, r.y1)
+        else:
+            break
+    if band_y1 - clip.y0 > clip.height * 0.5:
+        return clip
+    return pymupdf.Rect(clip.x0, band_y1 + 2, clip.x1, clip.y1)
+
+
 def extract_figures(doc, caps):
     """Channel B: render each validated caption's figure region @3x."""
     FIG_DIR.mkdir(parents=True, exist_ok=True)
+    # 截图式代码图门控名单：仅 crop_top=true 的条目（代码已在正文重建且
+    # 图内确有烧录代码带）。纯示意图条目（如 Fig 3.22）不裁——其顶部
+    # 文本带是图内标签，裁掉即毁图。
+    try:
+        rebuild_figs = {r["fig"] for r in json.loads(
+            (BASE / "pipeline" / "patches_data.json").read_text("utf-8")
+        ).get("figure_code_rebuilds", []) if r.get("crop_top")}
+    except Exception:
+        rebuild_figs = set()
     mat = pymupdf.Matrix(ZOOM, ZOOM)
     _, col_x1 = _body_column(doc)
     by_page = {}
@@ -472,6 +515,8 @@ def extract_figures(doc, caps):
             min(page.rect.width, region.x1 + PAD),
             min(y_max - 2, region.y1 + PAD),
         )
+        if c["fig"] in rebuild_figs:
+            clip = _shrink_top_text_band(page, clip)
         name = f"Fig{c['fig']}_p{c['page']:03d}.png"
         path = FIG_DIR / name
         page.get_pixmap(clip=clip, matrix=mat).save(path)
