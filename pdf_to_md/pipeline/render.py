@@ -21,6 +21,8 @@ import re
 from mdlib import config
 from mdlib.asserts import run_global_asserts
 from mdlib.textutil import norm
+from mdlib.textutil import fence_mask
+from pipeline.merge import dehyphenate_text
 
 
 # ===========================================================================
@@ -95,7 +97,18 @@ def fix_text_noise(text: str) -> str:
     text = text.replace("Dragosavljevic´", "Dragosavljević")
     text = text.replace(" -- ", " — ")
     text = re.sub(r"(\w)--(\w)", r"\1—\2", text)
+    # URL scheme 后被 span 拼接注入的空格（PDF 内 URL 常因字体/kerning 拆 span）
+    text = re.sub(r"(https?://)\s+", r"\1", text)
     return text
+
+
+def fix_bullets_control(lines: list) -> list:
+    """搬运 fix_structure.fix_bullets_control：行内 "• " → "- "，去 \\x07。"""
+    out = []
+    for line in lines:
+        new = line.replace("• ", "- ").replace("\x07", "")
+        out.append(new)
+    return out
 
 
 def normalize_list_markers(lines: list) -> list:
@@ -244,7 +257,52 @@ def fix_inline_code_breaks(lines: list, mask: list) -> list:
     return out
 
 
+# ---- fix_structure.py 搬运（fix_hyphenation：SPLIT_RE / KEEP_HYPHEN / FIXED_WORDS） ----
+# 允许合并的断词（词首小写 + 连字符 + 空格 + 小写）；
+# in/self/non/cross 前缀保留连字符（in-progress / self-attention / non-linear / cross-entropy）
+SPLIT_RE = re.compile(r"\b([a-z]{2,})- ([a-z]{2,})")
+KEEP_HYPHEN = {"in", "self", "non", "cross"}
+FIXED_WORDS = {
+    "onedimensional": "one-dimensional",
+    "twodimensional": "two-dimensional",
+    "shortstory": "short-story",
+    "finetuning": "fine-tuning",
+    "pretraining": "pretraining",  # 原样保留
+}
+
+
+def _join_split(m: re.Match) -> str:
+    """搬运 fix_structure.py 第 838-841 行。"""
+    if m.group(1) in KEEP_HYPHEN:
+        return f"{m.group(1)}-{m.group(2)}"
+    return m.group(1) + m.group(2)
+
+
+def fix_hyphenation(lines: list) -> list:
+    """搬运 fix_structure.py 第 844-854 行（仅围栏外，等价 iter_prose）。"""
+    mask = fence_mask(lines)
+    out = []
+    for k, l in enumerate(lines):
+        if mask[k]:
+            out.append(l)
+            continue
+        new = l
+        for bad, good in FIXED_WORDS.items():
+            new = re.sub(rf"\b{bad}\b", good, new)
+        new = SPLIT_RE.sub(_join_split, new)
+        out.append(new)
+    return out
+
+
 # ---- TOC / 锚点（rebuild_toc.py + p3_toc.py） ----
+from pipeline.patches import (
+    apply_missing_sections,
+    apply_pseudo_patches,
+    apply_format_patches,
+    insert_appendix_figure_links,
+)
+
+
 def slugify(text: str) -> str:
     s = text.strip().lower()
     s = re.sub(r"[^a-z0-9]+", "-", s)
@@ -283,7 +341,61 @@ def include_in_toc(text: str, appendix_ctx: str):
     return False, text
 
 
+def fix_appendix_e_heading(lines: list) -> int:
+    """搬运 rebuild_toc.fix_appendix_e_heading：附录 E 标题为普通行（小写开头），
+    升为 `## Appendix E ...`。"""
+    for i, l in enumerate(lines):
+        if l.strip() == "appendix E Parameter-efficient fine-tuning with LoRA":
+            lines[i] = "## Appendix E Parameter-efficient fine-tuning with LoRA"
+            return 1
+    return 0
+
+
+def fix_de_levels(lines: list) -> int:
+    """搬运 rebuild_toc.fix_de_levels：D.x/E.x 小节在 ## 附录下应为 ###（与附录 A
+    一致），修正 #### 跳变。"""
+    n = 0
+    for i, l in enumerate(lines):
+        if re.match(r"^#### [DE]\.\d", l):
+            lines[i] = "###" + l[4:]
+            n += 1
+    return n
+
+
+def strip_old(lines: list) -> list:
+    """搬运 rebuild_toc.strip_old：删除旧 TOC 区与所有锚点行。"""
+    out = []
+    in_toc = False
+    for l in lines:
+        if l.strip() == "## Table of Contents":
+            in_toc = True
+            continue
+        if in_toc:
+            s = l.strip()
+            if s == "" or re.match(r"^\s*- \[", l):
+                continue
+            in_toc = False  # 遇到正文内容，保留该行
+        if ANCHOR_RE.match(l):
+            continue
+        out.append(l)
+    return out
+
+
 def build(lines: list) -> list:
+    """搬运 rebuild_toc.build（含 main 序列的前置 pass）。
+
+    旧链等价说明：书名标题 "# Build a Large Language Model (From Scratch)" 由
+    p3_toc 前置于文件首并经 rebuild_toc.strip_old 保留；新管道无 p3 前置步骤，
+    故在此显式补上标题行后再执行 build。
+    """
+    # 搬运 rebuild_toc.main 前置 pass
+    fix_appendix_e_heading(lines)
+    fix_de_levels(lines)
+    lines = strip_old(lines)
+    # 等价 p3_toc 前置的书名标题（strip_old 后它应位于文件首）
+    if not any(l.startswith("# Build a Large Language Model") for l in lines[:5]):
+        lines = ["# Build a Large Language Model (From Scratch)"] + lines
+
     heads = scan_headings(lines)
     used = {}
     slugs = []
@@ -292,9 +404,7 @@ def build(lines: list) -> list:
         used[base] = used.get(base, 0) + 1
         slugs.append(base if used[base] == 1 else f"{base}-{used[base]}")
 
-    toc = ["# Build a Large Language Model (From Scratch)", ""]
-    toc.append("## Table of Contents")
-    toc.append("")
+    toc = ["## Table of Contents", ""]
     appendix_ctx = ""
     for (idx, level, text), slug in zip(heads, slugs):
         if text.startswith("Appendix"):
@@ -392,14 +502,25 @@ def _block_to_lines(block) -> list:
             body = " ".join(t.split()).strip()
         return [f"> **NOTE** {body}", ""]
 
+    if k == "callout":
+        # 搬运旧链语义：p1 段落合并把块内可视行并为一段，p2 对含 \uf0a1 的行
+        # 转 `> ` 单行引用（续行块无 PUA，保持普通段落）。
+        frags = [ln.strip().replace("\uf0a1", "").strip() for ln in t.split("\n")]
+        body = " ".join(f for f in frags if f)
+        return [f"> {body}", ""]
+
     if k == "exercise":
         return [f"> **{t}**", ""]
 
     if k == "listing_caption":
+        # 搬运旧链路径：p1 输出普通行，p2 bold_captions 的 CAP_RE 统一加粗；
+        # 附录 A-E 行由 patches.fix_appendix_listings 兜底加粗。
         full = block.meta.get("full", t)
-        return [f"**{full}**", ""]
+        return [f"{full}", ""]
 
     if k == "figure_caption":
+        # 折叠同块多行为单行（等价旧链 p1 段落合并；bold_captions 依赖单行匹配）
+        t = " ".join(t.split("\n")).strip()
         return [f"{t}", ""]
 
     if k == "bullet":
@@ -426,6 +547,13 @@ def render(blocks: list, manifest_path) -> str:
     for b in blocks:
         lines.extend(_block_to_lines(b))
 
+    # 步骤 1.5：断词处理（搬运 p2_clean 第 351-352 行：行级、不跳围栏；
+    # 随后 fix_structure.fix_hyphenation：仅围栏外。顺序等价旧链）
+    lines = [dehyphenate_text(l) for l in lines]
+    lines = fix_hyphenation(lines)
+    # 行内 bullet 符号归一（搬运 fix_structure.fix_bullets_control）
+    lines = fix_bullets_control(lines)
+
     # 步骤 2：图链接合成
     fig_map = load_figure_map(str(manifest_path))
     lines = insert_figures(lines, fig_map)
@@ -447,19 +575,30 @@ def render(blocks: list, manifest_path) -> str:
     # 步骤 5：Exercise 格式化
     lines = format_exercises(lines)
 
-    # 步骤 6：断词兜底（基于代码围栏掩码）
-    mask = [l.strip().startswith("```") for l in lines]
-    # 重建连续的 fence 掩码
-    fence_mask_lines = []
-    inf = False
-    for l in lines:
-        if l.strip().startswith("```"):
-            inf = not inf
-            fence_mask_lines.append(inf)
-            continue
-        fence_mask_lines.append(inf)
-    lines = fix_dash_bullets(lines, fence_mask_lines)
-    lines = fix_inline_code_breaks(lines, fence_mask_lines)
+    # 步骤 6：断词兜底（基于代码围栏掩码；每个 pass 前重算掩码——
+    # fix_dash_bullets 会合并行导致后续索引偏移，共享掩码会错位）
+    lines = fix_dash_bullets(lines, fence_mask(lines))
+    lines = fix_inline_code_breaks(lines, fence_mask(lines))
+
+    # 步骤 6.5：内容锚点补丁（搬运 fix_missing_sections.py 全部 pass）
+    lines = apply_missing_sections(lines)
+
+    # 步骤 6.6：伪标题/损坏区修复 + 封底裁剪（搬运 fix_structure.run_pseudo）
+    lines = apply_pseudo_patches(lines)
+
+    # 步骤 6.7：索引区三栏重排（搬运 fix_index.py 整体逻辑）
+    from pipeline.index import rebuild_index
+    lines, _ = rebuild_index(lines)
+
+    # 步骤 6.8：附录 E 图渲染与链接插入（搬运 render_appendix_figures.py）
+    lines = insert_appendix_figure_links(lines)
+
+    # 步骤 6.9：格式一致性收尾（搬运 fix_structure.run_round2 相关 pass）
+    lines = apply_format_patches(lines)
+
+    # 步骤 6.10：等价旧链的落盘/重读边界——把 pass 内嵌入的 "\n" 拆成独立行
+    # （旧链各脚本以 write_text + split("\n") 交接，行列表元素内不会保留换行）
+    lines = [sub for l in lines for sub in l.split("\n")]
 
     # 步骤 7：TOC + 锚点
     # 使用 rebuild_toc.build（文档顺序，含附录上下文）

@@ -23,6 +23,15 @@ import fitz
 from mdlib import config
 from mdlib.textutil import norm, norm_keep_case
 from pipeline.ir import KINDS
+from pipeline.merge import _should_merge_prose
+
+
+def _merge_body_lines(blines: list) -> list:
+    """框体正文按块内空格拼接（搬运 collect_concept_boxes 第 83/87 行的
+    " ".join(...) 语义：同一 PDF 块内的可视行合并为一段）。"""
+    if not blines:
+        return []
+    return [" ".join(s.strip() for s in blines).strip()]
 
 # ---- 标题判定（搬运自 fix_structure.fix_headings） ----
 SKIP_TITLES = {
@@ -111,12 +120,13 @@ def _is_concept_box(block, drawings, skip_rects=None) -> tuple[bool, str, list]:
                 title = spans[0]["text"].strip()
         if has_title:
             # 搬运 collect_concept_boxes：bodies 排除首行（标题行）
-            blines = block.text.split("\n")
-            bodies = [ln for ln in blines[1:] if ln.strip()
+            blines = [ln for ln in block.text.split("\n")[1:] if ln.strip()
                       and "\uf0a1" not in ln]
+            bodies = _merge_body_lines(blines)
         else:
-            bodies = [ln for ln in block.text.split("\n") if ln.strip()
+            blines = [ln for ln in block.text.split("\n") if ln.strip()
                       and "\uf0a1" not in ln]
+            bodies = _merge_body_lines(blines)
         return True, title, bodies
     return False, "", []
 
@@ -160,6 +170,18 @@ def _is_bullet(block) -> bool:
     return any("Wingdings" in s["font"] for s in block.meta.get("spans", []))
 
 
+def _in_covers_rect(block, skip_rects) -> bool:
+    """block 是否落在任一含 "This chapter covers" 的 CALLOUT_FILL drawing 内
+    （与 _is_concept_box 的整框跳过判定同源）。"""
+    if not skip_rects:
+        return False
+    bx = fitz.Rect(block.bbox)
+    for sr in skip_rects:
+        if not (bx & fitz.Rect(sr)).is_empty:
+            return True
+    return False
+
+
 def _apply_inline_code(block) -> None:
     """搬运 p1_text_stream 的内联代码标记：对 prose 块中 Courier 字体的连续
     span 包反引号（内联代码）。纯 Courier 代码块已由 classify 判为 code 块，
@@ -190,12 +212,16 @@ def _apply_inline_code(block) -> None:
 
 
 def build_toc_map(doc_toc) -> list:
-    """搬运 fix_headings 的 TOC 去重 + SKIP 过滤，返回 [(level, title)]。"""
+    """搬运 fix_headings 的 TOC 去重 + SKIP 过滤，返回 [(level, title)]。
+    另搬运 find_all_heading_candidates 的长度护栏（norm 长度 ≤2 的条目不作为
+    标题真相源，如 PDF TOC 中的垃圾条目 'T'）。"""
     seen = set()
     entries = []
     for level, title, page in doc_toc:
         tn = norm(title.strip())
         if tn in SKIP_TITLES:
+            continue
+        if len(tn) <= 2:
             continue
         if tn in seen:
             continue
@@ -237,9 +263,18 @@ def classify_pages(pages: list) -> list:
             toc_norm[norm(m.group(1).replace("\u2014", " "))] = (lvl, t)
 
     blocks_out: list = []
+    # 附录 B/C 页界（搬运 fix_appendix_chapter_dups 的区域语义：附录 B 内的
+    # Chapter N 为文献分组（###），附录 C 内为习题解答主节（##））
+    appendix_ranges = {}
+    for lvl, title, pg in toc:
+        m = re.match(r"appendix ([A-E])", title.strip(), re.I)
+        if m and lvl == 1:
+            appendix_ranges[m.group(1)] = pg - 1  # 0 基
+    b_start = appendix_ranges.get("B")
+    c_start = appendix_ranges.get("C")
+    d_start = appendix_ranges.get("D")
     for page in pages:
-        drawings = getattr(page, "drawings", [])
-        # 预计算本页含 "This chapter covers" 的 CALLOUT_FILL drawing 矩形集合
+        drawings = getattr(page, "drawings", [])        # 预计算本页含 "This chapter covers" 的 CALLOUT_FILL drawing 矩形集合
         # （搬运 collect_concept_boxes 第 54-72 行的整框跳过逻辑）
         skip_rects = []
         page_block_texts = [b.text for b in page.blocks]
@@ -271,8 +306,15 @@ def classify_pages(pages: list) -> list:
             if _block_courier_frac(block) >= COURIER_THRESHOLD:
                 block.kind = "code"
                 block.lang = _detect_code_lang(text)
+                # 搬运 p1_text_stream 第 520-523/337 行：代码文本保留前导缩进
+                block.text = "\n".join(
+                    block.meta.get("raw_lines", block.text.split("\n"))
+                ).rstrip()
                 blocks_out.append(block)
                 continue
+            # 内联代码反引号（搬运 p1_text_stream.inline_code_wrap_line：旧链 p1
+            # 对除纯 Courier 代码块外的所有文本块统一包反引号）
+            _apply_inline_code(block)
             # 2) 概念框
             is_box, title, bodies = _is_concept_box(block, drawings, skip_rects)
             if is_box:
@@ -303,9 +345,17 @@ def classify_pages(pages: list) -> list:
                 block.kind = "figure_caption"
                 blocks_out.append(block)
                 continue
-            # 7) bullet
+            # 7) bullet / callout（搬运旧链语义）：
+            #    旧链 p2 concept_boxes_to_blockquote 把一切含 \uf0a1 的行转 blockquote；
+            #    仅章首 "This chapter covers" 区域被 fix_chapter_covers 重写为 `- ` 列表。
+            #    故：covers 区域内 → bullet；区域外的 PUA bullet 块 → callout。
             if _is_bullet(block):
-                block.kind = "bullet"
+                if _in_covers_rect(block, skip_rects):
+                    block.kind = "bullet"
+                elif "\uf0a1" in block.text:
+                    block.kind = "callout"
+                else:
+                    block.kind = "bullet"
                 blocks_out.append(block)
                 continue
             # 8) 标题（TOC ground truth）
@@ -319,17 +369,64 @@ def classify_pages(pages: list) -> list:
                 block.level, orig_title = mh  # 1/2/3 + TOC 原文（正确大小写）
                 # 用 TOC ground-truth 标题覆盖 PDF 提取文本（修复大小写/空格）
                 block.text = orig_title
+                # 搬运 fix_appendix_chapter_dups 区域语义：按所在附录调整 Chapter N 级别
+                if re.match(r"^Chapter \d+$", block.text.strip()):
+                    if b_start is not None and c_start is not None \
+                            and b_start <= block.page < c_start:
+                        block.level = 2  # 附录 B：文献分组 → ###
+                    elif c_start is not None and (d_start is None or block.page < d_start) \
+                            and (c_start <= block.page):
+                        block.level = 1  # 附录 C：习题解答主节 → ##
                 blocks_out.append(block)
                 continue
             # 其余
             block.kind = "prose"
-            _apply_inline_code(block)  # 内联代码反引号标记（搬运 p1_text_stream）
             blocks_out.append(block)
 
+    # 标题后缀碎片剔除（搬运 fix_structure.fix_chapter_titles Case 2 的删除语义：
+    # 章节标题在 PDF 中拆为多块时，首块经 TOC 匹配还原完整标题，其余碎片块删除）
+    # 边注/清单注释标签标记：HumanistMann/Arial 小字号块为书旁注本体，
+    # 禁止被 merge_pending_prose 吸收进无关段落（错位污染治理 P1）
+    for b in blocks_out:
+        sps = (b.meta.get("spans") or [])
+        if b.kind == "prose" and sps:
+            ann = sum(1 for x in sps
+                      if ("HumanistMann" in x["font"] or "Arial" in x["font"])
+                      and x["size"] <= 12.0)
+            if ann >= max(1, len(sps) // 2) and len(b.text) <= 160:
+                b.meta["annot"] = True
+
+    _drop_heading_suffix_fragments(blocks_out)
     # 章节标题补全：TOC level-1 章节条目若 PDF 未提取到文本（大字/图标题被剔除），
     # 以 TOC ground truth 在最接近章节首页处插入 heading 块（搬运 fix_chapters 的重建意图）。
     _ensure_chapter_headings(blocks_out, toc, pages)
     return blocks_out
+
+
+def _drop_heading_suffix_fragments(blocks_out: list) -> None:
+    """紧跟标题块之后、同页的 prose 块若其文本是标题文本的后缀（norm 比较），
+    视为被拆出的标题碎片，就地删除（置空文本并标记 skip）。"""
+    from pipeline.ir import Block  # noqa: F401  (类型提示用)
+    i = 0
+    n = len(blocks_out)
+    while i < n:
+        b = blocks_out[i]
+        if b.kind == "heading":
+            title_n = norm(b.text.replace("\n", " ").replace("\u2014", " "))
+            j = i + 1
+            while j < n and blocks_out[j].page == b.page:
+                nxt = blocks_out[j]
+                if nxt.kind != "prose":
+                    break
+                nxt_n = norm(nxt.text.replace("\n", " "))
+                if not nxt_n or not title_n.endswith(nxt_n):
+                    break
+                nxt.meta["drop"] = True
+                j += 1
+            i = max(j, i + 1)
+        else:
+            i += 1
+    blocks_out[:] = [b for b in blocks_out if not b.meta.get("drop")]
 
 
 def _ensure_chapter_headings(blocks_out: list, toc, pages: list) -> None:

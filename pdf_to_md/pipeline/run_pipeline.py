@@ -22,16 +22,18 @@ from pipeline.merge import (
     merge_pending_prose,
     merge_pending_code,
     merge_two_line_headings,
-    dehyphenate_text,
 )
 
 
 def merge_all(blocks: list) -> list:
-    """按顺序合并块（保持与旧链等价的行为）。"""
-    # 断词（基于 KEEP_HYPHEN_PREFIXES 唯一词表）
+    """按顺序合并块（保持与旧链等价的行为）。
+    注：断词处理已移至 render 行级（搬运 p2_clean 第 351-352 行的位置语义）。"""
+    # URL scheme 空格前置清理：merge 阶段的 URL 断裂判定（_URL_TAIL_RE）
+    # 依赖 'https://' 后无空格；render 层的同名清理保留作兜底（幂等）。
+    import re as _re
     for b in blocks:
-        if b.kind in ("prose", "heading", "code", "note", "concept_box"):
-            b.text = dehyphenate_text(b.text)
+        if b.text and "http" in b.text:
+            b.text = _re.sub(r"(https?://)\s+", r"\1", b.text)
     # 两行标题合并
     blocks = merge_two_line_headings(blocks)
     # 跨块段落合并
@@ -53,6 +55,10 @@ def run(out_path: Path) -> None:
     run_global_asserts(text)
     out_path.write_text(text, encoding="utf-8")
     print(f"[pipeline] wrote {out_path} ({len(text.splitlines())} lines)")
+    # 图片 manifest 元数据增强（source/md5/caption，增量幂等）
+    from pipeline.manifest_enrich import enrich_manifest
+    if enrich_manifest(config.MANIFEST_PATH, text):
+        print("[pipeline] manifest enriched (source/md5/bytes/caption)")
 
 
 def render_blocks(blocks: list) -> str:

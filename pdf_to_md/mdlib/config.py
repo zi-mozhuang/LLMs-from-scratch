@@ -23,6 +23,31 @@ KEEP_HYPHEN_PREFIXES = {
     "neuro", "socio", "geo", "cyber", "open", "near", "far",
 }
 
+# ---- 连字符处理词表（golden 行为的搬运，消除旧链矛盾的唯一实现） ----
+# 真复合词前缀：保留连字符不合并（p2_clean.py 第 32-37 行）。
+# e.g. self-attention, multi-head, cross-attention, state-of-the-art,
+# in-progress, pre-training, non-linear ...
+COMPOUND_PREFIXES = {
+    "self", "state", "well", "cross", "multi", "pre", "post", "sub", "non",
+    "anti", "bio", "co", "re", "un", "in", "semi", "auto", "inter", "intra",
+    "extra", "super", "micro", "macro", "neuro", "socio", "geo", "cyber",
+    "open", "near", "far",
+}
+# 通常为断词的前缀：跨行合并（p2_clean.py 第 38-41 行）。
+# under-stand -> understand, over-view -> overview, up-date -> update,
+# down-stream -> downstream, out-put -> output.
+JOIN_PREFIXES = {"under", "over", "up", "down", "out"}
+# 精确断词修复（fix_line_continuity.py 第 178-184 行）：
+# p2 的通用合并因 COMPOUND_PREFIXES 保守保留 pre-/post- 而漏掉的已知断词；
+# 其余一律不动（如 "in- progress" 绝不能变成 "inprogress"）。
+KNOWN_BREAKS = {
+    "pre- viously": "previously",
+    "pre- training": "pre-training",
+    "post- erior": "posterior",
+    "post- processing": "post-processing",
+    "re- cur": "recur",
+}
+
 # 句间连接词：行尾出现则下一行为续行（fix_line_continuity.py 第 55-65 行）。
 OPENERS = {
     "a", "an", "the", "of", "in", "via", "to", "and", "or", "for", "with",

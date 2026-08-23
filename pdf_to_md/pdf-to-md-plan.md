@@ -6,18 +6,38 @@
 
 ## 流水线总览
 
+> **2025-08 重构后**：单一入口 `bash run_pipeline.sh` 一次产出最终 MD。
+> 数据流固定为 **P0 → extract → classify → merge → render → verify**；
+> 旧补丁链脚本（p1/p2/p3/fix_*/clean_*/rebuild_toc/check_*/audit 等）已归档至
+> `.backup/legacy_scripts/`（只读留档，管道不再依赖）；`figure_text_detect.py`
+> 与 `p0_extract_images.py` 按重构决定保留在根目录原位。
+> 回归基准与差异分诊见 `golden/`（含 `diff_triage.md`）。
+
 | 阶段 | 脚本 | 输入 → 输出 |
 |------|------|------------|
 | P0 图片提取 | `p0_extract_images.py` | PDF → `extracted_images/{embedded,figures}/` + `manifest.json` |
+| 提取 | `pipeline/extract.py` | PDF → `Page/Block` 页模型（一次拿全字体/颜色/绘图/TOC） |
+| 分类 | `pipeline/classify.py` | 页模型 → 语义块（code/heading/concept_box/note/bullet/callout 等，规则前移到提取期） |
+| 合并 | `pipeline/merge.py` | 块级合并（段落/代码/两行标题/断词，词表唯一来源 `mdlib/config.py`） |
+| 渲染 | `pipeline/render.py` (+`patches.py`/`index.py`) | 语义块 → 最终 `llms-from-scratch.md`（图文合成、数学清洗、加粗、TOC+锚点、内容锚点补丁、索引重排） |
+| 校验 | `mdlib/asserts.py` + `pipeline/verify.py` | 围栏成对/无 PUA/无 sup-mark/TOC⊆锚点断言 + TOC/Figure/概念框/covers 完备性对账 + 图片文件完整性 |
+| manifest 增强 | `pipeline/manifest_enrich.py` | 图片条目补 source/md5/bytes/caption（幂等，render 后自动执行） |
+| 子模块 图内文字 | `figure_text_detect.py` | 被 pipeline/extract 调用，几何法剔除图内文字 |
+| 归档 验证套件 | `.backup/legacy_scripts/check_*.py`、`audit_md_quality.py` | 外部回归套件（不属管道），baseline 存于 `golden/baseline_*.txt` |
+
+<details>
+<summary>旧补丁链总览（已归档，仅供考古）</summary>
+
+| 阶段 | 脚本 | 输入 → 输出 |
+|------|------|------------|
 | P1 文本流 | `p1_text_stream.py` | PDF → 文本流 Markdown（页眉剔除、代码块还原、段落合并） |
 | P2 清洗合成 | `p2_clean.py` | P1 输出 → 图文合成 + 断词/概念框/数学/加粗清洗 |
 | P3 TOC 校验 | `p3_toc.py` | P2 输出 → 最终 `llms-from-scratch.md`（TOC + 锚点 + 断言） |
-| 子模块 图内文字 | `figure_text_detect.py` | 被 P1 调用，几何法剔除图内文字 |
 | 修复 round1 | `fix_structure.py --phase round1` | 标题级别 + 章节标题/本章涵盖（headings + chapters） |
 | 修复 gaps | `fix_special_blocks.py` / `clean_figure_text.py` / `fix_line_continuity.py` / `fix_missing_sections.py` / `fix_structure.py --phase pseudo` / `fix_index.py` / `render_appendix_figures.py` | 异形块、图内残留、行连续性、缺失节、伪标题/损坏标题、索引、附录图 |
 | 修复 round2 | `fix_structure.py --phase round2` + `rebuild_toc.py` | 格式一致性 + 章节封面 + TOC 重写 |
-| 验证 图内文字 | `check_figure_text.py` | 独立校验图内文字删除（V1-V8） |
-| 验证 图片审计 | `check_figures.py` | 渲染图 vs 整页证据审计（V1-V3） |
+</details>
+
 
 ## 1. 方案决策依据（PDF 实测事实）
 
@@ -146,9 +166,13 @@ assert links <= anchors                          # TOC 全部可跳转
 
 ## 13. 已知遗留（非阻断）
 
+- **Fig 7.8（p236）曾缺失于 MD，已修复**：其图注标签 "Figure 7.8" 用 `FranklinGothic-Demi`（即 `chapter_label` 页眉字体）设置，且位于底部边距（行 `y1≈591.7 > 页高-75`），被 §5 的 span 级页脚剔除误判为页脚 span 而整行删除，导致该块文本只剩 "The padding…"、不再以 "Figure 7.8" 起头，既无法被判为 `figure_caption`，`insert_figures` 的 `^Figure (\d+\.\d+)` 也不命中，MD 缺 `![Fig 7.8]`、破坏 PDF↔MD 一一对应。已在 `pipeline/extract.py` 对图注块（`_FIGURE_CAPTION_RE` 起头的块）整体豁免页眉/页脚剔除（逐 span 也保留），修复后 MD 图链 **128↔PDF 128** 完全一一对应。`_FIGURE_CAPTION_RE` 与 `pipeline/classify.py` 共用同一 `^Figure X.Y` 结构模式，未硬码页号/坐标。
+- **页边注（side notes）曾 86% 丢失于 MD，已修复**：全书 `HumanistMann` 字体的右侧页边注共 522 句，原 `figure_text_detect.is_figure_text` 的 `HumanistMann` 邻近守卫（距图元 <30pt 即判为图注标签丢弃）把紧邻图的右侧边注（如 p24 "Algorithms that learn rules…"，x0≈377 仅比图 union.x1=373 右移 4pt）误删。已在 `is_figure_text` 增加 `page_width` 参数，并在 `HumanistMann` 分支对**右侧页边栏**（`bbox.x0 > page_width*0.62`）块豁免丢弃（真实图内标签不在此列，HIGH 相交规则不受影响，无图内文字回漏；Fig 2.13 token 数组仍正确丢弃）。修复后 MD 边注缺失由 449/522(86%) 降至 23/522(4%)；MD 由 11409→12359 行。`format_scan.py`+`format_audit.py` 为差分审计工具（Phase 0/1）。
+
 - §5.4 和 §7.4 整节内容在 P1 提取中缺失（PDF 提取遗漏，需人工补录或重新提取）。
 - 正文上标在 P1 直提中已平化，未做 LaTeX 还原。
 - 重复 Chapter 标题（附录练习）TOC 以 `(Appendix)` 区分，但正文标题文本相同。
+- 个别矢量图 PNG 在图注上方多截了相邻正文代码片段（Fig 3.12 p84、Fig 6.5 p195）：该代码已在正文流中以围栏块出现，图中重复属可接受冗余。`build_figure_region` 的 code relay 分支按"图形绘制矩形/标签 + 空白走廊"生长图区域；正文代码紧邻图上方且与图形绘制间距极小（如 3.12 代码距流程图仅 ~4pt），与纯文本图（Fig 7.7 的示例代码即属图内内容）无法靠局部几何可靠区分，故保留现状。曾尝试"代码须与图形绘制矩形纵向重叠才中继纳入"的约束，虽修掉 3.12/6.5 过度包含，却把 7.7 的示例代码（延伸到绘制矩形之外）截断，因得不偿失而回退。
 
 ## 14. 代码清单跨 block 合并（已整合进 `p1_text_stream.py`）
 

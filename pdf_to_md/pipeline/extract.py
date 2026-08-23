@@ -11,11 +11,38 @@ is_header_span / block_courier_frac / is_figure_text 调用约定。
 """
 
 import fitz
+import json
+from collections import defaultdict
 from pathlib import Path
+
+import re
 
 from mdlib import config
 from pipeline.ir import Page, Block
 from figure_text_detect import page_element_regions, is_figure_text
+
+# 图注行：起头为 "Figure X.Y"。图注即使落在页脚区也不得当页脚剔除，
+# 否则底部图注（如 Fig 7.8，p236 用 FranklinGothic-Demi 且 y1≈591）会被误删，
+# 导致 MD 缺图、破坏 PDF↔MD 图片一一对应。
+
+def _manifest_clips():
+    """p0 manifest 的图像裁剪框（物理页 0 基 -> [Rect]）。
+    p0 渲染 PNG 用的正是这些 clip，是"真图边界"的权威源；
+    page_element_regions 的 drawings-union 启发式会把箭头/引导线等
+    装饰图元一并并入，横吞半页正文（见 diff_triage 审计记录）。"""
+    try:
+        data = json.loads(config.MANIFEST_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    m = defaultdict(list)
+    for e in data.get("figures", []):
+        pg, clip = e.get("page"), e.get("clip")
+        if pg and clip and len(clip) == 4:
+            m[pg - 1].append(fitz.Rect(clip))
+    return m
+
+
+_FIGURE_CAPTION_RE = re.compile(r"^\*{0,2}Figure\s+\d+\.\d+\b")
 
 
 def _is_header_span_like(span: dict, page_height: float) -> bool:
@@ -87,6 +114,7 @@ def extract_book(pdf_path) -> list:
     doc = fitz.open(pdf_path)
     page_heights = {p: doc[p].rect.height for p in range(len(doc))}
     toc = doc.get_toc()  # 全文档一次
+    manifest_clips = _manifest_clips()
     toc_skip = _detect_toc_pages(doc)  # 目录页剔除（搬运 p1）
 
     pages: list = []
@@ -109,8 +137,24 @@ def extract_book(pdf_path) -> list:
             if dr.get("fill")
         ]
 
-        # 图区域（剔除图内文字）
-        fig_rects, fig_union = page_element_regions(page)
+        # 图区域（剔除图内文字）：manifest clips 权威优先，启发式兜底。
+        # manifest 模式下关闭 HumanistMann/Arial 字体一票否决守卫——
+        # 该守卫会误杀清单旁注释标签与边注（审计实锤三类系统性丢失）。
+        if pno in manifest_clips:
+            fig_rects = manifest_clips[pno]
+            fig_union = None
+            for r in fig_rects:
+                fig_union = r if fig_union is None else fig_union | r
+            fig_font_guard = False
+        else:
+            fig_rects, fig_union = page_element_regions(page)
+            fig_rects = [r for r in fig_rects if not r.is_empty and r.width * r.height >= 16.0]
+            fig_union = None
+            for r in fig_rects:
+                fig_union = r if fig_union is None else fig_union | r
+            # 无 manifest 图的页面不存在"烘进 PNG 的文字"，
+            # 字体守卫在此纯误杀边注/清单标签（审计三类丢失根源），一并关闭
+            fig_font_guard = False
 
         p = Page(index=pno, height=page_height)
         p.drawings = drawings
@@ -121,26 +165,47 @@ def extract_book(pdf_path) -> list:
                 # 纯图片/绘图块：不产出 Block（不携带正文）
                 continue
 
-            # 剔除整块页眉/页脚
-            non_header_lines = [
-                ln for ln in block["lines"]
-                if any(not _is_header_span_like(s, page_height) for s in ln["spans"])
-                and not _is_header_line_like(ln, page_height)
-            ]
+            # 图注块整体豁免页眉/页脚剔除（见 _FIGURE_CAPTION_RE 注释）。
+            is_figcap = any(
+                _FIGURE_CAPTION_RE.match(
+                    "".join(s["text"] for s in ln["spans"]).strip())
+                for ln in block["lines"]
+            )
+            if is_figcap:
+                non_header_lines = list(block["lines"])
+            else:
+                non_header_lines = [
+                    ln for ln in block["lines"]
+                    if any(not _is_header_span_like(s, page_height) for s in ln["spans"])
+                    and not _is_header_line_like(ln, page_height)
+                ]
             if not non_header_lines:
                 continue
 
+            # manifest 模式精判：块内过半行中心落在 clip 内 -> 已烘进 PNG，
+            # 整块剔除（块级中心判定会漏掉跨宽标签块，如 'Model input…'）
+            if pno in manifest_clips and block.get("lines"):
+                _cl = manifest_clips[pno]
+                _in = [ln for ln in block["lines"]
+                       if any(r.contains(fitz.Point((ln["bbox"][0] + ln["bbox"][2]) / 2,
+                                                    (ln["bbox"][1] + ln["bbox"][3]) / 2))
+                              for r in _cl)]
+                if _in and len(_in) >= max(1, len(block["lines"]) // 2):
+                    continue
             # 剔除图内文字（避免与渲染 PNG 重复）
-            if is_figure_text(block, fig_rects, fig_union, page_height):
+            if is_figure_text(block, fig_rects, fig_union, page_height,
+                              page.rect.width, font_guard=fig_font_guard):
                 continue
 
             # 把原始行/span 信息存入 Block 的 meta，供 classify 使用。
             # 同时做最小清洗：拼接非页眉 span 文本。
+            # 图注块豁免页眉剔除：保留全部 span，避免 "Figure X.Y" 标签被删。
+            span_keep = (lambda s: True) if is_figcap else (
+                lambda s: not _is_header_span_like(s, page_height))
             block_text_lines = []
             for ln in non_header_lines:
                 txt = "".join(
-                    s["text"] for s in ln["spans"]
-                    if not _is_header_span_like(s, page_height)
+                    s["text"] for s in ln["spans"] if span_keep(s)
                 ).strip()
                 if txt:
                     block_text_lines.append(txt)
@@ -158,7 +223,7 @@ def extract_book(pdf_path) -> list:
             spans_info = []
             for ln in non_header_lines:
                 for s in ln["spans"]:
-                    if _is_header_span_like(s, page_height):
+                    if not span_keep(s):
                         continue
                     spans_info.append({
                         "text": s["text"],
@@ -169,9 +234,15 @@ def extract_book(pdf_path) -> list:
                         "color": s.get("color"),
                     })
             b.meta["spans"] = spans_info
+            # 搬运 p1_text_stream 第 521-523 行：代码行的原始文本仅 rstrip
+            # （保留前导缩进），供 classify 判为 code 块时还原。
+            b.meta["raw_lines"] = [
+                "".join(s["text"] for s in ln["spans"]
+                        if span_keep(s)).rstrip()
+                for ln in non_header_lines
+            ]
             b.meta["lines"] = [
-                {"spans": [sp for sp in ln["spans"]
-                           if not _is_header_span_like(sp, page_height)]}
+                {"spans": [sp for sp in ln["spans"] if span_keep(sp)]}
                 for ln in non_header_lines
             ]
             p.blocks.append(b)

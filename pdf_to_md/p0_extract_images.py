@@ -29,7 +29,8 @@ OUT_DIR = BASE / "extracted_images"
 EMB_DIR = OUT_DIR / "embedded"
 FIG_DIR = OUT_DIR / "figures"
 
-ZOOM = 3
+# 渲染倍率：默认 3（≈216dpi）。可用环境变量 P0_ZOOM 覆盖（如 300dpi → P0_ZOOM=4.17）。
+ZOOM = float(__import__("os").environ.get("P0_ZOOM", "3"))
 PAD = 6.0
 CAPTION_RE = re.compile(r"^Figure\s+(\d+\.\d+)\b")
 BARE_RE = re.compile(r"^Figure\s+\d+\.\d+$")
@@ -330,45 +331,6 @@ def _crosses_bar(lo_rect, hi_rect, bars):
     return False
 
 
-def _span_components(spans, link):
-    """Union-find components over non-body spans.
-
-    Returns ({span_index: root_id}, {root_id: has_label_span}). Used to
-    qualify long-distance code relay: a far code span may be pulled in only
-    when its cluster also carries sans-serif labels (text diagrams like
-    Fig 7.7); pure-Courier clusters are body snippets/listings and stay
-    out (Figs 3.12 / 6.5).
-    """
-    idx_map = {}
-    item_list = []
-    classes = []
-    for i, (r, _, f, s, _) in enumerate(spans):
-        cls = _span_class(f, s)
-        if cls != "body":
-            idx_map[i] = len(item_list)
-            item_list.append(r)
-            classes.append(cls)
-    n = len(item_list)
-    parent = list(range(n))
-
-    def find(x):
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
-    for i in range(n):
-        for j in range(i + 1, n):
-            if _rect_gap(item_list[i], item_list[j]) <= link:
-                parent[find(i)] = find(j)
-    comp_has_label = defaultdict(bool)
-    for k in range(n):
-        if classes[k] == "label":
-            comp_has_label[find(k)] = True
-    root_of = {i: find(idx_map[i]) for i in idx_map}
-    return root_of, comp_has_label
-
-
 def build_figure_region(page, cap, y_min, y_max, col_x1):
     """Build figure region for one validated caption.
 
@@ -439,7 +401,6 @@ def build_figure_region(page, cap, y_min, y_max, col_x1):
         line_classes[lid].add(_span_class(f, s))
     mixed_lines = {lid for lid, cls in line_classes.items()
                    if "body" in cls and len(cls) > 1}
-    root_of, comp_has_label = _span_components(spans, 14.0)
     taken = [False] * len(spans)
     while True:
         added = False
@@ -461,8 +422,8 @@ def build_figure_region(page, cap, y_min, y_max, col_x1):
                     continue
             elif cls == "code":
                 # code joins when almost enclosed, or via relay across an
-                # empty corridor (text-only diagrams); a body span in the
-                # corridor marks exterior listing/prose content
+                # empty corridor (text-only diagrams like Fig 7.7); a body
+                # span in the corridor marks exterior listing/prose content.
                 inter = region & r
                 if inter.get_area() < 0.9 * max(r.get_area(), 1e-6):
                     if lid in mixed_lines \

@@ -79,7 +79,8 @@ def _max_size(block: dict) -> float:
                default=0.0)
 
 
-def is_figure_text(block: dict, rects, union, page_height: float) -> bool:
+def is_figure_text(block: dict, rects, union, page_height: float,
+                   page_width: float = None, font_guard: bool = True) -> bool:
     """Decide whether a text block lives inside a figure (-> drop)."""
     if not rects:
         return False
@@ -137,8 +138,13 @@ def is_figure_text(block: dict, rects, union, page_height: float) -> bool:
     # phrases, and even when they sit just outside the figure's union bbox as
     # side annotations (Fig 1.4 left/right labels). Check proximity to any figure rect.
     # This must run BEFORE sentence/glossary guards, which would otherwise keep them.
-    if fonts and any("HumanistMann" in f or "Arial" in f for f in fonts):
+    if font_guard and fonts and any("HumanistMann" in f or "Arial" in f for f in fonts):
         if any(sz <= 12.0 for sz in sizes):
+            # Right-margin side notes (true margin notes) sit beside figures but
+            # are complete sentences, NOT figure art. They must be kept, so exempt
+            # blocks in the right margin column from the figure-label guard below.
+            if page_width and block["bbox"][0] > page_width * 0.62:
+                return False
             # Inside union -> definitely figure label
             if union is not None:
                 cx = (bb.x0 + bb.x1) / 2
@@ -196,7 +202,7 @@ def detect_page_figure_text(page, page_height: float):
     for b in page.get_text("dict").get("blocks", []):
         if "lines" not in b:
             continue  # drawing / image only
-        if is_figure_text(b, rects, union, page_height):
+        if is_figure_text(b, rects, union, page_height, page.rect.width):
             dropped.append(b)
         else:
             kept.append(b)

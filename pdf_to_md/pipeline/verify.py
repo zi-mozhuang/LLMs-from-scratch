@@ -106,9 +106,49 @@ def main(md_path: Path = MD_PATH) -> int:
     print(f"[verify] '**This chapter covers**' 存在={has_any}")
     print(f"         -> {'PASS' if covers_ok else 'FAIL'}")
 
-    all_ok = toc_ok and fig_ok and box_ok and covers_ok
+    # 5) 图片文件完整性：manifest 引用的文件必须存在；0 字节判 FAIL，
+    #    <1KB 列 WARN（疑似空白渲染，人工复核）
+    img_ok, n_small = _check_image_files()
+    print(f"[verify] 图片文件完整性={'PASS' if img_ok else 'FAIL'}  (<1KB 警告 {n_small} 个)")
+    print(f"         -> {'PASS' if img_ok else 'FAIL'}")
+
+    all_ok = toc_ok and fig_ok and box_ok and covers_ok and img_ok
     print(f"\n[verify] 总体: {'ALL PASS' if all_ok else 'FAIL'}")
     return 0 if all_ok else 1
+
+
+def _check_image_files() -> tuple:
+    """校验 manifest 引用的图片文件。返回 (是否通过, <1KB 文件数)。"""
+    try:
+        data = json.loads(config.MANIFEST_PATH.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"         (manifest 读取失败: {e})")
+        return False, 0
+    base = config.MANIFEST_PATH.parent
+    ok = True
+    small = []
+    for key in ("figures", "embedded"):
+        for entry in data.get(key, []):
+            rel = entry.get("file")
+            if not rel:
+                continue
+            f = base / rel
+            if not f.exists():
+                print(f"         [缺失] {rel}")
+                ok = False
+                continue
+            size = f.stat().st_size
+            if size == 0:
+                print(f"         [空文件] {rel}")
+                ok = False
+            elif size < 1024:
+                small.append(rel)
+    if small:
+        for rel in small[:5]:
+            print(f"         [偏小] {rel}")
+        if len(small) > 5:
+            print(f"         ... 共 {len(small)} 个")
+    return ok, len(small)
 
 
 if __name__ == "__main__":
