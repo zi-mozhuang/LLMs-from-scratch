@@ -50,13 +50,16 @@ def _is_chapter_label_then_title(prev: str, cur: str) -> bool:
     return bool(cur) and cur[0].isupper() and len(cur) < 80
 
 
-def _should_merge_prose(prev: str, cur: str) -> bool:
+def _should_merge_prose(prev: str, cur: str, force_open: bool = False) -> bool:
     if not prev or not cur:
         return False
     if _FIG_RE.match(prev) or _FIG_RE.match(cur):
         return False
     if prev[-1] in ".!?\"'”’":
         return False
+    # force_open：参考文献 URL 签名等场景，越过开放词/长度/大写守卫强制并入
+    if force_open:
+        return True
     # (2) inline-code / unclosed-delimiter continuation
     if cur.startswith("`"):
         return True
@@ -204,58 +207,182 @@ def _merge_box_group(group: list) -> None:
 # --------------------------------------------------------------------------- #
 # Listing 旁注归位                                                             #
 # --------------------------------------------------------------------------- #
+def _rect_gap_dist(a, c) -> float:
+    import fitz as _f
+    ra, rc = _f.Rect(a), _f.Rect(c)
+    dx = max(rc.x0 - ra.x1, ra.x0 - rc.x1, 0)
+    dy = max(rc.y0 - ra.y1, ra.y0 - rc.y1, 0)
+    return (dx * dx + dy * dy) ** 0.5
+
+
+def _target_line_text(page_rows, target_y, target_page):
+    """页级行索引中与 target_y（箭头中心）几何最近的 Courier 行文本。
+    page_rows: {page: [(cy, text), ...]}。跨页清单的 y 坐标分属各页，
+    必须按注块所在页过滤。失败返回 None。"""
+    best = None
+    for cy, t in page_rows.get(target_page, []):
+        d = abs(cy - target_y)
+        if best is None or d < best[0]:
+            best = (d, t)
+    return None if best is None else best[1]
+
+
 def merge_listing_callouts(blocks: list) -> list:
     """Listing 旁注 → 代码注释：classify._mark_listing_callouts 标记的块
-    （书版排版中指向代码行的箭头注释短语）折叠为单行 `# ...` 追加到所属
-    code block 文本尾部，原块删除。两级归属：
-    1. 流序：紧跟 code block 之后 ≤6 个块内直接挂（绝大多数情形）；
-    2. 几何兜底：间隔超限者按同页 y-overlap 最大的 code block 归属
-       （旁注与代码间可能隔着图注/段落块）。
-    两级都失败则维持散段落现状（无害）。"""
-    def _fold(b):
-        return " ".join(b.text.split())
+    按 meta['callout_lines']={gid:[(行文本,目标箭头cy),...]} 组装完整短语，
+    归入所属代码块后按目标行插入 `# ` 注释（行级定位：目标行取页级行
+    索引中与箭头 cy 几何最近者，再在 owner.text 中按行文本定位插入点，
+    注释插在目标行上方、缩进随目标行）。一个 PDF 块可向多个组贡献行
+    （跨栏混排块），消费时整块删除——其正文语义已全部转移。
 
-    def _yov(a, c):
-        return min(a.bbox[3], c.bbox[3]) - max(a.bbox[1], c.bbox[1])
+    两级归属：
+    1. 流序：贡献块之前最近 code block 且间隔 ≤6 块 + 页域/贴近门；
+    2. 几何兜底：页域覆盖注块页的 code 中 y-overlap 最大者；无重叠时
+       间隙距离 ≤60pt。
+    定位失败回退围栏尾部追加；两级归属都失败维持散段落现状（无害）。"""
+    # 0) 页级行索引：所有块的行级 Courier 行（不依赖 code 块合并后的
+    #    meta 对齐，天然完整）
+    page_rows: "dict[int, list]" = {}
+    for b in blocks:
+        pg = b.page
+        for ln in b.meta.get("lines", []):
+            sp = [s for s in ln.get("spans", []) if s.get("bbox")
+                  and s.get("text", "").strip()]
+            if not sp:
+                continue
+            cou = sum(1 for s in sp if "Courier" in s.get("font", ""))
+            if cou * 2 < len(sp):
+                continue
+            txt = "".join(s["text"] for s in sp).rstrip()
+            cy = (min(s["bbox"][1] for s in sp)
+                  + max(s["bbox"][3] for s in sp)) / 2
+            page_rows.setdefault(pg, []).append((cy, txt))
+    # 1) 组装组（流序）：gid -> {"texts":[], "y":cy, "blocks":[]}
+    groups: "dict[str, dict]" = {}
+    order: list = []
+    for b in blocks:
+        cl = b.meta.get("callout_lines") if b.meta.get("listing_callout") \
+            else None
+        if not cl:
+            continue
+        for gid, items in cl.items():
+            if gid not in groups:
+                groups[gid] = {"texts": [], "y": None, "blocks": []}
+                order.append(gid)
+            g = groups[gid]
+            g["texts"].extend(t for t, _cy in items)
+            if g["y"] is None and items:
+                g["y"] = items[0][1]
+            if not any(x is b for x in g["blocks"]):
+                g["blocks"].append(b)
 
-    out: list = []
-    pending_code = None   # 最近一个代码块（流序一级分配）
-    gap = 0               # 距该代码块的 intervening 块数
-    attached = 0
+    # 2) 归属候选链：tier1 流序贴近门给出首选；tier2 几何兜底补全候选，
+    #    同页域全部 code 按「纵向重叠降序、间隙升序」入列——插入阶段
+    #    逐个尝试直到目标行文本命中（清单被 PDF 拆块时，箭头目标行
+    #    可能落在非首选段；单选失败即尾插会造成顶格注释堆叠）
+    def _page_ok(code_block, page):
+        sp = code_block.meta.get("page_span") or (code_block.page,) * 2
+        return sp[0] <= page <= sp[1]
+
+    first_pick: dict = {}
+    last_code = None
+    since = 0
     for b in blocks:
         if b.kind == "code":
-            pending_code = b
-            gap = 0
-            out.append(b)
+            last_code = b
+            since = 0
             continue
-        gap += 1
-        txt = _fold(b)
-        if b.meta.get("listing_callout") and txt \
-                and pending_code is not None and gap <= 6:
-            pending_code.text = (pending_code.text.rstrip("\n")
-                                 + "\n\n# " + txt)
-            attached += 1
-            continue  # 块删除
         if b.meta.get("listing_callout"):
-            b.meta["callout_deferred"] = True   # 二次几何分配候选
-        out.append(b)
-
-    # 二级：deferred 按同页几何归属
-    codes = [b for b in blocks if b.kind == "code"]
-    for b in out:
-        if not b.meta.get("callout_deferred"):
+            cl = b.meta.get("callout_lines") or {}
+            if cl and last_code is not None and since <= 6 \
+                    and _page_ok(last_code, b.page) \
+                    and _rect_gap_dist(b.bbox, last_code.bbox) <= 60.0:
+                # 几何贴近门：since 只保证流序近邻，还需注块与 owner
+                # 纵向贴邻（重叠或间隙≤60pt），防同页远隔 fence 截胡
+                for gid in cl:
+                    first_pick.setdefault(gid, last_code)
             continue
-        cands = [c for c in codes if c.page == b.page and _yov(b, c) > 5]
-        if cands:
-            best = max(cands, key=lambda c: _yov(b, c))
-            best.text = best.text.rstrip("\n") + "\n\n# " + _fold(b)
-            attached += 1
-            b.meta["callout_consumed"] = True
-    out = [b for b in out if not b.meta.pop("callout_consumed", False)]
-    for b in out:
-        b.meta.pop("callout_deferred", None)
+        since += 1
+
+    owner_cands: "dict[str, list]" = {}
+    for gid in order:
+        blks = groups[gid]["blocks"]
+        page = blks[0].page
+        gb = (min(b.bbox[0] for b in blks), min(b.bbox[1] for b in blks),
+              max(b.bbox[2] for b in blks), max(b.bbox[3] for b in blks))
+        cands = [c for c in blocks if c.kind == "code" and _page_ok(c, page)]
+        scored = []
+        for c in cands:
+            ov = min(gb[3], c.bbox[3]) - max(gb[1], c.bbox[1])
+            gap = _rect_gap_dist(gb, c.bbox)
+            scored.append((-min(ov, 10**6), gap, id(c), c))
+        scored.sort(key=lambda t: (t[0], t[1]))
+        ordered = [c for *_, c in scored]
+        fp = first_pick.get(gid)
+        if fp is not None:
+            if fp in ordered:
+                ordered.remove(fp)
+            ordered.insert(0, fp)
+        owner_cands[gid] = ordered
+
+    # 4) 插入收集与消费标记（候选链逐个尝试，thy 命中即挂）
+    ins: "dict[int, list]" = {}
+    tails: "dict[int, list]" = {}
+    consumed = set()
+    attached = 0
+    n_unlocatable = 0
+    for k, gid in enumerate(order):
+        d = groups[gid]
+        text = " ".join(t.strip() for t in d["texts"] if t.strip()).strip()
+        if not text or gid not in owner_cands:
+            continue
+        consumed.update(id(f) for f in d["blocks"])
+        thy = _target_line_text(page_rows, d["y"], d["blocks"][0].page)
+        placed_owner = None
+        idx = None
+        if thy is not None:
+            for cand in owner_cands[gid]:
+                tl = cand.text.split("\n")
+                for i2, l in enumerate(tl):
+                    if l.strip() == thy.strip():
+                        idx = i2
+                        break
+                if idx is not None:
+                    placed_owner = cand
+                    break
+        if placed_owner is None:
+            fallback = owner_cands[gid][0]
+            tails.setdefault(id(fallback), []).append(text)
+            if thy is not None:
+                n_unlocatable += 1
+        else:
+            ins.setdefault(id(placed_owner), []).append((idx, text, k))
+        attached += 1
+
+    def apply(owner) -> None:
+        items = ins.get(id(owner)) or []
+        tl = owner.text.split("\n")
+        for idx, text, _k in sorted(items, key=lambda t: (-t[0], -t[2])):
+            idx = min(idx, len(tl) - 1)
+            indent = re.match(r"[ \t]*", tl[idx]).group(0)
+            tl.insert(idx, f"{indent}# {text}")
+        new_text = "\n".join(tl)
+        for text in tails.get(id(owner), []):
+            new_text = new_text.rstrip("\n") + "\n\n# " + text
+        if items or tails.get(id(owner)):
+            owner.text = new_text
+
+    owners = {id(c): c for c in blocks if c.kind == "code"}
+    for o in owners.values():
+        if id(o) in ins or id(o) in tails:
+            apply(o)
+
     merge_listing_callouts.last_attached = attached
-    return out
+    merge_listing_callouts.last_unlocatable = n_unlocatable
+    merge_listing_callouts.last_unowned = [
+        (gid, " ".join(groups[gid]["texts"])[:60])
+        for gid in order if gid not in owner_cands]
+    return [b for b in blocks if id(b) not in consumed]
 
 
 # --------------------------------------------------------------------------- #
@@ -418,9 +545,15 @@ def merge_pending_prose(blocks: list) -> list:
                 prev_block, prev_txt = pending
                 _pa = getattr(prev_block, "meta", {}).get("annot")
                 _ca = getattr(b, "meta", {}).get("annot")
-                if _pa != _ca:
+                if _pa != _ca or prev_block.meta.get("listing_callout") \
+                        or b.meta.get("listing_callout") \
+                        or prev_block.meta.get("showcase") \
+                        or b.meta.get("showcase"):
                     # 标签↔正文互不吸收（错位污染治理）；两侧同为标签时
-                    # 落入下方常规合并（标签自身折行的续行需并回）
+                    # 落入下方常规合并（标签自身折行的续行需并回）。
+                    # listing_callout 块一律保持独立：其行已按 callout_lines
+                    # 组登记，被并块会丢组元数据（须由 merge_listing_callouts
+                    # 在 pending_code 后消费）。
                     out.append(prev_block)
                     pending = (b, txt)
                     continue
@@ -436,7 +569,8 @@ def merge_pending_prose(blocks: list) -> list:
                     continue
                 if (prev_block.kind == "callout"
                         and b.kind == "prose"
-                        and _should_merge_prose(prev_txt.replace("\uf0a1", ""), txt)):
+                        and _should_merge_prose(prev_txt.replace("\uf0a1", ""),
+                                                txt)):
                     # 续行并入 callout 块（等价 p1 行级合并）
                     prev_block.text = (prev_txt + " " + txt).strip()
                     pending = (prev_block, prev_block.text.strip())
@@ -456,48 +590,71 @@ def merge_pending_prose(blocks: list) -> list:
 
 def merge_pending_code(blocks: list) -> list:
     """代码清单合并：相邻 code 块合并为一块（图片/绘图块不打断需外部保证，
-    这里处理 code 的连续折叠：相邻 code 块合并，中间若夹非 code 则断开）。"""
+    这里处理 code 的连续折叠：相邻 code 块合并，中间若夹非 code 则断开）。
+    listing_callout 块夹层时不打断合并（透明占位）——PDF 把一份清单拆成
+    多个 code 块、旁注短语恰夹其间；合并同步拼接 raw_lines / lines /
+    line_pages（行级定位坐标映射）与 page_span / bbox 并集。"""
     out: list = []
     pending_code = None
     for b in blocks:
         if b.kind == "code":
             if pending_code is not None:
-                # 连续 code 块：合并文本，保留首个 lang
-                pending_code.text = (pending_code.text + "\n" + b.text).strip("\n")
+                pending_code.text = (
+                    pending_code.text + "\n" + b.text).strip("\n")
+                pending_code.meta["raw_lines"] = (
+                    (pending_code.meta.get("raw_lines") or [])
+                    + (b.meta.get("raw_lines") or []))
+                pending_code.meta["lines"] = (
+                    (pending_code.meta.get("lines") or [])
+                    + (b.meta.get("lines") or []))
+                pa, pb_ = pending_code.bbox, b.bbox
+                pending_code.bbox = (min(pa[0], pb_[0]), min(pa[1], pb_[1]),
+                                     max(pa[2], pb_[2]), max(pa[3], pb_[3]))
+                sp = pending_code.meta.get("page_span")
+                sp = sp or (pending_code.page, pending_code.page)
+                pending_code.meta["page_span"] = (
+                    min(sp[0], b.page), max(sp[1], b.page))
             else:
                 pending_code = b
                 out.append(b)
-        else:
+        elif not b.meta.get("listing_callout"):
             pending_code = None
             out.append(b)
+        else:
+            out.append(b)   # 旁注块透传（后续由 callouts 消费），不断开合并
     return out
 
 
 def merge_two_line_headings(blocks: list) -> list:
     """两行章节标题合并：相邻两 prose 块若满足 _is_two_line_heading，
-    合并为一块 prose（标题化在 render 阶段按 TOC 重新判定）。"""
+    合并为一块 prose（标题化在 render 阶段按 TOC 重新判定）。
+    annot/listing_callout/showcase 块跳过——旁注短语两行相邻会被误判为
+    标题对，且并块会丢 callout_lines 组元数据；showcase 块须保持组内独立。"""
     out: list = []
     pending = None
+
+    def _flush():
+        nonlocal pending
+        if pending is not None:
+            out.append(pending)
+            pending = None
+
     for b in blocks:
-        if b.kind == "prose" and pending is not None:
-            prev_txt = pending.text.strip()
-            cur_txt = b.text.strip()
-            if (pending.page == b.page
-                    and _is_two_line_heading(prev_txt, cur_txt)):
-                pending.text = (prev_txt + " " + cur_txt).strip()
+        skip = bool(b.meta.get("listing_callout") or b.meta.get("annot")
+                    or b.meta.get("showcase"))
+        if b.kind == "prose" and not skip:
+            if pending is not None and pending.page == b.page \
+                    and _is_two_line_heading(pending.text.strip(),
+                                             b.text.strip()):
+                pending.text = (pending.text.strip() + " "
+                                + b.text.strip()).strip()
                 continue
-            else:
-                out.append(pending)
-                pending = b
-        elif b.kind == "prose":
+            _flush()
             pending = b
         else:
-            if pending is not None:
-                out.append(pending)
-                pending = None
+            _flush()
             out.append(b)
-    if pending is not None:
-        out.append(pending)
+    _flush()
     return out
 
 

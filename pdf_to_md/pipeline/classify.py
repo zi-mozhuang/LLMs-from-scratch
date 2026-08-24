@@ -53,6 +53,14 @@ LISTING_FILL = config.LISTING_FILL
 
 # ---- 图注 / Exercise（方案表） ----
 FIGURE_CAPTION_RE = re.compile(r"^\*{0,2}Figure\s+\d+\.\d+\b")
+# 正文引用句排除：'Figure X.Y shows/illustrates …' 是以图号开头的正文段，
+# 不是图注——误判会使段A 被走 caption 渲染路径并成为图链插入锚点
+# （L3219 型：图拉到引用段前、真图注孤悬段后）。真图注为名词短语开头。
+FIGURE_PROSE_REF_RE = re.compile(
+    r"^\*{0,2}Figure\s+\d+\.\d+\s+"
+    r"(shows|illustrates|plots|graphs|depicts|summarizes|displays|presents"
+    r"|outlines|demonstrates|compares|visualizes|captures)\b",
+    re.I)
 EXERCISE_RE = re.compile(r"^Exercise\s+\d+\.\d+")
 
 # ---- Listing 标题解析（搬运自 collect_listing_headers） ----
@@ -201,38 +209,254 @@ def _mark_annot_blocks(page_blocks) -> None:
                 b.meta["annot"] = True
 
 
-def _mark_listing_callouts(page_blocks, drawings) -> None:
-    """Listing 旁注标注（Manning 排版：代码旁的 HumanistMann 短语 +
-    指向代码行的箭头图形）。判定三条件（缺一不可，防边注误收）：
-    1. 已是 annot 块（HumanistMann/Arial 小字号短文本）；
-    2. bbox 与同页某 code block 纵向重叠 >5pt；
-    3. 页面存在小尺寸黑色 drawing（箭头三角/连线，宽高 ≤12pt）且其
-       y 中心距块 ≤40pt——组级几何锚定，边注（无指示符）天然排除。
-    打 meta["listing_callout"]=True；由 merge.merge_listing_callouts
-    归位进代码围栏尾部作 `# ` 注释。判定失败者维持散段落现状（无害）。"""
-    codes = [b for b in page_blocks if b.kind == "code"]
-    if not codes:
-        return
-    marker_ys = []
+# ---- Listing 旁注标记（2026-08 重构：贪心配对 + 片段分组）------------------
+# 旧判据「bbox 与 code block 纵向重叠 >5pt」漏掉悬在代码区上方的旁注
+# （p48 Listing 2.3 实测两处），且组级 marker 探测无法定位目标行。
+# 新结构链：annot 前置不变；折行碎片按几何分组；组与三角箭头簇贪心最近
+# 唯一配对（间隙欧氏距离）；箭头中心须落进某 code block y 范围 ±15pt
+# （箭头指进代码才是成员资格判据）。meta 记录 callout_gid/callout_y 供
+# merge 行级定位插入。
+_TRI_MAX = 12.0          # 三角部件最大宽高（与 figure_text_detect 同源）
+_PAIR_MAX_DIST = 70.0    # 组↔箭头最大间隙欧氏距离
+_PAIR_MAX_DY = 40.0      # 组↔箭头最大纵向间隙（沿用旧阈值）
+_GROUP_GAP_Y = 12.0      # 折行碎片最大纵向间隙
+_CODE_NEAR = 15.0        # 箭头中心距代码块边界的容差
+
+
+def _tri_arrow_clusters(drawings) -> list:
+    """黑色小三角 drawing 部件按 cy 聚簇（每支箭头一个 (cx, cy) 中心）。
+    一支三角常拆成 2-4 个部件矩形，cy 相近（≤3pt）。"""
+    pts = []
     for fill, r in drawings or []:
         if fill is None:
             continue
         if tuple(round(v, 2) for v in fill) != (0.0, 0.0, 0.0):
             continue
-        if r.width <= 12 and r.height <= 12:
-            marker_ys.append((r.y0 + r.y1) / 2)
-    if not marker_ys:
-        return
+        if r.width <= _TRI_MAX and r.height <= _TRI_MAX:
+            pts.append(((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2))
+    clusters = []
+    for cx, cy in sorted(pts, key=lambda p: p[1]):
+        if clusters and abs(cy - clusters[-1][1] / clusters[-1][2]) <= 3.0:
+            sx, sy, n = clusters[-1]
+            clusters[-1] = (sx + cx, sy + cy, n + 1)
+        else:
+            clusters.append((cx, cy, 1))
+    return [(sx / n, sy / n) for sx, sy, n in clusters]
+
+
+def _annot_line_units(page_blocks) -> list:
+    """annot prose 块 → 行级单元 [block, line_idx, text, bbox]。
+    跨栏混排的 PDF 块（p222 实测：右栏尾行与左栏另一短语并进一块）
+    依赖行级拆分才能归入各自短语组。"""
+    units = []
     for b in page_blocks:
-        if b.kind != "prose" or not b.meta.get("annot"):
+        if not (b.kind == "prose" and b.meta.get("annot")):
             continue
-        bx = fitz.Rect(b.bbox)
-        if not any(min(bx.y1, c.bbox[3]) - max(bx.y0, c.bbox[1]) > 5
+        raws = b.meta.get("raw_lines") or b.text.split("\n")
+        lns = b.meta.get("lines") or []
+        for i, raw in enumerate(raws):
+            txt = raw.strip()
+            if not txt:
+                continue
+            bb = None
+            if i < len(lns):
+                sp = [s for s in lns[i].get("spans", []) if s.get("bbox")]
+                if sp:
+                    bb = (min(s["bbox"][0] for s in sp),
+                          min(s["bbox"][1] for s in sp),
+                          max(s["bbox"][2] for s in sp),
+                          max(s["bbox"][3] for s in sp))
+            units.append([b, i, txt, bb if bb is not None else tuple(b.bbox)])
+    return units
+
+
+def _group_callout_fragments(page_blocks) -> list:
+    """行级单元折行分组：同列（x 重叠 ≥50% 较窄者）+ 纵向相邻 ≤12pt +
+    前单元未收句（独立旁注守卫：p99 实测两条独立注 gap 仅 9.6pt，而真
+    折行片段 gap ≤1pt 且无句末标点）。单元先按 (y0,x0) 排序——跨栏混排
+    块会打乱流序（p222 实测："sequence" 行因块合并提前于 "to the
+    longest"），y 序 + 多开放组按列各自链接才能还原阅读顺序。
+    返回 [[unit,...],...]，unit=[block,i,text,bbox]。"""
+    groups: list = []
+    units = sorted(_annot_line_units(page_blocks),
+                   key=lambda u: (round(u[3][1], 1), round(u[3][0], 1)))
+    for u in units:
+        for g in groups:
+            lu = g[-1]
+            if (not lu[2].rstrip().endswith((".", "!", "?", ":", ";"))
+                    and -2.0 <= u[3][1] - lu[3][3] <= _GROUP_GAP_Y
+                    and _unit_same_column(lu, u)):
+                g.append(u)
+                break
+        else:
+            groups.append([u])
+    return groups
+
+
+def _unit_same_column(a, b) -> bool:
+    ox = min(a[3][2], b[3][2]) - max(a[3][0], b[3][0])
+    nw = min(a[3][2] - a[3][0], b[3][2] - b[3][0])
+    return nw > 0 and ox >= 0.5 * nw
+
+
+
+def _mark_listing_callouts(page_blocks, drawings) -> None:
+    """Listing 旁注标注（Manning 排版：代码旁 HumanistMann 短语 + 指向
+    代码行的三角箭头）。结构链：
+    1. annot 前置（_mark_annot_blocks 已打标）；
+    2. 行级单元分组：跨栏混排块按行拆分归属各自短语组（_group_callout_
+       fragments；同列 + 纵向相邻 ≤12pt + 句末标点守卫）；
+    3. 组 ↔ 三角箭头簇贪心最近唯一配对（间隙欧氏距离 ≤70pt 且纵向 ≤40pt）；
+    4. 成员资格：箭头中心落进某 code block y 范围 ±15pt（边注无指向
+       代码的箭头，天然排除）。
+    通过者打 meta["listing_callout"]=True 与 meta["callout_lines"]=
+    {gid: [(行文本, 目标箭头cy), ...]}——一个 PDF 块可向多个组贡献行；
+    由 merge.merge_listing_callouts 按目标行插入 `# ` 注释。"""
+    codes = [b for b in page_blocks if b.kind == "code"]
+    clusters = _tri_arrow_clusters(drawings)
+    if not codes or not clusters:
+        return
+    groups = _group_callout_fragments(page_blocks)
+    # 配对候选：(dist, dy, gi, ci)
+    cands = []
+    for gi, g in enumerate(groups):
+        gx0 = min(u[3][0] for u in g)
+        gy0 = min(u[3][1] for u in g)
+        gx1 = max(u[3][2] for u in g)
+        gy1 = max(u[3][3] for u in g)
+        for ci, (cx, cy) in enumerate(clusters):
+            dx = max(gx0 - cx, cx - gx1, 0)
+            dy = max(gy0 - cy, cy - gy1, 0)
+            dist = (dx * dx + dy * dy) ** 0.5
+            if dist <= _PAIR_MAX_DIST and dy <= _PAIR_MAX_DY:
+                cands.append((round(dy, 1), round(dist, 1), gi, ci))
+    cands.sort()
+    used_g, used_c = set(), set()
+    for _dist, _dy, gi, ci in cands:
+        if gi in used_g or ci in used_c:
+            continue
+        used_g.add(gi)
+        used_c.add(ci)
+        cx, cy = clusters[ci]
+        # 成员资格：箭头指进某代码块的 y 邻域
+        if not any(c.bbox[1] - _CODE_NEAR <= cy <= c.bbox[3] + _CODE_NEAR
                    for c in codes):
             continue
-        d = min(min(abs(m - bx.y0), abs(m - bx.y1)) for m in marker_ys)
-        if d <= 40:
-            b.meta["listing_callout"] = True
+        gid = f"p{groups[gi][0][0].page}:{gi}"
+        for u in groups[gi]:
+            blk = u[0]
+            blk.meta["listing_callout"] = True
+            lst = blk.meta.setdefault("callout_lines", {}).setdefault(gid, [])
+            lst.append((u[2], cy))
+
+    # 第三级成员资格（无箭头/箭头超距的旁注）：组与某 code block 纵向
+    # 重叠占组高 ≥50%。全书实测：13 组候选语义全为 listing 旁注
+    # （"Tensor shape:"、"Uses a placeholder…" 等）；历史合法边注与图
+    # 标签均与代码无重叠或重叠极小，零误收。目标行取组纵向中心。
+    for gi, g in enumerate(groups):
+        if gi in used_g:
+            continue
+        gy0 = min(u[3][1] for u in g)
+        gy1 = max(u[3][3] for u in g)
+        gh = gy1 - gy0
+        if gh <= 0:
+            continue
+        best = max(codes, key=lambda c: min(gy1, c.bbox[3]) - max(gy0, c.bbox[1]))
+        ov = min(gy1, best.bbox[3]) - max(gy0, best.bbox[1])
+        if ov / gh < 0.5:
+            continue
+        gid = f"p{g[0][0].page}:x{gi}"   # x 前缀 = 几何资格（无箭头配对）
+        cy = (gy0 + gy1) / 2
+        for u in g:
+            blk = u[0]
+            blk.meta["listing_callout"] = True
+            lst = blk.meta.setdefault("callout_lines", {}).setdefault(gid, [])
+            lst.append((u[2], cy))
+
+    # 第四级成员资格（清单尾注）：组紧贴某 code block 下缘（间隙 ≤15pt）
+    # 且横向与代码列重叠 ≥50% 组宽——Manning 尾注形态（注在清单结束后
+    # 下方、箭头向上指入末行），配对的 dy 上限与第三级的重叠判据对它
+    # 双双失效（p108 'Combines heads…' 实测）。目标行 = 清单末行
+    # （target_y 取 code 底缘上方 5pt）。误收分析：正文非 annot 字体
+    # 天然排除；真边注与代码列的贴邻概率由全书 diff 复核把关。
+    for gi, g in enumerate(groups):
+        if gi in used_g:
+            continue
+        gx0 = min(u[3][0] for u in g)
+        gy0 = min(u[3][1] for u in g)
+        gx1 = max(u[3][2] for u in g)
+        gw = gx1 - gx0
+        if gw <= 0:
+            continue
+        best = None
+        for c in codes:
+            ox = min(gx1, c.bbox[2]) - max(gx0, c.bbox[0])
+            if ox < 0.5 * gw:
+                continue
+            gap_below = gy0 - c.bbox[3]
+            gap_above = c.bbox[1] - gy1
+            if 0 <= gap_below <= 15.0 or 0 <= gap_above <= 15.0:
+                if best is None or gap_below < best[0]:
+                    best = (gap_below, c)
+        if best is None:
+            continue
+        gid = f"p{g[0][0].page}:t{gi}"   # t 前缀 = 清单尾注资格
+        cy = max(best[1].bbox[3] - 5.0, 0.0)
+        for u in g:
+            blk = u[0]
+            blk.meta["listing_callout"] = True
+            lst = blk.meta.setdefault("callout_lines", {}).setdefault(gid, [])
+            lst.append((u[2], cy))
+
+    # 第五级成员资格（leader 仲裁，仅兜底前四级失败的组）：Manning 挤压
+    # 版式下注文本可远离其箭头——「黑色细长竖线」一端接三角（线顶
+    # 侧旁，cx 容差 65 / cy 容差 12），另一端连注文本（线底），线即强
+    # 关联证据（p186 实测：三角 y340/350 + 竖线下探至 598/582 接页底
+    # 两注；p59 三条历史存量 STRAY 同此形态）。判定收紧：h≥60、底端
+    # 触组容差 [-5,+12]、横向远离排除。
+    leaders = [r for fill, r in drawings or []
+               if fill is not None
+               and tuple(round(v, 2) for v in fill) == (0.0, 0.0, 0.0)
+               and r.width <= 3.0 and r.height >= 60.0]
+    used_l: set = set()
+    for gi, g in enumerate(groups):
+        if gi in used_g:
+            continue
+        gy0 = min(u[3][1] for u in g)
+        gy1 = max(u[3][3] for u in g)
+        gx0 = min(u[3][0] for u in g)
+        gx1 = max(u[3][2] for u in g)
+        for L in sorted(leaders, key=lambda r: -r.height):
+            if id(L) in used_l:
+                continue
+            if not (gy0 - 5.0 <= L.y1 <= gy1 + 12.0):
+                continue
+            if L.x1 < gx0 - 40 or L.x0 > gx1 + 40:
+                continue
+            hit_ci = None
+            for ci, (cx, cy) in enumerate(clusters):
+                if ci in used_c:
+                    continue
+                if abs(cx - L.x0) <= 65.0 and abs(cy - L.y0) <= 12.0:
+                    hit_ci = ci
+                    break
+            if hit_ci is None:
+                continue
+            cx, cy = clusters[hit_ci]
+            if not any(c.bbox[1] - _CODE_NEAR <= cy <= c.bbox[3] + _CODE_NEAR
+                       for c in codes):
+                break   # 箭头未指入代码 → 该 leader 与本组无有效配对
+            used_g.add(gi)
+            used_c.add(hit_ci)
+            used_l.add(id(L))
+            gid = f"p{g[0][0].page}:L{gi}"   # L 前缀 = leader 仲裁
+            for u in g:
+                blk = u[0]
+                blk.meta["listing_callout"] = True
+                lst = blk.meta.setdefault("callout_lines",
+                                          {}).setdefault(gid, [])
+                lst.append((u[2], cy))
+            break
 
 
 def _tag_box_membership(page_blocks, page_index, drawings, skip_rects) -> None:
@@ -452,7 +676,8 @@ def classify_pages(pages: list) -> list:
                 blocks_out.append(block)
                 continue
             # 6) 图注
-            if FIGURE_CAPTION_RE.match(text):
+            if FIGURE_CAPTION_RE.match(text) \
+                    and not FIGURE_PROSE_REF_RE.match(text):
                 block.kind = "figure_caption"
                 blocks_out.append(block)
                 continue
@@ -507,10 +732,63 @@ def classify_pages(pages: list) -> list:
     #   供同页的 _mark_listing_callouts 依赖 annot 前置条件）
 
     _drop_heading_suffix_fragments(blocks_out)
+    # 模型输出展示区编组（FG-Demi12 标签 / FG-Book9.5 缩进体 → ```text 围栏）
+    _mark_showcase_groups(blocks_out)
     # 章节标题补全：TOC level-1 章节条目若 PDF 未提取到文本（大字/图标题被剔除），
     # 以 TOC ground truth 在最接近章节首页处插入 heading 块（搬运 fix_chapters 的重建意图）。
     _ensure_chapter_headings(blocks_out, toc, pages)
     return blocks_out
+
+
+# ---- 模型输出展示区（ch7 Ollama 示例：Demi12 标签 + Book9.5 缩进体） ----
+# 全书验证：FG-Demi12 x0>=115 仅 20 个标签块；FG-Book9.5 x0>=115 共 37 块
+# 恰为 7 组成员、零噪声（x0=114 为概念框 body，被阈值排除）。
+SHOWCASE_X_MIN = 115.0
+
+
+def _showcase_font(b) -> str | None:
+    sps = [s for ln in b.meta.get("lines", []) for s in (ln.get("spans") or [])]
+    if not sps or b.bbox[0] < SHOWCASE_X_MIN:
+        return None
+    f, sz = sps[0]["font"], sps[0]["size"]
+    if "FranklinGothic-Demi" in f and abs(sz - 12.0) < 0.3:
+        return "label"
+    if "FranklinGothic-Book" in f and abs(sz - 9.5) < 0.3:
+        return "body"
+    return None
+
+
+def _mark_showcase_groups(blocks_out: list) -> None:
+    """连续的展示区块编组（meta['showcase']=gid），供 render 包 ```text 围栏。
+
+    组起点 = Demi12 标签块 或 'Below is an instruction' 起头的 Book 体块；
+    成员 = 后续连续的标签/体块；非成员块关组。p256 三组连排时组间 gap
+    小于组内 gap，纯几何不可分界——起点模式是唯一可靠边界。"""
+    gid = 0
+    cur = False
+    for b in blocks_out:
+        role = _showcase_font(b)
+        is_start = role == "label" or (
+            role == "body"
+            and b.text.strip().startswith("Below is an instruction"))
+        if is_start:
+            if not cur:
+                gid += 1
+            cur = True
+            b.meta["showcase"] = gid
+        elif role and cur:
+            b.meta["showcase"] = gid
+        else:
+            cur = False
+    # 首尾标志（渲染围栏开合）
+    seen = {}
+    for b in blocks_out:
+        g = b.meta.get("showcase")
+        if g is not None:
+            seen.setdefault(g, []).append(b)
+    for g, members in seen.items():
+        members[0].meta["showcase_first"] = True
+        members[-1].meta["showcase_last"] = True
 
 
 def _drop_heading_suffix_fragments(blocks_out: list) -> None:

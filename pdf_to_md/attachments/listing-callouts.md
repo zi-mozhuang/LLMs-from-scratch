@@ -1,5 +1,9 @@
 # Listing 旁注归位为代码注释（2025-08）
 
+> **[2026-08 已升级]** 尾插方案被行级定位归位取代（按箭头落点插入目标
+> 行上方），并修复旁注在 extract 阶段被图区种子误删的遗漏——见
+> [listing-callout-positioning.md](listing-callout-positioning.md)。以下为历史记录。
+
 对应 pdf-to-md-plan.md「Listing 旁注」条目。结构信号链：`classify._mark_listing_callouts` 打标 → `merge.merge_listing_callouts` 归位。
 
 ## 问题（改造前）

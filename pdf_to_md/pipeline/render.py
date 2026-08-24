@@ -60,13 +60,31 @@ def load_figure_map(manifest_path: str) -> dict:
     return fig_map
 
 
+# 块级合成已插入的图（供兜底 pass 判定缺口；render 每次调用前重置）
+_INSERTED_FIGS: set = set()
+
+
 def insert_figures(lines: list, fig_map: dict) -> list:
+    """兜底图链插入：仅为块级合成未覆盖的 fig 补插。
+
+    主路径是 _block_to_lines 的 figure_caption 块级合成——caption 块本身
+    就是精确锚点。本兜底只处理 manifest 有图但全书无 figure_caption 块
+    的缺口 fig；锚定行要求斜体图注形态且排除正文引用句动词续行
+    （shows/illustrates/...），防 'Figure X.Y shows…' 正文段误锚
+    （L3219 型错插事故：图链被拉到引用段前、真图注孤悬）。"""
+    prose_ref = re.compile(
+        r"^\*{0,2}Figure [\w.]+\*{0,2}\s+(shows|illustrates|plots|graphs|"
+        r"depicts|summarizes|displays|presents|outlines|demonstrates|"
+        r"compares|visualizes|captures)\b", re.I)
     out = []
     for line in lines:
-        m = FIG_RE.match(line)
-        if m and m.group(1) in fig_map:
+        m = re.match(r"^\*{0,2}Figure ([\w.]+)\b", line)
+        if m and m.group(1) in fig_map \
+                and m.group(1) not in _INSERTED_FIGS \
+                and not prose_ref.match(line):
             rel = fig_map[m.group(1)]
             out.append(f"![Fig {m.group(1)}](extracted_images/{rel})")
+            _INSERTED_FIGS.add(m.group(1))
         out.append(line)
     return out
 
@@ -250,6 +268,40 @@ def fix_dash_bullets(lines: list, mask: list) -> list:
         out.append(f"{prefix}{merged}")
         i += 3
         fixes += 1
+    return out
+
+
+def merge_fragmented_inline_code(lines: list, mask: list) -> list:
+    """相邻行内代码片段合并：`a` `b` `c` → `a b c`（迭代至不动点，整链合一）。
+
+    PDF 把 Courier 引文按词/符号切 span，逐 span 包反引号产生逐词碎片
+    （如 `"Every` `effort` `moves"`、`context_vec` `=` `attn_weights`、
+    `[2,` `4,` `50257]`、断词残段 `num_` `tokens`）。围栏内不处理；
+    引用块剥前缀后处理再还原。"""
+    BT = chr(96)
+    pair = re.compile(BT + "([^" + BT + "]+)" + BT + " " + BT +
+                      "([^" + BT + "]+)" + BT)
+    out = []
+    for line, m in zip(lines, mask):
+        if m:
+            out.append(line)
+            continue
+        s = line
+        prefix = ""
+        core = s.lstrip()
+        if core.startswith(">"):
+            lead = core[1:]
+            prefix = s[:len(s) - len(core)] + ">" + lead[:len(lead) - len(lead.lstrip())]
+            s = lead.lstrip()
+            if not s:
+                out.append(line)
+                continue
+        while True:
+            new = pair.sub(BT + "\\1 \\2" + BT, s)
+            if new == s:
+                break
+            s = new
+        out.append(prefix + s)
     return out
 
 
@@ -466,10 +518,22 @@ def inject_anchors_and_toc(lines: list, heads, anchors, toc) -> str:
 # ===========================================================================
 # Block → 行渲染
 # ===========================================================================
-def _block_to_lines(block) -> list:
-    """把单个 Block 渲染为 markdown 行（不含 figure 合成 / 加粗 / 数学清洗）。"""
+def _block_to_lines(block, fig_map=None) -> list:
+    """把单个 Block 渲染为 markdown 行（数学清洗/加粗仍由后续 pass 承担；
+    figure_caption 的图链在此块级合成——caption 块即精确锚点）。"""
     k = block.kind
     t = block.text.strip()
+
+    if block.meta.get("showcase"):
+        lines = []
+        if block.meta.get("showcase_first"):
+            lines.append("```text")
+        for ln in t.split("\n"):
+            if ln.strip():
+                lines.append(ln)
+        if block.meta.get("showcase_last"):
+            lines += ["```", ""]
+        return lines
 
     if k == "heading":
         level = block.level  # 1/2/3
@@ -508,7 +572,8 @@ def _block_to_lines(block) -> list:
                 lines.append("> ```")
             else:
                 v = body["v"] if isinstance(body, dict) else body
-                lines.append(f"> {v}")
+                for sub in v.split("\n"):
+                    lines.append(f"> {sub}" if sub.strip() else ">")
         if not lines:
             lines.append(f"> {t}")
         lines.append("")
@@ -539,7 +604,8 @@ def _block_to_lines(block) -> list:
         lines = [f"> **{head}**"]
         for p in parts[1:]:
             lines.append(">")
-            lines.append(f"> {p}")
+            for sub in p.split("\n"):
+                lines.append(f"> {sub}" if sub.strip() else ">")
         lines.append("")
         return lines
 
@@ -552,7 +618,23 @@ def _block_to_lines(block) -> list:
     if k == "figure_caption":
         # 折叠同块多行为单行（等价旧链 p1 段落合并；bold_captions 依赖单行匹配）
         t = " ".join(t.split("\n")).strip()
-        return [f"{t}", ""]
+        out = []
+        m = re.match(r"^Figure ([\w.]+)\b", t)
+        if fig_map and m and m.group(1) in fig_map \
+                and m.group(1) not in _INSERTED_FIGS:
+            rel = fig_map[m.group(1)]
+            # 图+图注合成 <figure>，图注用 <figcaption> 区别于正文
+            # （不再发独立 ![Fig] 行 + 斜体 lead；bold_captions 仅管 Table/Listing）
+            esc = t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            out.append("<figure>")
+            out.append(f'<img src="extracted_images/{rel}" alt="Fig {m.group(1)}">')
+            out.append(f"<figcaption>{esc}</figcaption>")
+            out.append("</figure>")
+            out.append("")
+            _INSERTED_FIGS.add(m.group(1))
+        else:
+            out += [f"{t}", ""]
+        return out
 
     if k == "summary_list":
         # 章末 Summary：Wingdings 圆点列表 → Markdown 无序列表（merge_summary_items
@@ -584,11 +666,84 @@ def _block_to_lines(block) -> list:
     return [t, ""]
 
 
+def fix_blockquote_continuations(lines: list) -> list:
+    """修复引用框（callout/concept_box/note/exercise 等）因 PDF 折行导致的续行
+    掉出 `>` 块：某行非空白、非 `>`（排除代码围栏内 `>>` 与围栏行），其上下最近
+    非空白行均为 `>` 续行、且上行 `>` 未以句末标点结束（本行是上一句续写）→
+    该行重加 `>` 前缀并吞掉两侧空行。确定性、不误伤独立段落（独立段落前的 `>`
+    行以句末标点收尾，不会触发）。覆盖 concept_box/exercise 多行体拆分之外的
+    折行续行（如 callout 引用 URL 折到次行、参考文献描述句大写开头）。"""
+    TERM = set(".!?:;)])\"’'”")
+    n = len(lines)
+    infence = [False] * n
+    f = False
+    for j, l in enumerate(lines):
+        if l.strip().startswith("```"):
+            f = not f
+            infence[j] = True
+            continue
+        infence[j] = f
+    out = []
+    i = 0
+    while i < n:
+        line = lines[i]
+        s = line.lstrip()
+        if (not infence[i] and line.strip()
+                and not s.startswith(">")
+                and not s.startswith(">>")
+                and not s.startswith("```")):
+            u = i - 1
+            while u >= 0 and lines[u].strip() == "":
+                u -= 1
+            d = i + 1
+            while d < n and lines[d].strip() == "":
+                d += 1
+            if (u >= 0 and d < n
+                    and lines[u].lstrip().startswith(">")
+                    and not lines[u].lstrip().startswith(">>")
+                    and lines[d].lstrip().startswith(">")
+                    and not lines[d].lstrip().startswith(">>")):
+                up = lines[u].lstrip()[1:].strip()
+                # 实体结尾非断句：URL（附录 B 文献签名）、数字（ISBN/年份）、
+                # 连字符断词残留——其后的独立段落不得吞入引用块
+                if up and up[-1] not in TERM \
+                        and not re.search(r"https?://\S+$", up) \
+                        and not up[-1].isdigit() \
+                        and not up.endswith("-"):
+                    while out and out[-1].strip() == "":
+                        out.pop()
+                    out.append(f"> {line.strip()}")
+                    i += 1
+                    while i < n and lines[i].strip() == "":
+                        i += 1
+                    continue
+        out.append(line)
+        i += 1
+    return out
+
+
 def render(blocks: list, manifest_path) -> str:
-    # 步骤 1：Block → 行
+    fig_map = load_figure_map(str(manifest_path))
+    _INSERTED_FIGS.clear()
+    # 步骤 1：Block → 行（figure_caption 块级合成图链）
     lines = []
     for b in blocks:
-        lines.extend(_block_to_lines(b))
+        lines.extend(_block_to_lines(b, fig_map))
+
+    # 连续引用块拼接：同一 callout 被切成多个 IR 块时，块间裸空行会终止
+    # blockquote，使引用框断裂（如 "Information leakage" 被分成标题块与续写块）。
+    # 块间裸空行若上下均为 '>' 续行、且下一行非新标题 callout（'> **…'），
+    # 补 '>' 保持单一引用块连续；下一行是 '> **Title**' 则保持为独立引用框。
+    merged = []
+    for i, line in enumerate(lines):
+        if (line == "" and i > 0 and i + 1 < len(lines)
+                and lines[i - 1].lstrip().startswith(">")
+                and lines[i + 1].lstrip().startswith(">")
+                and not lines[i + 1].lstrip().startswith("> **")):
+            merged.append(">")
+        else:
+            merged.append(line)
+    lines = merged
 
     # 步骤 1.5：断词处理（搬运 p2_clean 第 351-352 行：行级、不跳围栏；
     # 随后 fix_structure.fix_hyphenation：仅围栏外。顺序等价旧链）
@@ -597,8 +752,8 @@ def render(blocks: list, manifest_path) -> str:
     # 行内 bullet 符号归一（搬运 fix_structure.fix_bullets_control）
     lines = fix_bullets_control(lines)
 
-    # 步骤 2：图链接合成
-    fig_map = load_figure_map(str(manifest_path))
+    # 步骤 2：图链接兜底（仅补块级合成未覆盖的缺口 fig；斜体形态锚定
+    # 且排除正文引用句动词续行，见 insert_figures docstring）
     lines = insert_figures(lines, fig_map)
     lines = dedupe_figures(lines)
 
@@ -619,16 +774,20 @@ def render(blocks: list, manifest_path) -> str:
     # fix_dash_bullets 会合并行导致后续索引偏移，共享掩码会错位）
     lines = fix_dash_bullets(lines, fence_mask(lines))
     lines = fix_inline_code_breaks(lines, fence_mask(lines))
+    # 步骤 6.4：相邻行内代码片段合并（PDF 逐词 span 碎片 → 单一代码段）
+    lines = merge_fragmented_inline_code(lines, fence_mask(lines))
 
     # 步骤 6.5：内容锚点补丁（搬运 fix_missing_sections.py 全部 pass）
     lines = apply_missing_sections(lines)
 
-    # 步骤 6.6：伪标题/损坏区修复 + 封底裁剪（搬运 fix_structure.run_pseudo）
+    # 步骤 6.6：伪标题/损坏区修复（搬运 fix_structure.run_pseudo；
+    # 原封底裁剪已并入步骤 6.7 索引截断）
     lines = apply_pseudo_patches(lines)
 
-    # 步骤 6.7：索引区三栏重排（搬运 fix_index.py 整体逻辑）
-    from pipeline.index import rebuild_index
-    lines, _ = rebuild_index(lines)
+    # 步骤 6.7：索引区截断（自 Index 标题起不入 MD；原三栏重排已废弃，
+    # 见 attachments/format-fix-round2.md 子方案 2 的历史记录）
+    from pipeline.index import drop_index
+    lines, _ = drop_index(lines)
 
     # 步骤 6.8：附录 E 图渲染与链接插入（搬运 render_appendix_figures.py）
     lines = insert_appendix_figure_links(lines)
@@ -639,6 +798,9 @@ def render(blocks: list, manifest_path) -> str:
     # 步骤 6.10：等价旧链的落盘/重读边界——把 pass 内嵌入的 "\n" 拆成独立行
     # （旧链各脚本以 write_text + split("\n") 交接，行列表元素内不会保留换行）
     lines = [sub for l in lines for sub in l.split("\n")]
+
+    # 步骤 6.11：引用框折行续行修复（掉出 > 块的裸行重加前缀）
+    lines = fix_blockquote_continuations(lines)
 
     # 步骤 7：TOC + 锚点
     # 使用 rebuild_toc.build（文档顺序，含附录上下文）

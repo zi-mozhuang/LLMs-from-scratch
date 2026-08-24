@@ -4,8 +4,10 @@
 - fix_missing_sections.py：§5.4 / §7.4 标题缺失、残段与丢失代码块（全部）。
 - fix_structure.py 的 run_pseudo / run_round2 相关 pass：
   macOS callout 重建、附录 B/C/D 标题、Figure E.1 泄漏清理、输出块围栏化、
-  §7.8 评估方法区重建、Exercise 7.2 空壳删除、封底裁剪、附录 Listing 加粗、
+  §7.8 评估方法区重建、Exercise 7.2 空壳删除、附录 Listing 加粗、
   E.2 标题拆出、Figure E caption 加粗、附录 B Chapter1 恢复、第1章标题插入。
+  （封底裁剪 cut_back_cover 已删：索引区截断（render 步骤 6.7）覆盖其全部
+  输出，A/B monkeypatch identity → 全量渲染 MD 哈希不变，2026-08。）
 - render_appendix_figures.py：附录 E Figure E.1–E.5 渲染与链接插入。
 
 所有补丁按内容特征定位、幂等可重跑；逻辑与阈值原样保留。
@@ -40,6 +42,12 @@ DEVICE_CODE = list(PATCHES_DATA["device_code"])
 # 文本层无对应文字，正文引导语悬空。从 PNG 逐字转录重建（2025-08）。
 FIGURE_CODE_REBUILDS = PATCHES_DATA["figure_code_rebuilds"]
 
+# 截图式/绘制式数学公式重建：书版把展示型公式只画进矢量图（文本层无对应
+# 文字，正文以 "…:" / "approximation" 等引导语悬空），与 figure_code_rebuilds
+# 同理，从 PDF 物理内容逐字转录 LaTeX 注入锚点后。display=true 用 $$…$$
+# 块级公式；inline 用 $…$ 行内公式（由 fix_equation_gaps 按锚点就地包裹）。
+EQUATION_REBUILDS = PATCHES_DATA.get("equation_rebuilds", [])
+
 
 def fix_figure_code_gaps(lines: list) -> int:
     """截图式代码图的内容重建：在引导语锚点行后插入图内独有代码围栏
@@ -62,6 +70,38 @@ def fix_figure_code_gaps(lines: list) -> int:
             insert += ["", "```text"] + spec["output"] + ["```"]
         lines[i + 1:i + 1] = insert
         n += 1
+    return n
+
+
+def fix_equation_gaps(lines: list) -> int:
+    """绘制式/截图式数学公式重建（同 figure_code_rebuilds 思路）。书版把展示型
+    公式只画进矢量图，文本层无对应文字，正文以引导语悬空。display=true 在
+    锚点行后插入块级 $$…$$；display=false 把锚点行内公式片段就地包成 $…$。
+    幂等：已存在相同 tex 则跳过；锚点全书唯一才插（守卫）。"""
+    n = 0
+    for spec in EQUATION_REBUILDS:
+        anchor, tex = spec["anchor"], spec["tex"]
+        disp = spec.get("display", False)
+        hits = [i for i, l in enumerate(lines) if anchor in l]
+        if len(hits) != 1:
+            continue  # 锚点不唯一/缺失：放弃（不误插）
+        i = hits[0]
+        if disp:
+            block = ["", "$$" + tex + "$$", ""]
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines) and ("$$" + tex + "$$") in lines[j]:
+                continue  # 已重建
+            lines[i + 1:i + 1] = block
+            n += 1
+        else:
+            line = lines[i]
+            if ("$" + tex + "$") in line:
+                continue  # 已重建
+            if tex in line:
+                lines[i] = line.replace(tex, "$" + tex + "$")
+                n += 1
     return n
 
 
@@ -134,6 +174,7 @@ def apply_missing_sections(lines: list) -> list:
     fix_74_opening(lines)
     fix_74_device_code(lines)
     fix_figure_code_gaps(lines)
+    fix_equation_gaps(lines)
     return lines
 
 
@@ -333,33 +374,17 @@ def fix_exercise_72_dup(lines: list) -> int:
     return n
 
 
-def cut_back_cover(lines: list) -> int:
-    """删除封底营销区（封面描述段之后到文件末尾），并为 liveProjects 页补标题。"""
-    n = 0
-    idx = next((i for i, l in enumerate(lines)
-                if l.startswith("A view of the text processing steps in the context of an LLM")), None)
-    if idx is not None:
-        del lines[idx:]
-        n += 1
-    # liveProjects 推广页首行补成标题（幂等）
-    for i, l in enumerate(lines):
-        if l.strip() == "Hands-on projects for learning your way":
-            if not lines[i].startswith("#"):
-                lines[i] = "## Hands-on projects for learning your way"
-                n += 1
-            break
-    return n
-
-
 def apply_pseudo_patches(lines: list) -> list:
-    """搬运 fix_structure.run_pseudo 的 pass 序列（顺序一致）。"""
+    """搬运 fix_structure.run_pseudo 的 pass 序列（顺序一致）。
+    （原 cut_back_cover 已删：输出被索引截断完全覆盖，A/B 哈希不变。
+     原 wrap_leaked_output_block 已由 classify._mark_showcase_groups +
+     render 围栏渲染结构化接管——覆盖同区 3 组并新增 p265/266 评分
+     输出 2 组；且不再剥 '### ' 前缀，围栏内容恢复 PDF 原文。）"""
     fix_macos_callout(lines)
     fix_appendix_headings(lines)
     fix_figure_e1_leak(lines)
-    wrap_leaked_output_block(lines)
     fix_evaluation_section(lines)
     fix_exercise_72_dup(lines)
-    cut_back_cover(lines)
     return lines
 
 
@@ -478,6 +503,67 @@ def fix_table_1_1(lines: list) -> int:
     if e is None or e < s:
         return 0
     lines[s:e + 1] = list(t11["lines"])
+    return 1
+
+
+def fix_hardware_runtime_table(lines: list) -> int:
+    """ch7 概念框内无格线参考表（表头 'Model name/Device/Run time' +
+    6 数据行）→ 引用块内 GFM 管道表。
+
+    该表无网格线（区别于 Table 1.1），PDF 以每视觉行一个块提取、
+    块内 \n 分隔各列；被 concept_box 吸收后压成单段长文。本 pass 按
+    结构信号全书定位（页内 ≥4 个等高多列短块且首块含 'Model name'），
+    列数据运行时从 PDF 提取，无硬编码内容。幂等可重跑。"""
+    if any(l.startswith("> | Model name |") for l in lines):
+        return 0
+    anchor = next((i for i, l in enumerate(lines)
+                   if l.startswith("> Model name Device Run time")
+                   and "gpt2-medium" in l), None)
+    if anchor is None:
+        return 0
+    doc = pymupdf.open(str(config.PDF_PATH))
+    rows = None
+    for page in doc:
+        blocks = []
+        for b in page.get_text("dict")["blocks"]:
+            if b["type"] != 0:
+                continue
+            h = b["bbox"][3] - b["bbox"][1]
+            txts = ["".join(s["text"] for s in ln["spans"]).strip()
+                    for ln in b.get("lines", [])]
+            txts = [t for t in txts if t]
+            if h < 12 and len(txts) >= 2 and all(len(t) < 60 for t in txts):
+                blocks.append((b["bbox"][1], txts))
+        blocks.sort(key=lambda t: t[0])
+        # 连续等距(17±2pt)行链 ≥5 且首行含 'Model name'
+        run = []
+        prev = None
+        chains = []
+        for y, txts in blocks:
+            if prev is not None and abs((y - prev) - 17.0) <= 3.0:
+                run.append(txts)
+            else:
+                if len(run) >= 5:
+                    chains.append(run)
+                run = [txts]
+            prev = y
+        if len(run) >= 5:
+            chains.append(run)
+        for ch in chains:
+            if ch[0] and ch[0][0] == "Model name":
+                rows = ch
+                break
+        if rows:
+            break
+    doc.close()
+    if not rows:
+        return 0
+    header = rows[0]
+    gfm = ["> | " + " | ".join(header) + " |",
+           "> |" + "---|" * len(header)]
+    for r in rows[1:]:
+        gfm.append("> | " + " | ".join(r) + " |")
+    lines[anchor:anchor + 1] = gfm
     return 1
 
 
@@ -604,6 +690,7 @@ def apply_format_patches(lines: list) -> list:
     fix_exercise_levels(lines)
     fix_appendix_listings(lines)
     fix_table_1_1(lines)
+    fix_hardware_runtime_table(lines)
     fix_duplicate_chapter_headings(lines)
     fix_bare_special_tokens(lines)
     fix_url_word_damage(lines)

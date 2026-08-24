@@ -15,6 +15,8 @@
 - R9 文件尾卫生：缺末尾换行或文件尾多余空行。
 - R10 manifest 对账：extracted_images/manifest.json 的每个 figure 必须在 MD
   以图链或图注出现（防整图静默消失，见 attachments/extract-robustness.md）。
+- R12 图链锚定：`![Fig X]` 跳过空行后首个非空行必须是斜体图注——防正文
+  引用句（"Figure X.Y shows…"）被误作锚点把图拉到引用段前（L3219 型错位）。
 
 基线机制：存量可容忍问题记入 golden/baseline_md_lint.txt（每行 `RULE|detail`），
 默认只对"新增"违规报错退出码 1；--update-baseline 重写基线。
@@ -42,6 +44,9 @@ BASELINE_PATH = ROOT / "golden" / "baseline_md_lint.txt"
 IMG_LINE_RE = re.compile(r"^!\[[^\]]*\]\([^)]+\)\s*$")
 IMG_FIG_RE = re.compile(r"^!\[Fig ([\w.]+)\]\(")
 CAPTION_RE = re.compile(r"^\*{1,2}Figure ([\w.]+)\*{1,2}")
+# HTML <figure> 形态：图链为 <img src=.../FigX.Y.png>，图注为 <figcaption>Figure X.Y
+FIG_HTML_IMG_RE = re.compile(r'^<img src="[^"]+" alt="Fig ([\w.]+)">')
+FIGCAP_RE = re.compile(r"^<figcaption>Figure ([\w.]+)\b")
 HEADING_RE = re.compile(r"#{1,6} ")
 TABLE_ROW_RE = re.compile(r"^\|")
 ANCHOR_RE = re.compile(r'^<a id="[^"]+"></a>$')
@@ -122,8 +127,9 @@ def lint_text(text: str) -> list:
         if body.count("*") % 2 == 1:
             findings.append(("R6", ln, body.strip()[:_DETAIL_MAX]))
 
-        # R7 图文配对登记
-        m_img, m_cap = IMG_FIG_RE.match(line), CAPTION_RE.match(line)
+        # R7 图文配对登记（兼容 HTML <figure> 形态）
+        m_img = IMG_FIG_RE.match(line) or FIG_HTML_IMG_RE.match(line)
+        m_cap = CAPTION_RE.match(line) or FIGCAP_RE.match(line)
         if m_img:
             img_positions[m_img.group(1)] = ln
         if m_cap:
@@ -177,6 +183,20 @@ def lint_text(text: str) -> list:
                 and (j < n and lines[j].lstrip().startswith(">")):
             findings.append(("R11", i + 1, "引用-围栏-引用三明治（框内代码未合成）"))
 
+
+    # R12 图链锚定：跳过空行后首个非空行必须是图注（兼容 <figcaption> 形态）
+    for i, line in enumerate(lines):
+        m = IMG_FIG_RE.match(line) or FIG_HTML_IMG_RE.match(line)
+        if not m:
+            continue
+        j = i + 1
+        while j < n and not lines[j].strip():
+            j += 1
+        nxt = lines[j] if j < n else ""
+        if CAPTION_RE.match(nxt) or FIGCAP_RE.match(nxt):
+            continue
+        fid = m.group(1) if m else line[:_DETAIL_MAX]
+        findings.append(("R12", i + 1, f"Fig {fid} 图链未紧邻图注"))
 
     # R10 manifest 对账：每个 manifest figure 必须在 MD 中出现（图链或图注）。
     # 防"clip 过度生长 + 块级剔除"导致整图静默消失（Fig6.5/Fig7.11 事故）。

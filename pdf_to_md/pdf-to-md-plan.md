@@ -15,11 +15,11 @@
 | 提取 | `pipeline/extract.py` | PDF → Page/Block 页模型（一次拿全字体/颜色/绘图/TOC；带 `.cache/pages.pkl` 磁盘缓存） |
 | 分类 | `pipeline/classify.py` | 页模型 → 语义块（规则前移到提取期，禁止新增判定） |
 | 合并 | `pipeline/merge.py` | 块级合并：同框碎片→段落→代码→两行标题（词表唯一来源 `mdlib/config.py`） |
-| 渲染 | `pipeline/render.py` (+`patches.py`/`index.py`) | 语义块 → 最终 MD（图文合成、数学清洗、加粗、TOC+锚点、内容补丁、索引重排；文案在 `patches_data.json`） |
+| 渲染 | `pipeline/render.py` (+`patches.py`/`index.py`) | 语义块 → 最终 MD（图文合成、数学清洗、加粗、TOC+锚点、内容补丁、索引截断；文案在 `patches_data.json`） |
 | 校验 | `mdlib/asserts.py` + `pipeline/verify.py` | §3 断言 + TOC/Figure/概念框/covers 对账 + 图片完整性 + 渲染语义 lint + 引用块碎片对账 + Summary 列表对账 |
 | 离线审计 Summary | `audit_summary_formatting.py`（只读） | Summary 区 S1–S6 规则检查与列表项数 PDF↔MD 对账 |
 
-离线工具（不属管道）：`p0_extract_images.py`、`figure_text_detect.py`（被 extract 调用）、`audit_quote_fragmentation.py`、`.backup/legacy_scripts/check_*.py`。
+离线工具（不属管道）：`p0_extract_images.py`、`figure_text_detect.py`（被 extract 调用）、`audit_quote_fragmentation.py`、`audit_listing_callouts.py`、`.backup/legacy_scripts/check_*.py`。
 
 ## 1. 方案决策依据（PDF 实测事实）
 
@@ -81,10 +81,11 @@ assert links <= anchors                          # TOC 全部可跳转
 | 提取健壮性 | Fig7.8 缺失 / Fig6.5·7.11 整图静默消失 / 附录 E 标签泄漏 / 边注丢失 86%→4% | [extract-robustness.md](attachments/extract-robustness.md) |
 | 引用块碎片合并 | 同矩形概念框碎片 28 对→0；审计工具三类分诊 | [quote-fragmentation.md](attachments/quote-fragmentation.md) |
 | Summary 列表化 | 章末小结 Wingdings 列表 → `- ` 多级列表（67 项对账）；悬挂连字符守卫 | [summary-lists.md](attachments/summary-lists.md) |
-| Listing 旁注 | 代码旁箭头注释短语归位为 fence 内 `# ` 注释（229 块对账；三条件防边注误收） | [listing-callouts.md](attachments/listing-callouts.md) |
+| Listing 旁注 | 代码旁箭头注释短语**按目标行插入** fence 内 `# ` 注释（行级定位：箭头 cy ↔ 代码行 cy，`(dy,dist)` 纵向优先贪心配对 + 重叠 ≥50% / 清单尾贴邻两级几何兜底；240 组整行对账零遗漏零新增散段；旁注箭头剔出图区种子防 extract 误删） | [listing-callout-positioning.md](attachments/listing-callout-positioning.md) |
 | 图注斜体 | `*Figure N.M*` 斜体区别于正文（首词小写守卫防误染正文引用句） | §4 图文合成行 |
 | 框内代码 | 概念框内代码合成复合框输出 GFM 引用内围栏 `> ``` `（空行用 ">" 保持盒子连续；fence_mask/md_lint 兼容引用围栏） | verify 第 10 步对账 |
 | 截图式代码图重建 | 8 处书版截图式代码（文本层无）PNG 逐字转录 + 锚点补丁重建（`patches_data.json`，含 output 段）；P0 按 `crop_top` 标记裁 6 图顶部代码带（纯示意图如 Fig 3.22 不裁） | verify 第 11 步对账 + `audit_promise_chains.py` 承诺链审计 |
+| 索引区截断 | 自 `index` 标题行（结构信号，尾 10% 定位）起整段不入 MD（含封底 liveProjects 残段）；书级 TOC 同步无 Index 条目；原三栏重排废弃（A/B 对账：截断点前内容与旧逻辑逐行一致） | [format-fix-round2.md](attachments/format-fix-round2.md) 子方案 2 |
 | 渲染语义 lint | R1–R10 规则 + 基线机制（新增违规才报错） | [md-lint.md](attachments/md-lint.md) |
 | 性能与减量 | 冷 16s→7.3s 热 2.0s；A/B 护栏下的死代码清理 | [performance.md](attachments/performance.md) |
 

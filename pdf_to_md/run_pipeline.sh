@@ -6,7 +6,6 @@ set -e; cd "$(dirname "$0")"
 PY=python3
 
 # P0：已有产物（manifest.json）则跳过，避免全量重渲染 128+ 图。
-# 注：p0_extract_images.py 本身无跳过守卫（重跑会 rmtree 后全量提取），守卫在此编排层实现。
 if [ -f extracted_images/manifest.json ]; then
     echo "=== P0: extracted_images/ 已存在，跳过 ==="
 else
@@ -14,6 +13,8 @@ else
     $PY p0_extract_images.py
 fi
 
-echo "=== pipeline: extract → classify → merge → render → verify ==="
-# --verify：进程内对账（复用页模型 + extract 磁盘缓存，全程只解析一次 PDF）
-$PY pipeline/run_pipeline.py --verify
+echo "=== pipeline: extract → classify → merge → render ==="
+$PY pipeline/run_pipeline.py
+
+echo "=== verify: 完备性对账 ==="
+$PY pipeline/verify.py

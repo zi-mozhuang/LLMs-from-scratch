@@ -22,7 +22,13 @@ import re
 
 from mdlib import config
 from pipeline.ir import Page, Block
-from figure_text_detect import page_element_regions, is_figure_text
+from figure_text_detect import (
+    page_element_regions,
+    is_figure_text,
+    annot_span_rects,
+    courier_row_ranges,
+    seed_exclusion_rects,
+)
 
 # 图注行：起头为 "Figure X.Y"。图注即使落在页脚区也不得当页脚剔除，
 # 否则底部图注（如 Fig 7.8，p236 用 FranklinGothic-Demi 且 y1≈591）会被误删，
@@ -211,7 +217,12 @@ def extract_book(pdf_path, use_cache: bool = True) -> list:
             fig_font_guard = False
             burned_rects = None
         else:
-            fig_rects, fig_union = page_element_regions(page)
+            # Listing 装置（旁注箭头 + 标题色条）剔出图区种子
+            # （治 p48 型旁注被误判图内文字蒸发；manifest clip 权威页不走此分支）
+            _exclude = seed_exclusion_rects(
+                drawings, annot_span_rects(raw_blocks),
+                courier_row_ranges(raw_blocks))
+            fig_rects, fig_union = page_element_regions(page, exclude_rects=_exclude)
             fig_rects = [r for r in fig_rects if not r.is_empty and r.width * r.height >= 16.0]
             # 附录 E 图：patches 渲染、不在 manifest clips 内，但同样"烘进 PNG"。
             # 检测页内 ^Figure E.N 图注并生长图区域，作为 burned_rects 传入——

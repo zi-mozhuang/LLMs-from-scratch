@@ -125,5 +125,17 @@
         "Total size of the model: 621.83 MB"
       ]
     }
+  ],
+  "equation_rebuilds": [
+    {
+      "anchor": "found via curve fitting):",
+      "tex": "GELU(x) \\approx 0.5\\,x\\left(1 + \\tanh\\left(\\sqrt{\\frac{2}{\\pi}}\\left(x + 0.044715\\,x^{3}\\right)\\right)\\right)",
+      "display": true
+    },
+    {
+      "anchor": "is defined as GELU(x) = x\\cdotΦ(x), where",
+      "tex": "GELU(x) = x\\cdotΦ(x)",
+      "display": false
+    }
   ]
 }

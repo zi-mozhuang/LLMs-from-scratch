@@ -44,7 +44,8 @@ def merge_all(blocks: list) -> list:
     # 章末 Summary 列表重组（先于 prose 合并：summary_list 的折行续块
     # 须并入列表项，不得被 merge_pending_prose 吸收成独立段落）
     blocks = merge_summary_items(blocks)
-    # Listing 旁注归位（先于 prose 合并：旁注块从块流中删除并入代码围栏）
+    # Listing 旁注归位（先于 prose 合并：旁注块从块流中删除并入代码围栏；
+    # 先于 pending_code：定位基于 classify 原始行表，与 meta 对齐可靠）
     blocks = merge_listing_callouts(blocks)
     print(f"[pipeline] listing callouts 归位: {merge_listing_callouts.last_attached} 块")
     # 两行标题合并
@@ -64,9 +65,15 @@ def run(out_path: Path, run_verify: bool = False) -> int:
     pages = extract_book(str(config.PDF_PATH))
     print(f"[pipeline] classify_pages ({sum(len(p.blocks) for p in pages)} blocks) ...")
     blocks = classify_pages(pages)
-    # Listing 旁注对账快照（须在 merge 消费前提取，供 verify 第 9 步校验）
-    callout_texts = [" ".join(b.text.split()) for b in blocks
-                     if b.meta.get("listing_callout") and b.text.strip()]
+    # Listing 旁注对账快照（须在 merge 消费前提取，供 verify 第 9 步校验；
+    # 行级单元制下短语按 callout_lines 的行文本计，块文本可能跨组混排）
+    callout_texts = []
+    for b in blocks:
+        if not b.meta.get("listing_callout"):
+            continue
+        for items in (b.meta.get("callout_lines") or {}).values():
+            callout_texts.extend(t for t, _cy in items if t.strip())
+    callout_texts = [" ".join(t.split()) for t in callout_texts]
     print(f"[pipeline] merge_all ({len(blocks)} blocks) ...")
     blocks = merge_all(blocks)
     # 框内代码对账（verify 第 10 步）：取 merge 实际合成的 code body 数

@@ -41,7 +41,7 @@ def _count_headings(text: str) -> int:
 
 def _count_figure_captions(text: str) -> int:
     return sum(1 for l in text.split("\n")
-               if re.match(r"^\*{0,2}Figure\s+\d+\.\d+", l))
+               if re.match(r"^(?:\*{0,2}|<figcaption>)Figure\s+\d+\.\d+", l))
 
 
 def _count_concept_boxes(text: str) -> int:
@@ -213,6 +213,25 @@ def main(md_path: Path = MD_PATH, pages: list = None, blocks: list = None,
         if missing_rb:
             print(f"         [rebuild] Fig {missing_rb} 代码未出现在围栏内")
         print(f"         -> {'PASS' if rb_ok else 'FAIL'}")
+
+    # 12) 绘制式数学公式重建对账：patches_data.json 的每条 equation_rebuilds
+    #     的 tex 必须存在于 MD（display 用 $$…$$ 包裹）；防锚点漂移失效
+    try:
+        eqs = json.loads(
+            (Path(__file__).parent / "patches_data.json").read_text("utf-8")
+        ).get("equation_rebuilds", [])
+    except Exception:
+        eqs = []
+    if eqs:
+        joined = "\n".join(lines)
+        missing_eq = [e["anchor"] for e in eqs
+                      if (("$$" + e["tex"] + "$$") if e.get("display", False)
+                          else ("$" + e["tex"] + "$")) not in joined]
+        eq_ok = not missing_eq
+        print(f"[verify] 公式重建={len(eqs)}  失效={len(missing_eq)}")
+        if missing_eq:
+            print(f"         [rebuild] 未注入: {missing_eq}")
+        print(f"         -> {'PASS' if eq_ok else 'FAIL'}")
         all_ok = all_ok and rb_ok
     print(f"\n[verify] 总体: {'ALL PASS' if all_ok else 'FAIL'}")
     return 0 if all_ok else 1
