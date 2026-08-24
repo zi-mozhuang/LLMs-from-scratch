@@ -52,12 +52,13 @@ CALLOUT_FILL = config.CALLOUT_FILL
 LISTING_FILL = config.LISTING_FILL
 
 # ---- 图注 / Exercise（方案表） ----
-FIGURE_CAPTION_RE = re.compile(r"^\*{0,2}Figure\s+\d+\.\d+\b")
+# 图号含正文数字章与附录字母章，PROSE 排除动词判据对附录同样生效
+FIGURE_CAPTION_RE = re.compile(r"^\*{0,2}Figure\s+(?:[A-E]\.\d+|\d+\.\d+)\b")
 # 正文引用句排除：'Figure X.Y shows/illustrates …' 是以图号开头的正文段，
 # 不是图注——误判会使段A 被走 caption 渲染路径并成为图链插入锚点
 # （L3219 型：图拉到引用段前、真图注孤悬段后）。真图注为名词短语开头。
 FIGURE_PROSE_REF_RE = re.compile(
-    r"^\*{0,2}Figure\s+\d+\.\d+\s+"
+    r"^\*{0,2}Figure\s+(?:[A-E]\.\d+|\d+\.\d+)\s+"
     r"(shows|illustrates|plots|graphs|depicts|summarizes|displays|presents"
     r"|outlines|demonstrates|compares|visualizes|captures)\b",
     re.I)
@@ -198,14 +199,15 @@ def _in_covers_rect(block, skip_rects) -> bool:
 def _mark_annot_blocks(page_blocks) -> None:
     """边注/清单注释标签标记：HumanistMann/Arial 小字号块为书旁注本体，
     禁止被 merge_pending_prose 吸收进无关段落（错位污染治理 P1）。
-    须先于 _mark_listing_callouts 执行（后者依赖 annot 前置条件）。"""
+    须先于 _mark_listing_callouts 执行（后者依赖 annot 前置条件）。
+    Listing 旁注可较长（A.3 retain_graph 注 212 字符），上限放宽至 350。"""
     for b in page_blocks:
         sps = (b.meta.get("spans") or [])
         if b.kind == "prose" and sps:
             ann = sum(1 for x in sps
                       if ("HumanistMann" in x["font"] or "Arial" in x["font"])
                       and x["size"] <= 12.0)
-            if ann >= max(1, len(sps) // 2) and len(b.text) <= 160:
+            if ann >= max(1, len(sps) // 2) and len(b.text) <= 350:
                 b.meta["annot"] = True
 
 
@@ -219,7 +221,7 @@ def _mark_annot_blocks(page_blocks) -> None:
 _TRI_MAX = 12.0          # 三角部件最大宽高（与 figure_text_detect 同源）
 _PAIR_MAX_DIST = 70.0    # 组↔箭头最大间隙欧氏距离
 _PAIR_MAX_DY = 40.0      # 组↔箭头最大纵向间隙（沿用旧阈值）
-_GROUP_GAP_Y = 12.0      # 折行碎片最大纵向间隙
+_GROUP_GAP_Y = 5.0       # 折行碎片最大纵向间隙（A.1 11.7/A.2 5.4-7.9 误并，12→5 正确拆分）
 _CODE_NEAR = 15.0        # 箭头中心距代码块边界的容差
 
 
@@ -317,21 +319,54 @@ def _mark_listing_callouts(page_blocks, drawings) -> None:
     if not codes or not clusters:
         return
     groups = _group_callout_fragments(page_blocks)
+    # 密集清单（A.1/A.2）按 y 排序 1:1 配对更稳：贪心最近会使首注抢占后注箭头
+    # 当组/簇均≥4 且 y 区间重叠时，按 y 排序顺序配对（dy≤40 且 dist≤70）
+    used_g, used_c = set(), set()
+    if len(groups) >= 4 and len(clusters) >= 4:
+        # 按 y 排序
+        g_order = sorted(range(len(groups)), key=lambda gi: min(u[3][1] for u in groups[gi]))
+        c_order = sorted(range(len(clusters)), key=lambda ci: clusters[ci][1])
+        # 顺序配对，取较少者
+        for gi, ci in zip(g_order, c_order):
+            g = groups[gi]
+            gx0 = min(u[3][0] for u in g)
+            gy0 = min(u[3][1] for u in g)
+            gx1 = max(u[3][2] for u in g)
+            gy1 = max(u[3][3] for u in g)
+            cx, cy = clusters[ci]
+            dx = max(gx0 - cx, cx - gx1, 0)
+            dy = max(gy0 - cy, cy - gy1, 0)
+            dist = (dx * dx + dy * dy) ** 0.5
+            if dist <= _PAIR_MAX_DIST and dy <= _PAIR_MAX_DY:
+                if not any(c.bbox[1] - _CODE_NEAR <= cy <= c.bbox[3] + _CODE_NEAR for c in codes):
+                    continue
+                used_g.add(gi)
+                used_c.add(ci)
+                gid = f"p{groups[gi][0][0].page}:{gi}"
+                for u in groups[gi]:
+                    blk = u[0]
+                    blk.meta["listing_callout"] = True
+                    lst = blk.meta.setdefault("callout_lines", {}).setdefault(gid, [])
+                    lst.append((u[2], cy))
+    # 剩余未配对按原贪心最近
     # 配对候选：(dist, dy, gi, ci)
     cands = []
     for gi, g in enumerate(groups):
+        if gi in used_g:
+            continue
         gx0 = min(u[3][0] for u in g)
         gy0 = min(u[3][1] for u in g)
         gx1 = max(u[3][2] for u in g)
         gy1 = max(u[3][3] for u in g)
         for ci, (cx, cy) in enumerate(clusters):
+            if ci in used_c:
+                continue
             dx = max(gx0 - cx, cx - gx1, 0)
             dy = max(gy0 - cy, cy - gy1, 0)
             dist = (dx * dx + dy * dy) ** 0.5
             if dist <= _PAIR_MAX_DIST and dy <= _PAIR_MAX_DY:
                 cands.append((round(dy, 1), round(dist, 1), gi, ci))
     cands.sort()
-    used_g, used_c = set(), set()
     for _dist, _dy, gi, ci in cands:
         if gi in used_g or ci in used_c:
             continue
@@ -391,7 +426,8 @@ def _mark_listing_callouts(page_blocks, drawings) -> None:
         best = None
         for c in codes:
             ox = min(gx1, c.bbox[2]) - max(gx0, c.bbox[0])
-            if ox < 0.5 * gw:
+            dx = max(gx0 - c.bbox[2], c.bbox[0] - gx1, 0)
+            if ox < 0.5 * gw and dx > 60:
                 continue
             gap_below = gy0 - c.bbox[3]
             gap_above = c.bbox[1] - gy1

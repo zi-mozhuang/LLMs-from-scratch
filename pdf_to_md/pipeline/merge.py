@@ -1,12 +1,15 @@
 """pipeline.merge — 块级合并（从 p1_text_stream / fix_line_continuity 原样搬运）。
 
-5 个纯函数，输入输出均为 list[Block]：
+7 个纯函数，输入输出均为 list[Block]：
 1. merge_box_fragments     : 同矩形概念框碎片合并（classify 打 box_key）
-2. merge_pending_prose    : 跨块段落合并
-3. merge_pending_code     : 代码清单合并（图片/绘图块不打断）
-4. merge_two_line_headings: 两行章节标题合并
-5. dehyphenate_text       : 连字符断词处理（词表唯一来源 = mdlib.config，
-                            等价旧链 p2_clean.dehyphenate + KNOWN_BREAKS）
+2. merge_summary_items     : 章末 Summary 列表重组（\uf0a1 圆点 → 列表项）
+3. merge_numbered_lists    : 连续递增编号 prose 块 → ol_list（verify 第 13 步对账）
+   strip_box_continuation_markers: 跨页概念框 "(continued)" 残标剔除
+4. merge_pending_prose     : 跨块段落合并
+5. merge_pending_code      : 代码清单合并（图片/绘图块不打断）
+6. merge_two_line_headings : 两行章节标题合并
+7. dehyphenate_text        : 连字符断词处理（词表唯一来源 = mdlib.config，
+                             等价旧链 p2_clean.dehyphenate + KNOWN_BREAKS）
 """
 
 import re
@@ -364,6 +367,11 @@ def merge_listing_callouts(blocks: list) -> list:
         tl = owner.text.split("\n")
         for idx, text, _k in sorted(items, key=lambda t: (-t[0], -t[2])):
             idx = min(idx, len(tl) - 1)
+            # 多行语句的续行修正：若目标行是缩进续行（上一行以 ,/[/（ 结束），
+            # 则旁注应归属整条语句，插在首行之前而非续行之间（A.1 tensor2d/3d）
+            while idx > 0 and tl[idx].startswith((" ", "\t")) \
+                    and tl[idx - 1].rstrip().endswith((",", "(", "[", "{", "\\")):
+                idx -= 1
             indent = re.match(r"[ \t]*", tl[idx]).group(0)
             tl.insert(idx, f"{indent}# {text}")
         new_text = "\n".join(tl)
@@ -449,6 +457,89 @@ def merge_summary_items(blocks: list) -> list:
     return out
 
 
+_OL_ITEM_RE = re.compile(r"^(\d{1,2})(?:\s+|\n)([A-Z“\"'(])")
+
+
+def _ol_item_marker(text: str) -> int | None:
+    """prose 块文本的有序列表项编号；非列表项形态返回 None。
+    结构信号：1-2 位编号独立起头（PDF 内编号自成一行或紧跟空格），
+    后随大写词/引号/括号（排除 "3.5 Decoding" 式小节号——其归 heading 链）。"""
+    m = _OL_ITEM_RE.match(text.strip())
+    return int(m.group(1)) if m else None
+
+
+def merge_numbered_lists(blocks: list) -> list:
+    """编号列表重组：连续 ≥2 个 prose 块首部带严格递增编号（n, n+1, …）
+    → 合为单块 kind="ol_list"（meta["items"]=[(编号, 折行折叠后文本)]），
+    render 输出 Markdown 有序列表。须先于 merge_pending_prose 执行，
+    否则列表项会被段落合并链吸收成裸段落（点号丢失缺陷的根因）。
+    守卫：annot 旁注块、heading/code 等非 prose kind 不参与；
+    编号不连续即断组（单块不成列表）。全书仅 Exercise 5.3/5.5 答案一处命中。"""
+    out: list = []
+    i, n = 0, len(blocks)
+    while i < n:
+        b = blocks[i]
+        num = _ol_item_marker(b.text) if b.kind == "prose" and not b.meta.get("annot") else None
+        if num is None:
+            out.append(b)
+            i += 1
+            continue
+        group = [(num, b)]
+        j = i + 1
+        while j < n:
+            nb = blocks[j]
+            if nb.kind != "prose" or nb.meta.get("annot"):
+                break
+            nnum = _ol_item_marker(nb.text)
+            if nnum is None or nnum != group[-1][0] + 1:
+                break
+            group.append((nnum, nb))
+            j += 1
+        if len(group) < 2:
+            out.append(b)
+            i += 1
+            continue
+        texts = [(num_, blk.text) for num_, blk in group]
+        leader = group[0][1]
+        leader.kind = "ol_list"
+        leader.text = "\n".join(t for _, t in texts)
+        # 项文本 = 去编号后的正文（编号独立行形丢弃编号行；同行形切首个
+        # 空白段），块内折行按 prose 同语义折叠为单行。
+        items = []
+        for num_, txt in texts:
+            lines = [ln for ln in txt.split("\n") if ln.strip()]
+            if len(lines) > 1:
+                body_lines = lines[1:]
+            else:
+                parts = lines[0].split(" ", 1)
+                body_lines = [parts[1]] if len(parts) > 1 else []
+            items.append((num_, " ".join(body_lines).strip()))
+        leader.meta["items"] = items
+        out.append(leader)
+        i = j
+    return out
+
+
+def strip_box_continuation_markers(blocks: list) -> list:
+    """跨页概念框排版残标清理：无标题 concept_box 且位于页顶（续框碎片）、
+    首段恰为印刷版 "(continued)" 续框标记 → 从 text 与 bodies 中剔除该标记。
+    结构信号：盒类型 + 无 title + 页顶 y + 精确标记词（排版体系固有符号，
+    同 Wingdings \\uf0a1 / Summary 状态机先例）。全书仅 p161 Perplexity 框命中。"""
+    for b in blocks:
+        if (b.kind != "concept_box" or b.meta.get("title")
+                or not b.text.lstrip().startswith("(continued)")):
+            continue
+        if b.bbox[1] > 100:  # 页顶续框碎片（正文页上边距 ≈65pt）
+            continue
+        stripped = re.sub(r"^\(continued\)\s*", "", b.text.lstrip())
+        if stripped and not stripped.startswith("(continued)"):
+            b.text = stripped
+            bodies = b.meta.get("bodies")
+            if bodies:
+                bodies[0] = re.sub(r"^\(continued\)\s*", "", bodies[0].lstrip())
+    return blocks
+
+
 def _url_direct_join(prev: str, cur: str):
     """URL 在 PDF 行宽处折断的跨块无缝拼接（不加空格）：
       …arxiv.org/abs/ + 2405.14394 → abs/2405.14394（行尾斜杠，下行纯数字）
@@ -482,15 +573,16 @@ def merge_box_code(blocks: list) -> list:
                 and blocks[i + 1].meta.get("in_concept_box"):
             chain = [b]
             j = i + 1
+            box_key = b.meta.get("box_key")
             while True:
                 if j < n and blocks[j].kind == "code" \
                         and blocks[j].meta.get("in_concept_box") \
                         and blocks[j].page == b.page:
                     chain.append(blocks[j])
                     j += 1
-                    # 后续同 key 文字段继续入链
+                    # 后续同 key 文字段继续入链（box_key 必须一致，防止跨盒误并 A.9 macOS/Exercise）
                     while j < n and blocks[j].kind == "concept_box" \
-                            and blocks[j].meta.get("box_key"):
+                            and blocks[j].meta.get("box_key") == box_key:
                         chain.append(blocks[j])
                         j += 1
                     continue

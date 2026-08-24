@@ -32,11 +32,13 @@ FIG_DIR = OUT_DIR / "figures"
 # 渲染倍率：默认 3（≈216dpi）。可用环境变量 P0_ZOOM 覆盖（如 300dpi → P0_ZOOM=4.17）。
 ZOOM = float(__import__("os").environ.get("P0_ZOOM", "3"))
 PAD = 6.0
-CAPTION_RE = re.compile(r"^Figure\s+(\d+\.\d+)\b")
-BARE_RE = re.compile(r"^Figure\s+\d+\.\d+$")
+# 图号含正文数字章 (1.1..7.21) 与附录字母章 (A.1..E.5)——附录图与正文图
+# 走同一提取/渲染/对账主通道（FigE 特例链已删）。
+CAPTION_RE = re.compile(r"^Figure\s+([A-E]\.\d+|\d+\.\d+)\b")
+BARE_RE = re.compile(r"^Figure\s+(?:[A-E]\.\d+|\d+\.\d+)$")
 
 ABOVE_GAP = 80.0    # max vertical distance element-bottom -> caption-top
-SIDE_GAP = 30.0     # max horizontal gap for side-by-side layout
+SIDE_GAP = 50.0     # max horizontal gap for side-by-side layout (Fig A.2 = 46)
 LINK_GAP = 80.0     # max element-to-region gap for chain absorption
 LABEL_GAP = 30.0    # max gap for absorbing sans-serif label spans
 CODE_RELAY_GAP = 40.0  # max gap for extending through code-diagram spans
@@ -127,8 +129,8 @@ def test_candidates():
     dups = {k: v for k, v in cnt.items() if v > 1}
     print(f"candidates={len(cands)} unique={len(cnt)} dup_figs={len(dups)}")
     print("dups:", dict(sorted(dups.items())))
-    assert len(cands) == 143, f"expected 143 line matches, got {len(cands)}"
-    assert len(cnt) == 128, f"expected 128 unique figs, got {len(cnt)}"
+    assert len(cands) == 166, f"expected 166 line matches, got {len(cands)}"
+    assert len(cnt) == 148, f"expected 148 unique figs, got {len(cnt)}"
     print("STAGE 1 PASS")
     return cands
 
@@ -198,21 +200,24 @@ def validate_candidates(doc, cands):
             best[c["fig"]] = (rank, c)
 
     def fig_key(item):
-        return [int(x) for x in item[0].split(".")]
+        ch, n = item[0].split(".")
+        # 附录字母章排在数字章之后；同章内按编号升序
+        return (0, "", int(n)) if ch.isdigit() else (1, ch, int(n))
 
     return [c for _, (_, c) in sorted(best.items(), key=fig_key)]
 
 
 def test_validate():
-    """Stage 2 test: 128 unique true captions, known pages, no chapter gaps."""
+    """Stage 2 test: 148 unique true captions, known pages, no chapter gaps."""
     doc = pymupdf.open(PDF_PATH)
     caps = validate_candidates(doc, find_caption_candidates(doc))
     figs = [c["fig"] for c in caps]
     print(f"validated={len(caps)} unique={len(set(figs))}")
-    assert len(caps) == 128, f"expected 128 true captions, got {len(caps)}"
-    assert len(set(figs)) == 128, "duplicate fig numbers survived"
+    assert len(caps) == 148, f"expected 148 true captions, got {len(caps)}"
+    assert len(set(figs)) == 148, "duplicate fig numbers survived"
     expect_pages = {"1.1": 25, "1.7": 34, "3.7": 78, "5.4": 155,
-                    "6.16": 220, "7.2": 228, "7.21": 270}
+                    "6.16": 220, "7.2": 228, "7.21": 270,
+                    "A.1": 274, "A.13": 305, "D.2": 339, "E.5": 357}
     by_fig = {c["fig"]: c for c in caps}
     for fig, pg in expect_pages.items():
         got = by_fig[fig]["page"]
@@ -220,7 +225,7 @@ def test_validate():
     per_ch = defaultdict(list)
     for f in figs:
         ch, n = f.split(".")
-        per_ch[int(ch)].append(int(n))
+        per_ch[ch].append(int(n))
     for ch, nums in sorted(per_ch.items()):
         nums.sort()
         assert nums == list(range(1, len(nums) + 1)), f"ch{ch} gaps: {nums}"
@@ -595,11 +600,13 @@ def verify(embedded, figures, failures, expected_figs):
     ok &= report["V1_embedded"]["pass"]
 
     # V2: coverage — every expected fig number rendered exactly once
+    def _fig_sort(s):
+        ch, n = s.split(".")
+        return (0, "", int(n)) if ch.isdigit() else (1, ch, int(n))
+
     got = Counter(f["fig"] for f in figures)
-    missing = sorted(set(expected_figs) - set(got),
-                     key=lambda s: [int(x) for x in s.split(".")])
-    dupes = sorted([f for f, n in got.items() if n > 1],
-                   key=lambda s: [int(x) for x in s.split(".")])
+    missing = sorted(set(expected_figs) - set(got), key=_fig_sort)
+    dupes = sorted([f for f, n in got.items() if n > 1], key=_fig_sort)
     report["V2_coverage"] = {
         "pass": not missing and not dupes and len(figures) == len(expected_figs),
         "expected": len(expected_figs),

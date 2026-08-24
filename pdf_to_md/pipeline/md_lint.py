@@ -209,23 +209,18 @@ def lint_text(text: str) -> list:
                 findings.append(("R10", 0, f"manifest Fig {fid} 未出现在 MD"))
     except Exception:
         pass
-    # R10b 附录 E 图：不在 manifest 内（patches 渲染），单独核对 E.1–E.5。
-    # 图链与图注同灭时 R7 配对仍"一致"，必须独立锚定 PDF 侧事实。
+    # R10b 附录图：manifest 已含全部附录图（148 图主通道），不再走 patches._find_captions
+    # PDF 侧扫描；图链与图注同灭时 R7 配对仍"一致"，必须独立锚定 PDF 侧事实。
     try:
-        import pymupdf
-    except ImportError:
-        pymupdf = None
-    if pymupdf is not None:
-        try:
-            from pipeline.patches import _find_captions
-            doc = pymupdf.open(str(config.PDF_PATH))
-            appendix_tags = {t for _p, t, _c in _find_captions(doc)}
-            doc.close()
-            for tag in sorted(appendix_tags):
-                if tag not in md_ids:
-                    findings.append(("R10", 0, f"附录 {tag} 未出现在 MD"))
-        except Exception:
-            pass
+        data = json.loads(config.MANIFEST_PATH.read_text(encoding="utf-8"))
+        appendix_tags = {f["fig"] for f in data.get("figures", [])
+                         if f["fig"][:1].isalpha()}
+        for tag in sorted(appendix_tags,
+                          key=lambda s: (s.split(".")[0], int(s.split(".")[1]))):
+            if tag not in md_ids:
+                findings.append(("R10", 0, f"附录 {tag} 未出现在 MD"))
+    except Exception:
+        pass
 
     return findings
 

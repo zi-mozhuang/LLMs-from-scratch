@@ -51,34 +51,7 @@ def _manifest_clips():
     return m
 
 
-_FIGURE_CAPTION_RE = re.compile(r"^\*{0,2}Figure\s+\d+\.\d+\b")
-
-# 附录 E 图注（patches._render_appendix_figures 同判据：前缀匹配 +
-# 余词大写开头，区分正文引用 "Figure E.1 illustrates/plots..."。
-# 注意不用 \b：实际文本 "Figure E.1A comparison" 数字后紧跟字母无边界）
-_APPENDIX_CAP_RE = re.compile(r"^\*{0,2}Figure (E\.\d)")
-
-
-def _appendix_fig_rects(page) -> list:
-    """检测页内附录 E 图注，返回其上方图形区域的 Rect 列表。
-
-    区域生长逻辑复用 pipeline.patches._figure_region（渲染与剔除必须
-    用同一区域，保证"已烘进 PNG 的文字"判定一致）。
-    """
-    from pipeline.patches import _figure_region
-    rects = []
-    for b in page.get_text("dict")["blocks"]:
-        if b["type"] != 0 or "lines" not in b:
-            continue
-        txt = "".join(s["text"] for ln in b["lines"]
-                      for s in ln["spans"]).strip()
-        m = _APPENDIX_CAP_RE.match(txt)
-        if not m:
-            continue
-        rest = txt[len(m.group(0)):].strip()
-        if rest and rest[0].isupper() and len(rest) > 5:
-            rects.append(_figure_region(page, fitz.Rect(b["bbox"])))
-    return rects
+_FIGURE_CAPTION_RE = re.compile(r"^\*{0,2}Figure\s+(?:[A-E]\.\d+|\d+\.\d+)\b")
 
 
 def _is_header_span_like(span: dict, page_height: float) -> bool:
@@ -224,16 +197,8 @@ def extract_book(pdf_path, use_cache: bool = True) -> list:
                 courier_row_ranges(raw_blocks))
             fig_rects, fig_union = page_element_regions(page, exclude_rects=_exclude)
             fig_rects = [r for r in fig_rects if not r.is_empty and r.width * r.height >= 16.0]
-            # 附录 E 图：patches 渲染、不在 manifest clips 内，但同样"烘进 PNG"。
-            # 检测页内 ^Figure E.N 图注并生长图区域，作为 burned_rects 传入——
-            # 区域内块无条件剔除，不受 glossary/sentence 守卫保护
-            # （FigE.1 事故：Outputs/Pretrained 等单词标签泄漏正文流）。
-            extra = _appendix_fig_rects(page)
-            if extra:
-                burned_rects = extra
-                fig_rects = list(fig_rects) + extra
-            else:
-                burned_rects = None
+            # 附录图已并入 P0 主通道（148 图 manifest），无额外 burned 区域
+            burned_rects = None
             fig_union = None
             for r in fig_rects:
                 fig_union = r if fig_union is None else fig_union | r
@@ -281,14 +246,7 @@ def extract_book(pdf_path, use_cache: bool = True) -> list:
                 if _in and len(_in) >= max(1, len(block["lines"]) // 2):
                     continue
             # 剔除图内文字（避免与渲染 PNG 重复）。
-            # 以 Figure E.N 起头的块（图注/正文引用）豁免烘焙区剔除：
-            # 其所在块的 bbox 常上探进图区域使块中心落入区内，整块剔除
-            # 会连图注一起丢（FigE.1 曾因此从 MD 消失）。
             burned = burned_rects
-            if burned is not None and block.get("lines"):
-                first_txt = "".join(s["text"] for s in block["lines"][0]["spans"]).strip()
-                if _APPENDIX_CAP_RE.match(first_txt):
-                    burned = None
             if is_figure_text(block, fig_rects, fig_union, page_height,
                               page.rect.width, font_guard=fig_font_guard,
                               burned_rects=burned):

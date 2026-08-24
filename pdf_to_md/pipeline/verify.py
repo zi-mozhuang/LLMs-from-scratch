@@ -3,7 +3,7 @@
 
 读取 PDF 与新输出，打印对账表并断言：
 - TOC 条目数：输出标题数 ≥ TOC 有效条目数 − 2（允许已知 2 处缺口）；
-- Figure 标题数 ≥ 141（与 golden/llms-from-scratch.md 一致）；
+- Figure 标题数 ≥ 161（148 manifest = 正文 128 + 附录 20，+引用行冗余）；
 - 概念框块数 ≈ 111（golden 基准，±15 容差）；
 - 每章（1-7）均存在 **This chapter covers**；
 - 同矩形引用块碎片 = 0（audit_quote_fragmentation 结构性修复的不变量）。
@@ -25,8 +25,10 @@ from mdlib import config
 from pipeline.extract import extract_book
 
 MD_PATH = config.MD_PATH
-EXPECTED_FIGURE_COUNT = 141  # 与 golden/llms-from-scratch.md 一致（manifest 仅 128 条，正文含更多引用）
+EXPECTED_FIGURE_COUNT = 161  # manifest 148（正文128+附录20）+ 行首引用句冗余
 EXPECTED_CONCEPT_BOX = (100, 120)  # golden 基准 111 概念框块数
+EXPECTED_OL_ITEMS = 6  # merge_numbered_lists 4 项（Exercise 5.3/5.5 答）
+                      # + llama 饲料清单 2 处 prose 原生 "1. " 行
 ALLOWED_TOC_GAP = 2
 # 同矩形引用块碎片：结构性修复后必须为 0（跨页截断框属已知遗留，
 # 由 audit_quote_fragmentation 的 STACKED/UNMATCHED 类目跟踪，不计入此断言）
@@ -41,7 +43,7 @@ def _count_headings(text: str) -> int:
 
 def _count_figure_captions(text: str) -> int:
     return sum(1 for l in text.split("\n")
-               if re.match(r"^(?:\*{0,2}|<figcaption>)Figure\s+\d+\.\d+", l))
+               if re.match(r"^(?:\*{0,2}|<figcaption>)Figure\s+(?:[A-E]\.\d+|\d+\.\d+)", l))
 
 
 def _count_concept_boxes(text: str) -> int:
@@ -233,6 +235,13 @@ def main(md_path: Path = MD_PATH, pages: list = None, blocks: list = None,
             print(f"         [rebuild] 未注入: {missing_eq}")
         print(f"         -> {'PASS' if eq_ok else 'FAIL'}")
         all_ok = all_ok and rb_ok
+    # 13) 有序列表对账：merge_numbered_lists 重组的编号列表项数
+    #     （ch5 Exercise 答案 2 组 × 2 项；llama 饲料清单 2 处为 prose 原生）
+    n_ol = sum(1 for l in lines if re.match(r"^\d{1,2}\. [A-Z“\"'(]", l))
+    ol_ok = n_ol == EXPECTED_OL_ITEMS
+    print(f"[verify] 有序列表项数={n_ol}  基准={EXPECTED_OL_ITEMS}")
+    print(f"         -> {'PASS' if ol_ok else 'FAIL'}")
+    all_ok = all_ok and ol_ok
     print(f"\n[verify] 总体: {'ALL PASS' if all_ok else 'FAIL'}")
     return 0 if all_ok else 1
 

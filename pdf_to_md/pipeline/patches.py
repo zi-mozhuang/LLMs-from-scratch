@@ -5,10 +5,10 @@
 - fix_structure.py 的 run_pseudo / run_round2 相关 pass：
   macOS callout 重建、附录 B/C/D 标题、Figure E.1 泄漏清理、输出块围栏化、
   §7.8 评估方法区重建、Exercise 7.2 空壳删除、附录 Listing 加粗、
-  E.2 标题拆出、Figure E caption 加粗、附录 B Chapter1 恢复、第1章标题插入。
+  E.2 标题拆出、附录 B Chapter1 恢复、第1章标题插入。
   （封底裁剪 cut_back_cover 已删：索引区截断（render 步骤 6.7）覆盖其全部
   输出，A/B monkeypatch identity → 全量渲染 MD 哈希不变，2026-08。）
-- render_appendix_figures.py：附录 E Figure E.1–E.5 渲染与链接插入。
+  附录图现走 P0 主通道（P0 validate+render），FigE 特例链已删（2026-08）。
 
 所有补丁按内容特征定位、幂等可重跑；逻辑与阈值原样保留。
 """
@@ -438,15 +438,6 @@ def fix_e2_heading(lines: list) -> int:
     return 0
 
 
-def fix_figure_e_captions(lines: list) -> int:
-    n = 0
-    for i, l in enumerate(lines):
-        m = re.match(r"^Figure (E\.\d) (.+)$", l.strip())
-        if m and "illustrates" not in l and "plots" not in l:
-            lines[i] = f"*Figure {m.group(1)}* {m.group(2)}"
-            n += 1
-    return n
-
 
 def fix_appendix_chapter_dups(lines: list) -> int:
     """附录 B（References）内的 `## Chapter N` 是文献分组小节，降为 `###`；
@@ -696,125 +687,7 @@ def apply_format_patches(lines: list) -> list:
     fix_url_word_damage(lines)
     fix_url_internal_spaces(lines)
     fix_e2_heading(lines)
-    fix_figure_e_captions(lines)
     fix_appendix_chapter_dups(lines)
     fix_appendix_b_ch1(lines)
     fix_chapter1_heading(lines)
-    return lines
-
-
-# ===========================================================================
-# 搬运自 render_appendix_figures.py（附录 E Figure E.1–E.5 渲染与链接插入）
-# ===========================================================================
-OUT_DIR = "extracted_images/figures"
-
-
-def _find_captions(doc) -> list:
-    """返回 (页号, 'E.N', caption bbox)。
-
-    先用 search_for 做页级预筛（C 侧文本搜索，远快于逐页 get_text("dict")
-    解析；实测全书 2.2s → <0.3s），仅命中的页面再走原 dict 判定，
-    结果与原实现一致。"""
-    caps = []
-    for pno in range(len(doc)):
-        if not doc[pno].search_for("Figure E."):
-            continue
-        for b in doc[pno].get_text("dict")["blocks"]:
-            if b["type"] != 0:
-                continue
-            txt = "".join(s["text"] for l in b["lines"] for s in l["spans"]).strip()
-            for n in range(1, 6):
-                tag = f"Figure E.{n}"
-                if txt.startswith(tag):
-                    rest = txt[len(tag):].strip()
-                    # 图注后跟大写开头描述；正文引用后跟小写动词(illustrates/plots)
-                    if rest and rest[0].isupper() and len(rest) > 5:
-                        caps.append((pno, f"E.{n}", pymupdf.Rect(b["bbox"])))
-    return caps
-
-
-def _figure_region(page, cap) -> pymupdf.Rect:
-    """caption 上方图形元素的并集区域。"""
-    x0, y0 = cap.x0 - 10, cap.y0
-    x1, y1 = cap.x1 + 10, cap.y0 + 20
-    band_top = cap.y0 - 420  # 图最多向上延伸 ~420pt
-    for d in page.get_drawings():
-        r = d["rect"]
-        if r.y1 <= cap.y0 + 2 and r.y1 > band_top and r.width > 5 and r.height > 5:
-            x0, y0 = min(x0, r.x0), min(y0, r.y0)
-            x1, y1 = max(x1, r.x1), max(y1, r.y1 + 20)
-    for img in page.get_image_info():
-        r = pymupdf.Rect(img["bbox"])
-        if r.y1 <= cap.y0 + 2 and r.y1 > band_top:
-            x0, y0 = min(x0, r.x0), min(y0, r.y0)
-            x1, y1 = max(x1, r.x1), max(y1, r.y1)
-    return pymupdf.Rect(x0, max(y0, band_top), x1, min(y1, cap.y0 + 20))
-
-
-def _render_appendix_figures() -> dict:
-    """渲染每个图，返回 {'E.1': 相对路径}。
-
-    幂等两级：目录里 E.1–E.5 PNG 齐全时直接由文件名重建映射返回
-    （省去全 doc caption 扫描 ~2s）；缺哪个才打开 PDF 补渲染。"""
-    import os
-    import re as _re
-    from pathlib import Path
-    outdir = Path(config.PDF_PATH).resolve().parent / OUT_DIR
-    cached = {}
-    if outdir.exists():
-        for f in outdir.iterdir():
-            m = _re.fullmatch(r"Fig(E[1-5])_p(\d+)\.png", f.name)
-            if m:
-                tag = f"{m.group(1)[0]}.{m.group(1)[1]}"
-                cached.setdefault(tag, f"{OUT_DIR}/{f.name}")
-    need = {f"E.{n}" for n in range(1, 6)} - set(cached)
-    if not need:
-        return cached
-    doc = pymupdf.open(str(config.PDF_PATH))
-    caps = _find_captions(doc)
-    assert len(caps) >= 5, f"caption 发现不足: {len(caps)}"
-    mat = pymupdf.Matrix(3, 3)
-    out = dict(cached)
-    seen = set(cached)
-    for pno, tag, cap in caps:
-        if tag in seen:
-            continue
-        seen.add(tag)
-        fname = f"Fig{tag.replace('.', '')}_p{pno + 1}.png"
-        rel = f"{OUT_DIR}/{fname}"
-        fpath = outdir / fname
-        if not fpath.exists():  # 幂等：已有产物则快速跳过（等价 P0 脚本自带校验）
-            region = _figure_region(doc[pno], cap)
-            pix = doc[pno].get_pixmap(matrix=mat, clip=region)
-            pix.save(str(fpath))
-            print(f"[pipeline.patches] 渲染 Figure {tag}: {fname} ({pix.width}x{pix.height})")
-        out[tag] = rel
-    doc.close()
-    return out
-
-
-def insert_appendix_figure_links(lines: list) -> list:
-    """在 caption 行前插入图片链接（搬运 render_appendix_figures.insert_links，幂等）。"""
-    paths = _render_appendix_figures()
-    n = 0
-    i = 0
-    while i < len(lines):
-        l = lines[i].strip()
-        for tag, rel in paths.items():
-            cap_prefix = f"Figure {tag}"
-            if (l.startswith((cap_prefix, f"**{cap_prefix}"))
-                    and len(l) > len(cap_prefix) + 5
-                    and not l.startswith("![")
-                    and "illustrates" not in l and "plots" not in l):
-                # 前两行已是该图链接（链接+空行）则跳过，保证幂等
-                prev = lines[max(0, i - 2):i]
-                if any(rel in p for p in prev):
-                    continue
-                lines[i:i] = [f"![Fig {tag}]({rel})", ""]
-                n += 1
-                i += 3  # 跳过插入的链接、空行与 caption 本身，避免重复处理
-                break
-        else:
-            i += 1
-    print(f"[pipeline.patches] 附录图链接插入: {n}")
     return lines

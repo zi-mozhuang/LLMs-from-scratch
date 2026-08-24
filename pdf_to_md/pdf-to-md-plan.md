@@ -93,10 +93,10 @@ assert links <= anchors                          # TOC 全部可跳转
 
 - §5.4 / §7.4 在 PDF 提取中缺失，已由内容锚点补丁重建关键段与代码块（`patches.py` + `patches_data.json`）。
 - 正文上标直提时平化，未做 LaTeX 还原（典型：附录 E LoRA 权重更新公式以 Fig E.1 截图承载，正文仅余残段）。
-- 个别编号列表点号丢失（PDF 内编号与文本分块，如 "1 Setting" 应为 "1. Setting"，ch5 deterministic 段 2 处）。
+- 个别编号列表点号丢失：已修（`merge.merge_numbered_lists`——连续递增编号的 prose 块重组 `ol_list`，render 输出有序列表；Exercise 5.3/5.5 答案 2 组；verify 第 13 步对账）。
 - 重复 Chapter 标题（附录练习）：TOC 以 `(Appendix)` 区分，正文标题文本相同。
 - Fig 3.12 p84 / Fig 6.5 p195 的 PNG 上缘多截相邻代码片段（正文围栏中已有，属可接受冗余；几何上无法与纯文本图可靠区分，约束尝试曾伤及 Fig 7.7 故回退）。
-- 跨页截断概念框 3 处呈两个引用块（p97-98 / p126-127 / p161-162 "(continued)"）。
+- 跨页截断概念框：引用块连续性已由 render 拼接 pass 保证；`(continued)` 排版残标已由 `merge.strip_box_continuation_markers` 剔除（无 title 页顶续框碎片 + 精确标记词）。
 - 无框 Wingdings 列表中，仅章末 Summary 已列表化；参考文献（93 块）、正文讲解列表（§2.4 特殊 token、§4.1 配置参数等 21 块）与前置链接按决策维持旧链 `> ` 引用块语义（影响面统计见 [attachments/summary-lists.md](attachments/summary-lists.md)）。
 
 ## 附件索引

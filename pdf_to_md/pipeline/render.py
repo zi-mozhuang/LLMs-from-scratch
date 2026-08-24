@@ -362,7 +362,6 @@ from pipeline.patches import (
     apply_missing_sections,
     apply_pseudo_patches,
     apply_format_patches,
-    insert_appendix_figure_links,
 )
 
 
@@ -648,6 +647,15 @@ def _block_to_lines(block, fig_map=None) -> list:
         lines.append("")
         return lines
 
+    if k == "ol_list":
+        # 编号列表（merge_numbered_lists 重组）：PDF 编号自成行/起头的
+        # 连续 prose 块 → Markdown 有序列表。项文本已含行内代码反引号
+        # （extract/classify 层注入），与 summary_list 同构。
+        items = block.meta.get("items") or []
+        lines = [f"{num}. {txt}" for num, txt in items]
+        lines.append("")
+        return lines
+
     if k == "bullet":
         # 去掉 Wingdings 字符
         txt = re.sub(r"[^\x20-\x7e]", "", t).strip()
@@ -789,10 +797,7 @@ def render(blocks: list, manifest_path) -> str:
     from pipeline.index import drop_index
     lines, _ = drop_index(lines)
 
-    # 步骤 6.8：附录 E 图渲染与链接插入（搬运 render_appendix_figures.py）
-    lines = insert_appendix_figure_links(lines)
-
-    # 步骤 6.9：格式一致性收尾（搬运 fix_structure.run_round2 相关 pass）
+    # 步骤 6.8：格式一致性收尾（搬运 fix_structure.run_round2 相关 pass）
     lines = apply_format_patches(lines)
 
     # 步骤 6.10：等价旧链的落盘/重读边界——把 pass 内嵌入的 "\n" 拆成独立行

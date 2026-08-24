@@ -1229,16 +1229,17 @@ The following code uses the `GPTDatasetV1` to load the inputs in batches via a P
 def create_dataloader_v1(txt, batch_size=4, max_length=256,
                          stride=128, shuffle=True, drop_last=True,
                          num_workers=0):
+    # Creates dataset
     tokenizer = tiktoken.get_encoding("gpt2")
-    # Initializes the tokenizer Creates dataset
+    # Initializes the tokenizer
     dataset = GPTDatasetV1(txt, tokenizer, max_length, stride)
+    # drop_last=True drops the last batch if it is shorter than the specified batch_size to prevent loss spikes during training.
+    # The number of CPU processes to use for preprocessing
     dataloader = DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
-        # The number of CPU processes to use for preprocessing
         drop_last=drop_last,
-        # drop_last=True drops the last batch if it is shorter than the specified batch_size to prevent loss spikes during training.
         num_workers=num_workers
     )
     return dataloader
@@ -1971,8 +1972,9 @@ Let’s begin by defining a few variables:
 ```text
 # The second input element
 x_2 = inputs[1]
-# The input embedding size, d=3 The output embedding size, d_out=2
+# The input embedding size, d=3
 d_in = inputs.shape[1]
+# The output embedding size, d_out=2
 d_out = 2
 ```
 
@@ -2509,9 +2511,9 @@ class CausalAttention(nn.Module):
         keys = self.W_key(x)
         queries = self.W_query(x)
         values = self.W_value(x)
-        # We transpose dimensions 1 and 2, keeping the batch dimension at the first position (0).
-        attn_scores = queries @ keys.transpose(1, 2)
         # In PyTorch, operations with a trailing underscore are performed in-place, avoiding unnecessary memory copies.
+        attn_scores = queries @ keys.transpose(1, 2)
+        # We transpose dimensions 1 and 2, keeping the batch dimension at the first position (0).
         attn_scores.masked_fill_(
             self.mask.bool()[:num_tokens, :num_tokens], -torch.inf)
         attn_weights = torch.softmax(
@@ -2677,20 +2679,19 @@ class MultiHeadAttention(nn.Module):
         values = self.W_value(x)
         keys = keys.view(b, num_tokens, self.num_heads, self.head_dim)
         values = values.view(b, num_tokens, self.num_heads, self.head_dim)
+        # we unroll the
         queries = queries.view(
-            # we unroll the
             b, num_tokens, self.num_heads, self.head_dim
-        # Transposes from shape (b, num_tokens, num_heads, head_dim) to (b, num_heads, num_tokens, head_dim)
         )
         keys = keys.transpose(1, 2)
-        # Transposes from shape (b, num_tokens, num_heads, head_dim) to (b, num_heads, num_tokens, head_dim)
         queries = queries.transpose(1, 2)
         values = values.transpose(1, 2)
         # head_dim).
         attn_scores = queries @ keys.transpose(2, 3)
-        # Masks truncated to the number of tokens
+        # Transposes from shape (b, num_tokens, num_heads, head_dim) to (b, num_heads, num_tokens, head_dim)
         mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
 
+        # Masks truncated to the number of tokens
         attn_scores.masked_fill_(mask_bool, -torch.inf)
         attn_weights = torch.softmax(
             attn_scores / keys.shape[-1]**0.5, dim=-1)
@@ -2699,8 +2700,8 @@ class MultiHeadAttention(nn.Module):
         context_vec = (attn_weights @ values).transpose(1, 2)
 
         # Combines heads, where self.d_out = self.num_heads * self.head_dim
+        # Tensor shape:
         context_vec = context_vec.contiguous().view(
-            # Tensor shape:
             b, num_tokens, self.d_out
         )
         # (b, num_tokens, n_heads, head_dim)
@@ -2974,8 +2975,9 @@ class DummyTransformerBlock(nn.Module):
     # This block does nothing and just returns its input.
     def forward(self, x):
         return x
+# A simple placeholder class that will be replaced by a real LayerNorm later
 class DummyLayerNorm(nn.Module):
-    # A simple placeholder class that will be replaced by a real LayerNorm later The parameters here are just to mimic the LayerNorm interface.
+    # The parameters here are just to mimic the LayerNorm interface.
     def __init__(self, normalized_shape, eps=1e-5):
         super().__init__()
     def forward(self, x):
@@ -3627,7 +3629,8 @@ This code prints the contents of the input batch followed by the output tensor:
 
 ```text
 Input batch:
- # Token IDs of text 1 Token IDs of text 2
+ # Token IDs of text 1
+ # Token IDs of text 2
  tensor([[6109,  3626,  6100,   345],
          [6109,  1110,  6622,   257]])
 Output shape: torch.Size([2, 4, 50257])
@@ -3702,8 +3705,9 @@ Weight tying reduces the overall memory footprint and computational complexity o
 Lastly, let’s compute the memory requirements of the 163 million parameters in our `GPTModel` object:
 
 ```python
+# Calculates the total size in bytes (assuming float32, 4 bytes per parameter)
 total_size_bytes = total_params * 4
-# Calculates the total size in bytes (assuming float32, 4 bytes per parameter) Converts to megabytes
+# Converts to megabytes
 total_size_mb = total_size_bytes / (1024 * 1024)
 print(f"Total size of the model: {total_size_mb:.2f} MB")
 ```
@@ -3749,10 +3753,10 @@ In practice, we repeat this process over many iterations, such as shown in figur
 
 **Listing 4.8** A function for the GPT model to generate text
 
-Crops current context if it exceeds the supported context size, e.g., if LLM supports only 5 tokens, and the context size is 10, then only the last 5 tokens are used as context
+idx is a (batch, n_tokens) array of indices in the current context.
 
 ```python
-# idx is a (batch, n_tokens) array of indices in the current context.
+# Crops current context if it exceeds the supported context size, e.g., if LLM supports only 5 tokens, and the context size is 10, then only the last 5 tokens are used as context
 def generate_text_simple(model, idx,
                          max_new_tokens, context_size):
     for _ in range(max_new_tokens):
@@ -3904,14 +3908,14 @@ Let’s set up the LLM and briefly recap the text generation process we implemen
 ```python
 import torch
 from chapter04 import GPTModel
+# It’s possible and common to set dropout to 0.
+# We shorten the context length from 1,024 to 256 tokens.
 GPT_CONFIG_124M = {
     "vocab_size": 50257,
-    # We shorten the context length from 1,024 to 256 tokens.
     "context_length": 256,
     "emb_dim": 768,
     "n_heads": 12,
     "n_layers": 12,
-    # It’s possible and common to set dropout to 0.
     "drop_rate": 0.1,
     "qkv_bias": False
 }
@@ -4008,9 +4012,10 @@ Note that the targets are the inputs but shifted one position forward, a concept
 Now we feed the inputs into the model to calculate logits vectors for the two input examples, each comprising three tokens. Then we apply the `softmax` function to transform these logits into probability scores (`probas`; figure 5.4, step 2):
 
 ```python
+# Disables gradient tracking since we are not training yet
 with torch.no_grad():
     logits = model(inputs)
-# Disables gradient tracking since we are not training yet Probability of each token in vocabulary
+# Probability of each token in vocabulary
 probas = torch.softmax(logits, dim=-1)
 print(probas.shape)
 ```
@@ -4035,10 +4040,10 @@ Given that we have two input batches, each containing three tokens, applying the
 ```text
 Token IDs:
  # First batch
+ # Second batch
  tensor([[[16657],
          [  339],
          [42826]],
-        # Second batch
         [[49906],
          [29669],
          [41751]]])
@@ -4204,7 +4209,7 @@ tensor(10.7940)
 >
 > Perplexity measures how well the probability distribution predicted by the model matches the actual distribution of the words in the dataset. Similar to the loss, a lower perplexity indicates that the model predictions are closer to the actual distribution.
 >
-> (continued) Perplexity can be calculated as `perplexity = torch.exp(loss)`, which returns `tensor(48725.8203)` when applied to the previously calculated loss.
+> Perplexity can be calculated as `perplexity = torch.exp(loss)`, which returns `tensor(48725.8203)` when applied to the previously calculated loss.
 >
 > Perplexity is often considered more interpretable than the raw loss value because it signifies the effective vocabulary size about which the model is uncertain at each step. In the given example, this would translate to the model being unsure about which among 48,725 tokens in the vocabulary to generate as the next token.
 
@@ -4437,12 +4442,14 @@ def train_model_simple(model, train_loader, val_loader,
     for epoch in range(num_epochs):
         model.train()
         for input_batch, target_batch in train_loader:
-            # Resets loss gradients from the previous batch iteration Calculates loss gradients Updates model weights using loss gradients
+            # Resets loss gradients from the previous batch iteration
             optimizer.zero_grad()
             loss = calc_loss_batch(
                 input_batch, target_batch, model, device
             )
+            # Calculates loss gradients
             loss.backward()
+            # Updates model weights using loss gradients
             optimizer.step()
             tokens_seen += input_batch.numel()
             global_step += 1
@@ -4514,8 +4521,8 @@ Let’s see this all in action by training a `GPTModel` instance for 10 epochs u
 torch.manual_seed(123)
 model = GPTModel(GPT_CONFIG_124M)
 model.to(device)
+# The .parameters() method returns all trainable weight parameters of the model.
 optimizer = torch.optim.AdamW(
-     # The .parameters() method returns all trainable weight parameters of the model.
      model.parameters(),
     lr=0.0004, weight_decay=0.1
 )
@@ -4568,8 +4575,9 @@ def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
     ax1.set_ylabel("Loss")
     ax1.legend(loc="upper right")
     ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
-    # Creates a second x-axis that shares the same y-axis Invisible plot for aligning ticks
+    # Creates a second x-axis that shares the same y-axis
     ax2 = ax1.twiny()
+    # Invisible plot for aligning ticks
     ax2.plot(tokens_seen, train_losses, alpha=0)
     ax2.set_xlabel("Tokens seen")
     fig.tight_layout()
@@ -4784,12 +4792,12 @@ Top positions: tensor([3, 7, 0])
 Subsequently, we apply PyTorch’s `where` function to set the logit values of tokens that are below the lowest logit value within our top-three selection to negative infinity (`-inf`):
 
 ```python
+# Retains the original logits for all other tokens
+# Identifies logits less than the minimum in the top 3
+# Assigns –inf to these lower logits
 new_logits = torch.where(
-    # Identifies logits less than the minimum in the top 3
     condition=next_token_logits < top_logits[-1],
-    # Assigns –inf to these lower logits
     input=torch.tensor(float('-inf')),
-    # Retains the original logits for all other tokens
     other=next_token_logits
 )
 print(new_logits)
@@ -4843,12 +4851,12 @@ def generate(model, idx, max_new_tokens, context_size,
                 torch.tensor(float('-inf')).to(logits.device),
                 logits
             )
-        # Applies temperature scaling
         if temperature > 0.0:
+            # Carries out greedy next-token selection as before when temperature scaling is disabled
             logits = logits / temperature
             probs = torch.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
-        # Carries out greedy next-token selection as before when temperature scaling is disabled
+        # Applies temperature scaling
         else:
             idx_next = torch.argmax(logits, dim=-1, keepdim=True)
         # Stops generating early if end-of-sequence token is encountered
@@ -5130,9 +5138,9 @@ def load_weights_into_gpt(gpt, params):
             gpt.trf_blocks[b].att.W_key.bias, k_b)
         gpt.trf_blocks[b].att.W_value.bias = assign(
             gpt.trf_blocks[b].att.W_value.bias, v_b)
+        # The np.split function is used to divide the attention and bias weights into three equal parts for the query, key, and value components.
         gpt.trf_blocks[b].att.out_proj.weight = assign(
             gpt.trf_blocks[b].att.out_proj.weight,
-            # The np.split function is used to divide the attention and bias weights into three equal parts for the query, key, and value components.
             params["blocks"][b]["attn"]["c_proj"]["w"].T)
         gpt.trf_blocks[b].att.out_proj.bias = assign(
             gpt.trf_blocks[b].att.out_proj.bias,
@@ -5155,6 +5163,7 @@ def load_weights_into_gpt(gpt, params):
         gpt.trf_blocks[b].norm1.shift = assign(
             gpt.trf_blocks[b].norm1.shift,
             params["blocks"][b]["ln_1"]["b"])
+        # The original GPT-2 model by OpenAI reused the token embedding weights in the output layer to reduce the total number of parameters,
         gpt.trf_blocks[b].norm2.scale = assign(
             gpt.trf_blocks[b].norm2.scale,
             params["blocks"][b]["ln_2"]["g"])
@@ -5163,7 +5172,7 @@ def load_weights_into_gpt(gpt, params):
             params["blocks"][b]["ln_2"]["b"])
     gpt.final_norm.scale = assign(gpt.final_norm.scale, params["g"])
     gpt.final_norm.shift = assign(gpt.final_norm.shift, params["b"])
-    # The original GPT-2 model by OpenAI reused the token embedding weights in the output layer to reduce the total number of parameters, weight tying.
+    # weight tying.
     gpt.out_head.weight = assign(gpt.out_head.weight, params["wte"])
 ```
 
@@ -5333,6 +5342,7 @@ import pandas as pd
 df = pd.read_csv(
     data_file_path, sep="\t", header=None, names=["Label", "Text"]
 )
+# Renders the data frame in a Jupyter notebook. Alternatively, use print(df).
 df
 ```
 
@@ -5368,10 +5378,11 @@ We can use the code in the following listing to undersample and create a balance
 
 ```python
 def create_balanced_dataset(df):
-    # Counts the instances of “spam” Randomly samples “ham” instances to match the number of “spam” instances
+    # Counts the instances of “spam”
     num_spam = df[df["Label"] == "spam"].shape[0]
     ham_subset = df[df["Label"] == "ham"].sample(
         num_spam, random_state=123
+    # Randomly samples “ham” instances to match the number of “spam” instances
     )
     balanced_df = pd.concat([
         ham_subset, df[df["Label"] == "spam"]
@@ -5419,8 +5430,8 @@ def random_split(df, train_frac, validation_frac):
     validation_df = df[train_end:validation_end]
     test_df = df[validation_end:]
     return train_df, validation_df, test_df
+# Test size is implied to be 0.2 as the remainder.
 train_df, validation_df, test_df = random_split(
-    # Test size is implied to be 0.2 as the remainder.
     balanced_df, 0.7, 0.1)
 ```
 
@@ -5639,8 +5650,10 @@ To begin the model preparation process, we employ the same configurations we use
 ```text
 CHOOSE_MODEL = "gpt2-small (124M)"
 INPUT_PROMPT = "Every effort moves"
+# Query-key-value bias
+# Vocabulary size Context length
+# Dropout rate
 BASE_CONFIG = {
-    # Vocabulary size Context length Dropout rate Query-key-value bias
     "vocab_size": 50257,
     "context_length": 1024,
     "drop_rate": 0.0,
@@ -6087,18 +6100,21 @@ def train_classifier_simple(
     # Initialize lists to track losses and examples seen
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
     examples_seen, global_step = 0, -1
-    # Main training loop Sets model to training mode
+    # Main training loop
+    # Sets model to training mode
     for epoch in range(num_epochs):
         model.train()
+        # Resets loss gradients from the previous batch iteration
         for input_batch, target_batch in train_loader:
-            # Resets loss gradients from the previous batch iteration
+            # Calculates loss gradients
             optimizer.zero_grad()
             loss = calc_loss_batch(
                 input_batch, target_batch, model, device
             )
+            # Updates model weights using loss gradients
             loss.backward()
+            # New: tracks examples instead of tokens
             optimizer.step()
-            # Calculates loss gradients Updates model weights using loss gradients New: tracks examples instead of tokens
             examples_seen += input_batch.shape[0]
             global_step += 1
 
@@ -6740,8 +6756,9 @@ def custom_collate_draft_2(
             new_item + [pad_token_id] *
             (batch_max_length - len(new_item))
         )
-        # Truncates the last token for inputs Shifts +1 to the right for targets
+        # Truncates the last token for inputs
         inputs = torch.tensor(padded[:-1])
+        # Shifts +1 to the right for targets
         targets = torch.tensor(padded[1:])
         inputs_lst.append(inputs)
         targets_lst.append(targets)
@@ -6797,13 +6814,14 @@ def custom_collate_fn(
     for item in batch:
         new_item = item.copy()
         new_item += [pad_token_id]
+        # Pads sequences to max_length
         padded = (
             new_item + [pad_token_id] *
             (batch_max_length - len(new_item))
         )
-        # Pads sequences to max_length
+        # Truncates the last token for inputs
         inputs = torch.tensor(padded[:-1])
-        # Truncates the last token for inputs Shifts +1 to the right for targets
+        # Shifts +1 to the right for targets
         # Replaces all but the first padding tokens in targets by ignore_index
         targets = torch.tensor(padded[1:])
         mask = targets == pad_token_id
@@ -6845,9 +6863,10 @@ The modified collate function works as expected, altering the target list by ins
 For demonstration purposes, consider the following simple and self-contained example where each output logit corresponds to a potential token from the model’s vocabulary. Here’s how we might calculate the cross entropy loss (introduced in chapter 5) during training when the model predicts a sequence of tokens, which is similar to what we did when we pretrained the model and fine-tuned it for classification:
 
 ```python
+# predictions for 2nd token
+# predictions for 1st token
 logits_1 = torch.tensor(
     [[-1.0, 1.0],
-     # predictions for 1st token predictions for 2nd token
      [-0.5, 1.5]]
 )
 targets_1 = torch.tensor([0, 1]) # Correct token indices to generate
@@ -6864,10 +6883,10 @@ tensor(1.1269)
 As we would expect, adding an additional token ID affects the loss calculation:
 
 ```python
+# New third token ID prediction
 logits_2 = torch.tensor(
     [[-1.0, 1.0],
      [-0.5, 1.5],
-     # New third token ID prediction
      [-0.5, 1.5]]
 )
 targets_2 = torch.tensor([0, 1, 1])
@@ -7274,9 +7293,10 @@ To complete the response instruction step, we use the `generate` function. We th
 
 ```python
 torch.manual_seed(123)
+# Iterates over the first three test set samples
 for entry in test_data[:3]:
     input_text = format_input(entry)
-    # Iterates over the first three test set samples Uses the generate function imported in section 7.5
+    # Uses the generate function imported in section 7.5
     token_ids = generate(
         model=model,
         idx=text_to_token_ids(input_text, tokenizer).to(device),
@@ -7545,8 +7565,8 @@ def query_model(
         "model": model,
         "messages": [
             {"role": "user", "content": prompt}
-        ],
         # Settings for deterministic responses
+        ],
         "options": {
             "seed": 123,
             "temperature": 0,
@@ -7555,10 +7575,10 @@ def query_model(
     }
     # Converts the dictionary to a JSONformatted string and encodes it to bytes
     payload = json.dumps(data).encode("utf-8")
+    # Creates a request object, setting the method to POST and adding necessary headers
     request = urllib.request.Request(
         url,
         data=payload,
-        # Creates a request object, setting the method to POST and adding necessary headers
         method="POST"
     )
 
@@ -7801,19 +7821,10 @@ One of the reasons PyTorch is so popular is its user-friendly interface and effi
 
 PyTorch is a relatively comprehensive library, and one way to approach it is to focus on its three broad components, summarized in figure A.1.
 
-PyTorch implements a tensor (array) library for efﬁcient computing.
-
-PyTorch includes utilities to differentiate computations automatically
-
-Tensor library Automatic diﬀerentiation engine
-
-3 PyTorch’s deep learning utilities make use of its tensor library and automatic differentiation engine.
-
-Deep learning
-
-library
-
-Figure A.1 PyTorch’s three main components include a tensor library as a fundamental building block for computing, automatic differentiation for model optimization, and deep learning utility functions, making it easier to implement and train deep neural network models.
+<figure>
+<img src="extracted_images/figures/FigA.1_p274.png" alt="Fig A.1">
+<figcaption>Figure A.1 PyTorch’s three main components include a tensor library as a fundamental building block for computing, automatic differentiation for model optimization, and deep learning utility functions, making it easier to implement and train deep neural network models.</figcaption>
+</figure>
 
 First, PyTorch is a tensor library that extends the concept of the array-oriented programming library NumPy with the additional feature that accelerates computation on GPUs, thus providing a seamless switch between CPUs and GPUs. Second, PyTorch is an automatic differentiation engine, also known as autograd, that enables the automatic computation of gradients for tensor operations, simplifying backpropagation and model optimization. Finally, PyTorch is a deep learning library. It offers modular, flexible, and efficient building blocks, including pretrained models, loss functions, and optimizers, for designing and training a wide range of deep learning models, catering to both researchers and developers.
 
@@ -7826,13 +7837,10 @@ AI is fundamentally about creating computer systems capable of performing tasks 
 
 Machine learning represents a subfield of AI, as illustrated in figure A.2, that focuses on developing and improving learning algorithms. The key idea behind machine learning is to enable computers to learn from data and make predictions or decisions without being explicitly programmed to perform the task. This involves developing algorithms that can identify patterns, learn from historical data, and improve their performance over time with more data and feedback.
 
-Figure A.2 Deep learning is a subcategory of machine learning focused on implementing deep neural networks. Machine learning is a subcategory of AI that is concerned with algorithms that learn from data. AI is the broader concept of machines being able to perform tasks that typically require human intelligence.
-
-Machine learning
-
-Deep learning
-
-Deep learning is machine learning with neural networks that have many layers.
+<figure>
+<img src="extracted_images/figures/FigA.2_p275.png" alt="Fig A.2">
+<figcaption>Figure A.2 Deep learning is a subcategory of machine learning focused on implementing deep neural networks. Machine learning is a subcategory of AI that is concerned with algorithms that learn from data. AI is the broader concept of machines being able to perform tasks that typically require human intelligence.</figcaption>
+</figure>
 
 Machine learning has been integral in the evolution of AI, powering many of the advancements we see today, including LLMs. Machine learning is also behind technologies like recommendation systems used by online retailers and streaming services, email spam filtering, voice recognition in virtual assistants, and even self-driving cars. The introduction and advancement of machine learning have significantly enhanced AI’s capabilities, enabling it to move beyond strict rule-based systems and adapt to new inputs or changing environments.
 
@@ -7842,27 +7850,10 @@ The typical predictive modeling workflow (also referred to as supervised learnin
 
 Using a learning algorithm, a model is trained on a training dataset consisting of examples and corresponding labels. In the case of an email spam classifier, for example, the training dataset consists of emails and their “spam” and “not spam” labels that a human identified. Then the trained model can be used on new observations (i.e., new emails) to predict their unknown label (“spam” or “not spam”). Of course, we also want to add a model evaluation between the training and inference stages to
 
-TRAINING
-
-In supervised learning, we train a model on a labeled dataset.
-
-Training dataset
-
-Examples
-
-Model and learning algorithm
-
-Labels
-
-New observations Predicted labels
-
-Trained model
-
-INFERENCE
-
-Once a model is trained, we can use it to predict the labels of new data.
-
-Figure A.3 The supervised learning workflow for predictive modeling consists of a training stage where a model is trained on labeled examples in a training dataset. The trained model can then be used to predict the labels of new observations.
+<figure>
+<img src="extracted_images/figures/FigA.3_p276.png" alt="Fig A.3">
+<figcaption>Figure A.3 The supervised learning workflow for predictive modeling consists of a training stage where a model is trained on labeled examples in a training dataset. The trained model can then be used to predict the labels of new observations.</figcaption>
+</figure>
 
 ensure that the model satisfies our performance criteria before using it in a real-world application.
 
@@ -7889,13 +7880,10 @@ Suppose your computer supports a CUDA-compatible GPU. In that case, it will auto
 
 To explicitly install the CUDA-compatible version of PyTorch, it’s often better to specify the CUDA you want PyTorch to be compatible with. PyTorch’s official website (https://pytorch.org) provides the commands to install PyTorch with CUDA support for different operating systems. Figure A.4 shows a command that will also install PyTorch, as well as the `torchvision` and `torchaudio` libraries, which are optional for this book.
 
-Select the latest stable version.
-
-Select a CUDA version that is compatible with your graphics card.
-
-If you don’t have an Nvidia graphics card that supports CUDA, select the CPU version.
-
-Figure A.4 Access the PyTorch installation recommendation on https://pytorch.org to customize and select the installation command for your system.
+<figure>
+<img src="extracted_images/figures/FigA.4_p277.png" alt="Fig A.4">
+<figcaption>Figure A.4 Access the PyTorch installation recommendation on https://pytorch.org to customize and select the installation command for your system.</figcaption>
+</figure>
 
 I use PyTorch 2.4.0 for the examples, so I recommend that you use the following command to install the exact version to guarantee compatibility with this book:
 
@@ -7941,11 +7929,10 @@ If the command returns `True`, you are all set. If the command returns `False`, 
 
 If you don’t have access to a GPU, there are several cloud computing providers where users can run GPU computations against an hourly cost. A popular Jupyter notebook–like environment is Google Colab (https://colab.research.google.com), which provides time-limited access to GPUs as of this writing. Using the Runtime menu, it is possible to select a GPU, as shown in the screenshot in figure A.5.
 
-Access this menu by clicking Change runtime type in the Runtime tab.
-
-If an A100 GPU is not available, it’s ok to choose a different GPU.
-
-Figure A.5 Select a GPU device for Google Colab under the Runtime/Change Runtime Type menu.
+<figure>
+<img src="extracted_images/figures/FigA.5_p279.png" alt="Fig A.5">
+<figcaption>Figure A.5 Select a GPU device for Google Colab under the Runtime/Change Runtime Type menu.</figcaption>
+</figure>
 
 > **PyTorch on Apple Silicon**
 >
@@ -7956,8 +7943,12 @@ Figure A.5 Select a GPU device for Google Colab under the Runtime/Change Runtime
 > ```
 >
 > If it returns `True`, it means that your Mac has an Apple Silicon chip that can be used to accelerate PyTorch code.
+
+> **Exercise A.1**
 >
 > Install and set up PyTorch on your computer
+
+> **Exercise A.2**
 >
 > Run the supplementary code at https://mng.bz/o05v that checks whether your environment is set up correctly.
 
@@ -7966,21 +7957,10 @@ Figure A.5 Select a GPU device for Google Colab under the Runtime/Change Runtime
 
 Tensors represent a mathematical concept that generalizes vectors and matrices to potentially higher dimensions. In other words, tensors are mathematical objects that can be characterized by their order (or rank), which provides the number of dimensions. For example, a scalar (just a number) is a tensor of rank 0, a vector is a tensor of rank 1, and a matrix is a tensor of rank 2, as illustrated in figure A.6.
 
-An example of a 3D vector that consists of 3 entries
-
-A scalar is just a single number.
-
-```text
-3 5 1 2
-1 7 2 3
-3 3 4 9
-```
-
-Figure A.6 Tensors with different ranks. Here 0D corresponds to rank 0, 1D to rank 1, and 2D to rank 2. A three-dimensional vector, which consists of three elements, is still a rank 1 tensor.
-
-Scalar
-
-Vector Matrix
+<figure>
+<img src="extracted_images/figures/FigA.6_p280.png" alt="Fig A.6">
+<figcaption>Figure A.6 Tensors with different ranks. Here 0D corresponds to rank 0, 1D to rank 1, and 2D to rank 2. A three-dimensional vector, which consists of three elements, is still a rank 1 tensor.</figcaption>
+</figure>
 
 From a computational perspective, tensors serve as data containers. For instance, they hold multidimensional data, where each dimension represents a different feature. Tensor libraries like PyTorch can create, manipulate, and compute with these arrays efficiently. In this context, a tensor library functions as an array library.
 
@@ -7999,11 +7979,14 @@ As mentioned earlier, PyTorch tensors are data containers for array-like structu
 
 ```python
 import torch
+# Creates a zero-dimensional tensor (scalar) from a Python integer
 tensor0d = torch.tensor(1)
-# Creates a zero-dimensional tensor (scalar) from a Python integer Creates a one-dimensional tensor (vector) from a Python list Creates a two-dimensional tensor from a nested Python list Creates a three-dimensional tensor from a nested Python list
+# Creates a one-dimensional tensor (vector) from a Python list
 tensor1d = torch.tensor([1, 2, 3])
+# Creates a two-dimensional tensor from a nested Python list
 tensor2d = torch.tensor([[1, 2],
                          [3, 4]])
+# Creates a three-dimensional tensor from a nested Python list
 tensor3d = torch.tensor([[[1, 2], [3, 4]],
                          [[5, 6], [7, 8]]])
 ```
@@ -8174,23 +8157,27 @@ Let’s look at a concrete example to illustrate the concept of a computation gr
 ```python
 # This import statement is a common convention in PyTorch to prevent long lines of code.
 import torch.nn.functional as F
+# True label
 y = torch.tensor([1.0])
+# Input feature
 x1 = torch.tensor([1.1])
+# Weight parameter
 w1 = torch.tensor([2.2])
+# Bias unit
 b = torch.tensor([0.0])
+# Net input
 z = x1 * w1 + b
-# True label Input feature Weight parameter Bias unit Net input Activation and output
+# Activation and output
 a = torch.sigmoid(z)
 loss = F.binary_cross_entropy(a, y)
 ```
 
 If not all components in the preceding code make sense to you, don’t worry. The point of this example is not to implement a logistic regression classifier but rather to illustrate how we can think of a sequence of computations as a computation graph, as shown in figure A.7.
 
-A trainable weight parameter A trainable bias unit The target label
-
-An intermediate result in the computation graph The input data
-
-Figure A.7 A logistic regression forward pass as a computation graph. The input feature x1 is multiplied by a model weight w1 and passed through an activation function σ after adding the bias. The loss is computed by comparing the model output a with a given label y.
+<figure>
+<img src="extracted_images/figures/FigA.7_p284.png" alt="Fig A.7">
+<figcaption>Figure A.7 A logistic regression forward pass as a computation graph. The input feature x1 is multiplied by a model weight w1 and passed through an activation function σ after adding the bias. The loss is computed by comparing the model output a with a given label y.</figcaption>
+</figure>
 
 In fact, PyTorch builds such a computation graph in the background, and we can use this to calculate gradients of a loss function with respect to the model parameters (here w1 and b) to train the model.
 
@@ -8199,15 +8186,10 @@ In fact, PyTorch builds such a computation graph in the background, and we can u
 
 If we carry out computations in PyTorch, it will build a computational graph internally by default if one of its terminal nodes has the `requires_grad` attribute set to `True`. This is useful if we want to compute gradients. Gradients are required when training neural networks via the popular backpropagation algorithm, which can be considered an implementation of the chain rule from calculus for neural networks, illustrated in figure A.8.
 
-The partial derivative of the intermediate result z with respect to the bias unit
-
-The partial derivative of the loss with respect to its input
-
-We can obtain the partial derivative of the loss with respect to the trainable weight by chaining the individual partial derivative in the graph.
-
-Similar to above, we can compute the partial derivative of the trainable derivative by applying the chain rule.
-
-Figure A.8 The most common way of computing the loss gradients in a computation graph involves applying the chain rule from right to left, also called reverse-model automatic differentiation or backpropagation. We start from the output layer (or the loss itself) and work backward through the network to the input layer. We do this to compute the gradient of the loss with respect to each parameter (weights and biases) in the network, which informs how we update these parameters during training.
+<figure>
+<img src="extracted_images/figures/FigA.8_p285.png" alt="Fig A.8">
+<figcaption>Figure A.8 The most common way of computing the loss gradients in a computation graph involves applying the chain rule from right to left, also called reverse-model automatic differentiation or backpropagation. We start from the output layer (or the loss itself) and work backward through the network to the input layer. We do this to compute the gradient of the loss with respect to each parameter (weights and biases) in the network, which informs how we update these parameters during training.</figcaption>
+</figure>
 
 PARTIAL DERIVATIVES AND GRADIENTS Figure A.8 shows partial derivatives, which measure the rate at which a function changes with respect to one of its variables. A gradient is a vector containing all of the partial derivatives of a multivariate function, a function with more than one variable as input.
 
@@ -8224,14 +8206,10 @@ y = torch.tensor([1.0])
 x1 = torch.tensor([1.1])
 w1 = torch.tensor([2.2], requires_grad=True)
 b = torch.tensor([0.0], requires_grad=True)
-```
-
-By default, PyTorch destroys the computation graph after calculating the gradients to free memory. However, since we will reuse this computation graph shortly, we set retain_graph=True so that it stays in memory.
-
-```python
 z = x1 * w1 + b
 a = torch.sigmoid(z)
 loss = F.binary_cross_entropy(a, y)
+# By default, PyTorch destroys the computation graph after calculating the gradients to free memory. However, since we will reuse this computation graph shortly, we set retain_graph=True so that it stays in memory.
 grad_L_w1 = grad(loss, w1, retain_graph=True)
 grad_L_b = grad(loss, b, retain_graph=True)
 ```
@@ -8272,21 +8250,10 @@ I’ve provided you with a lot of information, and you may be overwhelmed by the
 
 Next, we focus on PyTorch as a library for implementing deep neural networks. To provide a concrete example, let’s look at a multilayer perceptron, a fully connected neural network, as illustrated in figure A.9.
 
-This network has 10 input units.
-
-Input layer
-
-The 1st hidden layer has six nodes and one bias unit.
-
-The edges represent weight connections. This node represents the bias unit in this layer.
-
-The 2nd hidden layer has four nodes and a node representing the bias units.
-
-There are three output units.
-
-Output layer
-
-Figure A.9 A multilayer perceptron with two hidden layers. Each node represents a unit in the respective layer. For illustration purposes, each layer has a very small number of nodes.
+<figure>
+<img src="extracted_images/figures/FigA.9_p287.png" alt="Fig A.9">
+<figcaption>Figure A.9 A multilayer perceptron with two hidden layers. Each node represents a unit in the respective layer. For illustration purposes, each layer has a very small number of nodes.</figcaption>
+</figure>
 
 When implementing a neural network in PyTorch, we can subclass the `torch.nn.Module` class to define our own custom network architecture. This `Module` base class provides a lot of functionality, making it easier to build and train models. For instance, it allows us to encapsulate layers and operations and keep track of the model’s parameters.
 
@@ -8306,12 +8273,12 @@ class NeuralNetwork(torch.nn.Module):
             torch.nn.Linear(num_inputs, 30),
             torch.nn.ReLU(),
             # 2nd hidden layer
+            # The number of output nodes of one hidden layer has to match the number of inputs of the next layer.
             # Nonlinear activation functions are placed between the hidden layers.
             torch.nn.Linear(30, 20),
             torch.nn.ReLU(),
             # output layer
             torch.nn.Linear(20, num_outputs),
-        # The number of output nodes of one hidden layer has to match the number of inputs of the next layer.
         )
     def forward(self, x):
         logits = self.layers(x)
@@ -8484,25 +8451,10 @@ The values can now be interpreted as class-membership probabilities that sum up 
 
 Before we can train our model, we have to briefly discuss creating efficient data loaders in PyTorch, which we will iterate over during training. The overall idea behind data loading in PyTorch is illustrated in figure A.10.
 
-Custom `Dataset` class `DataLoader` class
-
-Each DataLoader object handles dataset shufﬂing, assembling the data records into batches, and more
-
-Instantiate Instantiate
-
-We create a custom class that deﬁnes how individual data records are loaded.
-
-Training dataset
-
-Training dataloader
-
-Using the Dataset class, we create different Dataset objects. Each Dataset object is fed to a data loader.
-
-Test dataset
-
-Test dataloader
-
-Figure A.10 PyTorch implements a `Dataset` and a `DataLoader` class. The `Dataset` class is used to instantiate objects that define how each data record is loaded. The `DataLoader` handles how the data is shuffled and assembled into batches.
+<figure>
+<img src="extracted_images/figures/FigA.10_p292.png" alt="Fig A.10">
+<figcaption>Figure A.10 PyTorch implements a `Dataset` and a `DataLoader` class. The `Dataset` class is used to instantiate objects that define how each data record is loaded. The `DataLoader` handles how the data is shuffled and assembled into batches.</figcaption>
+</figure>
 
 Following figure A.10, we will implement a custom `Dataset` class, which we will use to create a training and a test dataset that we’ll then use to create the data loaders. Let’s start by creating a simple toy dataset of five training examples with two features each. Accompanying the training examples, we also create a tensor containing the corresponding class labels: three examples belong to class 0, and two examples belong to class 1. In addition, we make a test set consisting of two entries. The code to create this dataset is shown in the following listing.
 
@@ -8573,19 +8525,19 @@ Now that we’ve defined a PyTorch `Dataset` class we can use for our toy datase
 ```python
 from torch.utils.data import DataLoader
 torch.manual_seed(123)
+# The number of background processes
+# The ToyDataset instance created earlier serves as input to the data loader.
+# Whether or not to shuffle the data
 train_loader = DataLoader(
-    # The ToyDataset instance created earlier serves as input to the data loader.
     dataset=train_ds,
     batch_size=2,
-    # Whether or not to shuffle the data
     shuffle=True,
-    # The number of background processes
     num_workers=0
 )
+# It is not necessary to shuffle a test dataset.
 test_loader = DataLoader(
     dataset=test_ds,
     batch_size=2,
-    # It is not necessary to shuffle a test dataset.
     shuffle=False,
     num_workers=0
 )
@@ -8648,25 +8600,10 @@ However, if we are working with very small datasets, setting `num_workers` to 1 
 
 Furthermore, for Jupyter notebooks, setting `num_workers` to greater than 0 can sometimes lead to problems related to the sharing of resources between different processes, resulting in errors or notebook crashes. Therefore, it’s essential to understand
 
-The next batch is taken from the loaded batches the data loader already queued up in the background.
-
-Load data A bottleneck where the model waits for the next batch to be loaded
-
-Load data
-
-Model training loop
-
-Model training loop
-
-With multiple workers enabled, the data loader can prepare the next data batches in the background.
-
-iteration
-
-iteration
-
-Model predicts the labels, the loss is computed, and the model weights are updated.
-
-Figure A.11 Loading data without multiple workers (setting `num_workers=0`) will create a data loading bottleneck where the model sits idle until the next batch is loaded (left). If multiple workers are enabled, the data loader can queue up the next batch in the background (right).
+<figure>
+<img src="extracted_images/figures/FigA.11_p296.png" alt="Fig A.11">
+<figcaption>Figure A.11 Loading data without multiple workers (setting `num_workers=0`) will create a data loading bottleneck where the model sits idle until the next batch is loaded (left). If multiple workers are enabled, the data loader can queue up the next batch in the background (right).</figcaption>
+</figure>
 
 the tradeoff and make a calculated decision on setting the `num_workers` parameter. When used correctly, it can be a beneficial tool but should be adapted to your specific dataset size and computational environment for optimal results.
 
@@ -8846,8 +8783,9 @@ def compute_accuracy(model, dataloader):
             logits = model(features)
 
         predictions = torch.argmax(logits, dim=1)
-        # Returns a tensor of True/ False values depending on whether the labels match The sum operation counts the number of True values.
+        # The sum operation counts the number of True values.
         compare = labels == predictions
+        # Returns a tensor of True/ False values depending on whether the labels match
         correct += torch.sum(compare)
         total_examples += len(compare)
     # The fraction of correct prediction, a value between 0 and 1. .item() returns the value of the tensor as a Python float.
@@ -8984,8 +8922,9 @@ Now that we are familiar with transferring tensors to the GPU, we can modify the
 ```python
 torch.manual_seed(123)
 model = NeuralNetwork(num_inputs=2, num_outputs=2)
-# Defines a device variable that defaults to a GPU Transfers the model onto the GPU
+# Defines a device variable that defaults to a GPU
 device = torch.device("cuda")
+# Transfers the model onto the GPU
 model = model.to(device)
 optimizer = torch.optim.SGD(model.parameters(), lr=0.5)
 num_epochs = 3
@@ -9046,6 +8985,8 @@ In the case of the modified training loop here, we probably won’t see a speedu
 > ```
 >
 > to take advantage of this chip.
+
+> **Exercise A.4**
 >
 > Compare the run time of matrix multiplication on a CPU to a GPU. At what matrix size do you begin to see the matrix multiplication on the GPU being faster than on the CPU? Hint: use the `%timeit` command in Jupyter to compare the run time. For example, given matrices `a` and `b`, run the command `%timeit a @ b` in a new notebook cell.
 
@@ -9062,23 +9003,19 @@ How does this work? PyTorch launches a separate process on each GPU, and each pr
 
 Each of the two GPUs will receive a copy of the model. Then, in every training iteration, each model will receive a minibatch (or just “batch”) from the data loader. We
 
-The model is initialized on the CPU.
-
-The model is initialized on the CPU.
-
-The ﬁrst minibatch
-
-Figure A.12 The model and data transfer in DDP involves two key steps. First, we create a copy of the model on each of the GPUs. Then we divide the input data into unique minibatches that we pass on to each model copy.
+<figure>
+<img src="extracted_images/figures/FigA.12_p305.png" alt="Fig A.12">
+<figcaption>Figure A.12 The model and data transfer in DDP involves two key steps. First, we create a copy of the model on each of the GPUs. Then we divide the input data into unique minibatches that we pass on to each model copy.</figcaption>
+</figure>
 
 can use a `DistributedSampler` to ensure that each GPU will receive a different, non-overlapping batch when using DDP.
 
 Since each model copy will see a different sample of the training data, the model copies will return different logits as outputs and compute different gradients during the backward pass. These gradients are then averaged and synchronized during training to update the models. This way, we ensure that the models don’t diverge, as illustrated in figure A.13.
 
-Each GPU computes the outputs (logits) independently.
-
-The gradients are synced across the GPUs to compute the weight updates for each GPU.
-
-Figure A.13 The forward and backward passes in DDP are executed independently on each GPU with its corresponding data subset. Once the forward and backward passes are completed, gradients from each model replica (on each GPU) are synchronized across all GPUs. This ensures that every model replica has the same updated weights.
+<figure>
+<img src="extracted_images/figures/FigA.13_p305.png" alt="Fig A.13">
+<figcaption>Figure A.13 The forward and backward passes in DDP are executed independently on each GPU with its corresponding data subset. Once the forward and backward passes are completed, gradients from each model replica (on each GPU) are synchronized across all GPUs. This ensures that every model replica has the same updated weights.</figcaption>
+</figure>
 
 The benefit of using DDP is the enhanced speed it offers for processing the dataset compared to a single GPU. Barring a minor communication overhead between devices that comes with DDP use, it can theoretically process a training epoch in half the time with two GPUs compared to just one. The time efficiency scales up with the number of GPUs, allowing us to process an epoch eight times faster if we have eight GPUs, and so on.
 
@@ -9109,31 +9046,33 @@ PyTorch’s `multiprocessing` submodule contains functions such as `multiprocess
 def ddp_setup(rank, world_size):
     # Address of the main node
     os.environ["MASTER_ADDR"] = "localhost"
-    # Any free port on the machine nccl stands for NVIDIA Collective Communication Library.
+    # Any free port on the machine
     os.environ["MASTER_PORT"] = "12345"
+    # world_size is the number of GPUs to use.
+    # rank refers to the index of the GPU we want to use.
+    # nccl stands for NVIDIA Collective Communication Library.
     init_process_group(
         backend="nccl",
         rank=rank,
-        # world_size is the number of GPUs to use.
         world_size=world_size
     )
-    # rank refers to the index of the GPU we want to use.
+    # Sets the current GPU device on which tensors will be allocated and operations will be performed
     torch.cuda.set_device(rank)
 def prepare_dataset():
     # insert dataset preparation code
-    # Sets the current GPU device on which tensors will be allocated and operations will be performed
+    # Splits the dataset into distinct, non-overlapping subsets for each process (GPU)
+    # Enables faster memory transfer when training on GPU
+    # Distibuted- Sampler takes care of the shuffling now.
     train_loader = DataLoader(
         dataset=train_ds,
         batch_size=2,
-        # Distibuted- Sampler takes care of the shuffling now.
         shuffle=False,
-        # Enables faster memory transfer when training on GPU
         pin_memory=True,
         drop_last=True,
-        # Splits the dataset into distinct, non-overlapping subsets for each process (GPU) The main function running the model training
         sampler=DistributedSampler(train_ds)
     )
     return train_loader, test_loader
+# The main function running the model training
 def main(rank, world_size, num_epochs):
     ddp_setup(rank, world_size)
     train_loader, test_loader = prepare_dataset()
@@ -9798,13 +9737,13 @@ GPT_CONFIG_124M = {
     "vocab_size": 50257,
     "context_length": 1024,
     "emb_dim": 768,
+    # Dropout for embedding layer
+    # Dropout for shortcut connections
+    # Dropout for multi- head attention
     "n_heads": 12,
     "n_layers": 12,
-    # Dropout for multi- head attention
     "drop_rate_attn": 0.1,
-    # Dropout for shortcut connections
     "drop_rate_shortcut": 0.1,
-    # Dropout for embedding layer
     "drop_rate_emb": 0.1,
     "qkv_bias": False
 }
@@ -9816,19 +9755,19 @@ The modified `TransformerBlock` and `GPTModel` look like
 class TransformerBlock(nn.Module):
     def __init__(self, cfg):
         super().__init__()
+        # Dropout for multi- head attention
         self.att = MultiHeadAttention(
             d_in=cfg["emb_dim"],
             d_out=cfg["emb_dim"],
             context_length=cfg["context_length"],
             num_heads=cfg["n_heads"],
-            # Dropout for multi- head attention
             dropout=cfg["drop_rate_attn"],
             qkv_bias=cfg["qkv_bias"])
         self.ff = FeedForward(cfg)
         self.norm1 = LayerNorm(cfg["emb_dim"])
         self.norm2 = LayerNorm(cfg["emb_dim"])
+        # Dropout for shortcut connections
         self.drop_shortcut = nn.Dropout(
-            # Dropout for shortcut connections
             cfg["drop_rate_shortcut"]
         )
     def forward(self, x):
@@ -9899,9 +9838,8 @@ On the other hand, larger top-k values (e.g., values in the range of 20 to 40) a
 
 There are multiple ways to force deterministic behavior with the `generate` function:
 
-1 Setting to `top_k=None` and applying no temperature scaling
-
-2 Setting `top_k=1`
+1. Setting to `top_k=None` and applying no temperature scaling
+2. Setting `top_k=1`
 
 > **Exercise 5.4**
 
@@ -9935,9 +9873,8 @@ Validation loss: 3.559617757797241
 
 The main observation is that the training and validation set performances are in the same ballpark. This can have multiple explanations:
 
-1 “The Verdict” was not part of the pretraining dataset when OpenAI trained GPT-2. Hence, the model is not explicitly overfitting to the training set and performs similarly well on the training and validation set portions of “The Verdict.” (The validation set loss is slightly lower than the training set loss, which is unusual in deep learning. However, it’s likely due to random noise since the dataset is relatively small. In practice, if there is no overfitting, the training and validation set performances are expected to be roughly identical).
-
-2 “The Verdict” was part of GPT-2’s training dataset. In this case, we can’t tell whether the model is overfitting the training data because the validation set would have been used for training as well. To evaluate the degree of overfitting, we’d need a new dataset generated after OpenAI finished training GPT-2 to make sure that it couldn’t have been part of the pretraining.
+1. “The Verdict” was not part of the pretraining dataset when OpenAI trained GPT-2. Hence, the model is not explicitly overfitting to the training set and performs similarly well on the training and validation set portions of “The Verdict.” (The validation set loss is slightly lower than the training set loss, which is unusual in deep learning. However, it’s likely due to random noise since the dataset is relatively small. In practice, if there is no overfitting, the training and validation set performances are expected to be roughly identical).
+2. “The Verdict” was part of GPT-2’s training dataset. In this case, we can’t tell whether the model is overfitting the training data because the validation set would have been used for training as well. To evaluate the degree of overfitting, we’d need a new dataset generated after OpenAI finished training GPT-2 to make sure that it couldn’t have been part of the pretraining.
 
 > **Exercise 5.6**
 
@@ -10026,8 +9963,8 @@ for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
         eos_id=50256
     )
     generated_text = token_ids_to_text(token_ids, tokenizer)
+    # New: Adjust ###Response to <|assistant|>
     response_text = (
-        # New: Adjust ###Response to <|assistant|>
         generated_text[len(input_text):]
         .replace("<|assistant|>:", "")
         .strip()
@@ -10081,8 +10018,8 @@ def custom_collate_fn(
     device="cpu"
 ):
     batch_max_length = max(len(item)+1 for instruction_length, item in batch)
-    inputs_lst, targets_lst = [], []
     # batch is now a tuple.
+    inputs_lst, targets_lst = [], []
     for instruction_length, item in batch:
         new_item = item.copy()
         new_item += [pad_token_id]
@@ -10289,13 +10226,17 @@ To make the code self-contained, we reinitialize the model we trained in chapter
 ```python
 import torch
 from chapter04 import GPTModel
+# Vocabulary size
 GPT_CONFIG_124M = {
-    # Vocabulary size
     "vocab_size": 50257,
+    # Embedding dimension
+    # Query-key-value bias
+    # Number of attention heads
+    # Dropout rate
+    # Number of layers
     "context_length": 256,
     "emb_dim": 768,
     "n_heads": 12,
-    # Embedding dimension Number of attention heads Number of layers Dropout rate Query-key-value bias
     "n_layers": 12,
     "drop_rate": 0.1,
     "qkv_bias": False
@@ -10387,16 +10328,16 @@ optimizer = torch.optim.AdamW(model.parameters(), weight_decay=0.1)
 lr_increment = (peak_lr - initial_lr) / warmup_steps
 global_step = -1
 track_lrs = []
+# Executes a typical training loop iterating over the batches in the training loader in each epoch
 for epoch in range(n_epochs):
     for input_batch, target_batch in train_loader:
         optimizer.zero_grad()
         global_step += 1
 
-        # Executes a typical training loop iterating over the batches in the training loader in each epoch
+        # Updates the learning rate if we are still in the warmup phase
         if global_step < warmup_steps:
             lr = initial_lr + global_step * lr_increment
         else:
-            # Updates the learning rate if we are still in the warmup phase
             lr = peak_lr
 
         # Applies the calculated learning rate to the optimizer
@@ -10419,7 +10360,10 @@ plt.show()
 
 The resulting plot shows that the learning rate starts with a low value and increases for 20 steps until it reaches the maximum value after 20 steps (figure D.1).
 
-Figure D.1 The learning rate warmup increases the learning rate for the first 20 training steps. After 20 steps, the learning rate reaches the peak of 0.01 and remains constant for the rest of the training.
+<figure>
+<img src="extracted_images/figures/FigD.1_p338.png" alt="Fig D.1">
+<figcaption>Figure D.1 The learning rate warmup increases the learning rate for the first 20 training steps. After 20 steps, the learning rate reaches the peak of 0.01 and remains constant for the rest of the training.</figcaption>
+</figure>
 
 Next, we will modify the learning rate further so that it decreases after reaching the maximum learning rate, which further helps improve the model training.
 
@@ -10469,7 +10413,10 @@ plt.show()
 
 The resulting learning rate plot shows that the learning rate starts with a linear warmup phase, which increases for 20 steps until it reaches the maximum value after 20 steps. After the 20 steps of linear warmup, cosine decay kicks in, reducing the learning rate gradually until it reaches its minimum (figure D.2).
 
-Figure D.2 The first 20 steps of linear learning rate warmup are followed by a cosine decay, which reduces the learning rate in a halfcosine cycle until it reaches its minimum point at the end of training.
+<figure>
+<img src="extracted_images/figures/FigD.2_p339.png" alt="Fig D.2">
+<figcaption>Figure D.2 The first 20 steps of linear learning rate warmup are followed by a cosine decay, which reduces the learning rate in a halfcosine cycle until it reaches its minimum point at the end of training.</figcaption>
+</figure>
 
 <a id="d-3-gradient-clipping"></a>
 ### D.3 Gradient clipping
@@ -10543,8 +10490,9 @@ def train_model(model, train_loader, val_loader, optimizer, device,
     train_losses, val_losses, track_tokens_seen, track_lrs = [], [], [], []
     tokens_seen, global_step = 0, -1
     peak_lr = optimizer.param_groups[0]["lr"]
-    # Calculates the total number of iterations in the training process Calculates the learning rate increment during the warmup phase
+    # Calculates the total number of iterations in the training process
     total_training_steps = len(train_loader) * n_epochs
+    # Calculates the learning rate increment during the warmup phase
     lr_increment = (peak_lr - initial_lr) / warmup_steps
     for epoch in range(n_epochs):
         model.train()
@@ -10654,29 +10602,10 @@ Using LoRA, we can then reformulate the weight update we defined earlier:
 
 Figure E.1 illustrates the weight update formulas for full fine-tuning and LoRA side by side.
 
-Weight update in regular ﬁne-tuning Weight update in LoRA
-
-Weight update in regular ﬁne-tuning Weight update in LoRA
-
-The weight parameters in any of the neural network layers
-
-The weight parameters in any of the neural network layers
-
-LoRA matrices and A B approximate the weight update matrix . ΔW
-
-LoRA matrices and A B approximate the weight update matrix . ΔW
-
-The inner dimension r is a hyperparameter.
-
-The inner dimension r is a hyperparameter.
-
-The values by which the weights are updated during training
-
-The values by which the weights are updated during training
-
-![Fig E.1](extracted_images/figures/FigE1_p345.png)
-
-*Figure E.1* A comparison between weight update methods: regular fine-tuning and LoRA. Regular fine-tuning involves updating the pretrained weight matrix W directly with ΔW (left). LoRA uses two smaller matrices, A and B, to approximate ΔW, where the product AB is added to W, and r denotes the inner dimension, a tunable hyperparameter (right).
+<figure>
+<img src="extracted_images/figures/FigE.1_p345.png" alt="Fig E.1">
+<figcaption>Figure E.1 A comparison between weight update methods: regular fine-tuning and LoRA. Regular fine-tuning involves updating the pretrained weight matrix W directly with ΔW (left). LoRA uses two smaller matrices, A and B, to approximate ΔW, where the product AB is added to W, and r denotes the inner dimension, a tunable hyperparameter (right).</figcaption>
+</figure>
 
 If you paid close attention, you might have noticed that the visual representations of full fine-tuning and LoRA in figure E.1 differ slightly from the earlier presented formulas. This variation is attributed to the distributive law of matrix multiplication, which allows us to separate the original and updated weights rather than combine them. For example, in the case of regular fine-tuning with x as the input data, we can express the computation as Similarly, we can write the following for LoRA:
 
@@ -10818,10 +10747,13 @@ from chapter04 import GPTModel
 from chapter05 import load_weights_into_gpt
 CHOOSE_MODEL = "gpt2-small (124M)"
 INPUT_PROMPT = "Every effort moves"
+# Query-key-value bias
+# Vocabulary size
+# Dropout rate
+# Context length
 BASE_CONFIG = {
     "vocab_size": 50257,
     "context_length": 1024,
-    # Vocabulary size Context length Dropout rate Query-key-value bias
     "drop_rate": 0.0,
     "qkv_bias": True
 }
@@ -10905,13 +10837,10 @@ Test accuracy: 48.75%
 
 Next, we modify and fine-tune the LLM using LoRA. We begin by initializing a LoRA- Layer that creates the matrices A and B, along with the `alpha` scaling factor and the `rank` (r) setting. This layer can accept an input and compute the corresponding output, as illustrated in figure E.2.
 
-Initialize LoRA matrices A B and , which approximate the weight update matrix ΔW.
-
-The inner dimension r is a hyperparameter.
-
-![Fig E.2](extracted_images/figures/FigE2_p350.png)
-
-*Figure E.2* The LoRA matrices A and B are applied to the layer inputs and are involved in computing the model outputs. The inner dimension r of these matrices serves as a setting that adjusts the number of trainable parameters by varying the sizes of A and B.
+<figure>
+<img src="extracted_images/figures/FigE.2_p350.png" alt="Fig E.2">
+<figcaption>Figure E.2 The LoRA matrices A and B are applied to the layer inputs and are involved in computing the model outputs. The inner dimension r of these matrices serves as a setting that adjusts the number of trainable parameters by varying the sizes of A and B.</figcaption>
+</figure>
 
 In code, this LoRA layer can be implemented as follows.
 
@@ -10938,15 +10867,12 @@ The other important setting, `alpha`, functions as a scaling factor for the outp
 
 In LoRA, the typical goal is to substitute existing `Linear` layers, allowing weight updates to be applied directly to the pre-existing pretrained weights, as illustrated in figure E.3.
 
-Computing the outputs involves both the original weights and the LoRA weights
+<figure>
+<img src="extracted_images/figures/FigE.3_p351.png" alt="Fig E.3">
+<figcaption>Figure E.3 The integration of LoRA into a model layer. The original pretrained weights (W) of a layer are combined with the outputs from LoRA matrices (A and B), which approximate the weight update matrix (ΔW). The final output is calculated by adding the output of the adapted layer (using LoRA weights) to the original output.</figcaption>
+</figure>
 
-LoRA matrices and , A B which approximate the weight update matrix ΔW
-
-The original weights in a given layer of a model
-
-![Fig E.3](extracted_images/figures/FigE3_p351.png)
-
-*Figure E.3* The integration of LoRA into a model layer. The original pretrained weights (W) of a layer are combined with the outputs from LoRA matrices (A and B), which approximate the weight update matrix (ΔW). The final output is calculated by adding the output of the To integrate the original `Linear` layer weights, we now create a `LinearWithLoRA` layer. This layer utilizes the previously implemented `LoRALayer` and is designed to replace existing `Linear` layers within a neural network, such as the self-attention modules or feed-forward modules in the `GPTModel`.
+To integrate the original `Linear` layer weights, we now create a `LinearWithLoRA` layer. This layer utilizes the previously implemented `LoRALayer` and is designed to replace existing `Linear` layers within a neural network, such as the self-attention modules or feed-forward modules in the `GPTModel`.
 
 **Listing E.6** Replacing a `LinearWithLora` layer with `Linear` layers
 
@@ -10981,13 +10907,10 @@ def replace_linear_with_lora(model, rank, alpha):
 
 We have now implemented all the necessary code to replace the `Linear` layers in the `GPTModel` with the newly developed `LinearWithLoRA` layers for parameter-efficient fine-tuning. Next, we will apply the `LinearWithLoRA` upgrade to all `Linear` layers found in the multihead attention, feed-forward modules, and the output layer of the `GPTModel`, as shown in figure E.4.
 
-The GPT model we implemented and used in previous chapters.
-
-We update the layers `Linear` with layers. `LinearWithLoRA`
-
-![Fig E.4](extracted_images/figures/FigE4_p353.png)
-
-*Figure E.4* The architecture of the GPT model. It highlights the parts of the model where `Linear` layers are upgraded to `LinearWithLoRA` layers for parameter-efficient fine-tuning.
+<figure>
+<img src="extracted_images/figures/FigE.4_p353.png" alt="Fig E.4">
+<figcaption>Figure E.4 The architecture of the GPT model. It highlights the parts of the model where `Linear` layers are upgraded to `LinearWithLoRA` layers for parameter-efficient fine-tuning.</figcaption>
+</figure>
 
 Before we apply the `LinearWithLoRA` layer upgrades, we first freeze the original model parameters:
 
@@ -11178,9 +11101,10 @@ plot_values(
 
 Figure E.5 plots the results.
 
-![Fig E.5](extracted_images/figures/FigE5_p357.png)
-
-*Figure E.5* The training and validation loss curves over six epochs for a machine learning model. Initially, both training and validation loss decrease sharply and then they level off, indicating the model is converging, which means that it is not expected to improve noticeably with further training.
+<figure>
+<img src="extracted_images/figures/FigE.5_p357.png" alt="Fig E.5">
+<figcaption>Figure E.5 The training and validation loss curves over six epochs for a machine learning model. Initially, both training and validation loss decrease sharply and then they level off, indicating the model is converging, which means that it is not expected to improve noticeably with further training.</figcaption>
+</figure>
 
 In addition to evaluating the model based on the loss curves, let’s also calculate the accuracies on the full training, validation, and test set (during the training, we approximated the training and validation set accuracies from five batches via the `eval_iter=5` setting):
 

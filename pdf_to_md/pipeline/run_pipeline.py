@@ -23,9 +23,11 @@ from pipeline.merge import (
     merge_box_code,
     merge_summary_items,
     merge_listing_callouts,
+    merge_numbered_lists,
     merge_pending_prose,
     merge_pending_code,
     merge_two_line_headings,
+    strip_box_continuation_markers,
 )
 
 
@@ -44,6 +46,11 @@ def merge_all(blocks: list) -> list:
     # 章末 Summary 列表重组（先于 prose 合并：summary_list 的折行续块
     # 须并入列表项，不得被 merge_pending_prose 吸收成独立段落）
     blocks = merge_summary_items(blocks)
+    # 编号列表重组（先于 prose 合并：连续递增编号的 prose 块须成 ol_list，
+    # 不得被段落合并链吸收成裸段落）
+    blocks = merge_numbered_lists(blocks)
+    # 跨页概念框 "(continued)" 排版残标剔除（盒碎片合并后执行）
+    blocks = strip_box_continuation_markers(blocks)
     # Listing 旁注归位（先于 prose 合并：旁注块从块流中删除并入代码围栏；
     # 先于 pending_code：定位基于 classify 原始行表，与 meta 对齐可靠）
     blocks = merge_listing_callouts(blocks)
