@@ -45,6 +45,17 @@ PY_HINT_RE = re.compile(
     r"(^\s*>>>|^\s*\.\.\.|def \w+\(|class \w+\(|import \w|from \w+ import|"
     r"print\(|>>> |\.cuda\(\)|torch\.\w+|np\.\w+|self\.\w+\s*=)"
 )
+# 首行锚定补充信号：纯 stdlib/自定义调用片段（with open / 赋值 / 控制流 /
+# 注释头 / 大写构造调用独占行）无 PY_HINT 信号，旧则误标 "text"。
+# 仅看首个非空行——输出块（tensor 转储/训练日志）首行是标签或数据，
+# 借此与代码块区分；` = ` 要求空格环绕且非 ==（排除 shell 环境变量风格）。
+PY_HINT_FIRST_RE = re.compile(
+    r"(^\s*with\s+\w"
+    r"|^[\w.]+ = [^=]"
+    r"|^(?:for|while|if|elif|else|try|except)\b"
+    r"|^#\s"
+    r"|^[A-Z]\w*\(\s*$)"
+)
 COURIER_THRESHOLD = 0.75
 
 # ---- 概念框 / Listing（搬运自 fix_special_blocks 常量） ----
@@ -88,6 +99,9 @@ def _block_courier_frac(block) -> float:
 
 def _detect_code_lang(text: str) -> str:
     if PY_HINT_RE.search(text):
+        return "python"
+    first = next((ln for ln in text.split("\n") if ln.strip()), "")
+    if PY_HINT_FIRST_RE.search(first):
         return "python"
     return "text"
 

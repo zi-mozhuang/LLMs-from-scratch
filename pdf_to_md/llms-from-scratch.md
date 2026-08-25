@@ -907,7 +907,7 @@ We can modify the tokenizer to use an `<|unk|>` token if it encounters a word th
 
 Let’s now modify the vocabulary to include these two special tokens, `<unk>` and `<|endoftext|>`, by adding them to our list of all unique words:
 
-```text
+```python
 all_tokens = sorted(list(set(preprocessed)))
 all_tokens.extend(["<|endoftext|>", "<|unk|>"])
 vocab = {token:integer for integer,token in enumerate(all_tokens)}
@@ -1044,7 +1044,7 @@ print("tiktoken version:", version("tiktoken"))
 
 Once installed, we can instantiate the BPE tokenizer from tiktoken as follows:
 
-```text
+```python
 tokenizer = tiktoken.get_encoding("gpt2")
 ```
 
@@ -1111,7 +1111,7 @@ The next step in creating the embeddings for the LLM is to generate the input–
 
 Let’s implement a data loader that fetches the input–target pairs in figure 2.12 from the training dataset using a sliding window approach. To get started, we will tokenize the whole “The Verdict” short story using the BPE tokenizer:
 
-```text
+```python
 with open("the-verdict.txt", "r", encoding="utf-8") as f:
     raw_text = f.read()
 enc_text = tokenizer.encode(raw_text)
@@ -1122,7 +1122,7 @@ Executing this code will return `5145`, the total number of tokens in the traini
 
 Next, we remove the first 50 tokens from the dataset for demonstration purposes, as it results in a slightly more interesting text passage in the next steps:
 
-```text
+```python
 enc_sample = enc_text[50:]
 ```
 
@@ -1247,7 +1247,7 @@ def create_dataloader_v1(txt, batch_size=4, max_length=256,
 
 Let’s test the `dataloader` with a batch size of 1 for an LLM with a context size of 4 to develop an intuition of how the `GPTDatasetV1` class from listing 2.5 and the `create_ dataloader_v1` function from listing 2.6 work together:
 
-```text
+```python
 with open("the-verdict.txt", "r", encoding="utf-8") as f:
     raw_text = f.read()
 dataloader = create_dataloader_v1(
@@ -1296,7 +1296,7 @@ noisy model updates. Just like in regular deep learning, the batch size is a tra
 
 Let’s look briefly at how we can use the data loader to sample with a batch size greater than 1:
 
-```text
+```python
 dataloader = create_dataloader_v1(
     raw_text, batch_size=8, max_length=4, stride=4,
     shuffle=False
@@ -1356,7 +1356,7 @@ input_ids = torch.tensor([2, 3, 5, 1])
 
 For the sake of simplicity, suppose we have a small vocabulary of only 6 words (instead of the 50,257 words in the BPE tokenizer vocabulary), and we want to create embeddings of size 3 (in GPT-3, the embedding size is 12,288 dimensions):
 
-```text
+```python
 vocab_size = 6
 output_dim = 3
 ```
@@ -1969,7 +1969,7 @@ Similarly, we start here by computing only one context vector, z(2), for illustr
 
 Let’s begin by defining a few variables:
 
-```text
+```python
 # The second input element
 x_2 = inputs[1]
 # The input embedding size, d=3
@@ -2898,7 +2898,7 @@ For example, in a neural network layer that is represented by a 2,048 × 2,048�
 
 We specify the configuration of the small GPT-2 model via the following Python dictionary, which we will use in the code examples later:
 
-```text
+```python
 GPT_CONFIG_124M = {
     "vocab_size": 50257,     # Vocabulary size
     "context_length": 1024,  # Context length
@@ -4235,7 +4235,7 @@ To compute the loss on the training and validation datasets, we use a very small
 
 The following code loads the “The Verdict” short story:
 
-```text
+```python
 file_path = "the-verdict.txt"
 with open(file_path, "r", encoding="utf-8") as file:
     text_data = file.read()
@@ -4270,7 +4270,7 @@ Next, we divide the dataset into a training and a validation set and use the dat
 
 To implement the data splitting and loading, we first define a `train_ratio` to use 90% of the data for training and the remaining 10% as validation data for model evaluation during training:
 
-```text
+```python
 train_ratio = 0.90
 split_idx = int(train_ratio * len(text_data))
 train_data = text_data[:split_idx]
@@ -4646,7 +4646,7 @@ Let’s now look at temperature scaling, a technique that adds a probabilistic s
 
 To illustrate the probabilistic sampling with a concrete example, let’s briefly discuss the next-token generation process using a very small vocabulary for illustration purposes:
 
-```text
+```python
 vocab = {
     "closer": 0,
     "every": 1,
@@ -5061,7 +5061,7 @@ architectural elements are repeated different numbers of times and the embedding
 
 After loading the GPT-2 model weights into Python, we still need to transfer them from the `settings` and `params` dictionaries into our `GPTModel` instance. First, we create a dictionary that lists the differences between the different GPT model sizes in figure 5.17:
 
-```text
+```python
 model_configs = {
     "gpt2-small (124M)": {"emb_dim": 768, "n_layers": 12, "n_heads": 12},
     "gpt2-medium (355M)": {"emb_dim": 1024, "n_layers": 24, "n_heads": 16},
@@ -5072,7 +5072,7 @@ model_configs = {
 
 Suppose we are interested in loading the smallest model, `"gpt2-small (124M)"`. We can use the corresponding settings from the `model_configs` table to update our full-length `GPT_CONFIG_124M` we defined and used earlier:
 
-```text
+```python
 model_name = "gpt2-small (124M)"
 NEW_CONFIG = GPT_CONFIG_124M.copy()
 NEW_CONFIG.update(model_configs[model_name])
@@ -5092,7 +5092,7 @@ NEW_CONFIG.update({"qkv_bias": True})
 
 We can now use the updated `NEW_CONFIG` dictionary to initialize a new `GPTModel` instance:
 
-```text
+```python
 gpt = GPTModel(NEW_CONFIG)
 gpt.eval()
 ```
@@ -5526,7 +5526,7 @@ class SpamDataset(Dataset):
 
 The `SpamDataset` class loads data from the CSV files we created earlier, tokenizes the text using the GPT-2 tokenizer from `tiktoken`, and allows us to pad or truncate the sequences to a uniform length determined by either the longest sequence or a predefined maximum length. This ensures each input tensor is of the same size, which is necessary to create the batches in the training data loader we implement next:
 
-```text
+```python
 train_dataset = SpamDataset(
     csv_file="train.csv",
     max_length=None,
@@ -5544,7 +5544,7 @@ The code outputs `120`, showing that the longest sequence contains no more than 
 
 Next, we pad the validation and test sets to match the length of the longest training sequence. Importantly, any validation and test set samples exceeding the length of the longest training example are truncated using `encoded_text[:self.max_length]` in the `SpamDataset` code we defined earlier. This truncation is optional; you can set `max_length=None` for both validation and test sets, provided there are no sequences exceeding 1,024 tokens in these sets:
 
-```text
+```python
 val_dataset = SpamDataset(
     csv_file="validation.csv",
     max_length=train_dataset.max_length,
@@ -5647,7 +5647,7 @@ We must prepare the model for classification fine-tuning to identify spam messag
 
 To begin the model preparation process, we employ the same configurations we used to pretrain unlabeled data:
 
-```text
+```python
 CHOOSE_MODEL = "gpt2-small (124M)"
 INPUT_PROMPT = "Every effort moves"
 # Query-key-value bias
@@ -5750,7 +5750,7 @@ We must modify the pretrained LLM to prepare it for classification fine-tuning. 
 
 Before we attempt the modification shown in figure 6.9, let’s print the model architecture via `print(model`):
 
-```text
+```python
 GPTModel(
   (tok_emb): Embedding(50257, 768)
   (pos_emb): Embedding(1024, 768)
@@ -5792,7 +5792,7 @@ Next, we replace the `out_head` with a new output layer (see figure 6.9) that we
 
 To get the model ready for classification fine-tuning, we first freeze the model, meaning that we make all layers nontrainable:
 
-```text
+```python
 for param in model.parameters():
     param.requires_grad = False
 ```
@@ -5816,7 +5816,7 @@ This new `model.out_head` output layer has its `requires_grad` attribute set to 
 
 To make the final `LayerNorm` and last transformer block trainable, we set their respective `requires_grad` to `True`:
 
-```text
+```python
 for param in model.trf_blocks[-1].parameters():
     param.requires_grad = True
 for param in model.final_norm.parameters():
@@ -6271,7 +6271,7 @@ when using the `train_classifier_simple` function, which means our estimations o
 
 Now we must calculate the performance metrics for the training, validation, and test sets across the entire dataset by running the following code, this time without defining the `eval_iter` value:
 
-```text
+```python
 train_accuracy = calc_accuracy_loader(train_loader, model, device)
 val_accuracy = calc_accuracy_loader(val_loader, model, device)
 test_accuracy = calc_accuracy_loader(test_loader, model, device)
@@ -6333,7 +6333,7 @@ def classify_review(
 
 Let’s try this `classify_review` function on an example text:
 
-```text
+```python
 text_1 = (
     "You are a winner you have been specially"
     " selected to receive $1000 cash or a $2000 award."
@@ -6345,7 +6345,7 @@ print(classify_review(
 
 The resulting model correctly predicts `"spam"`. Let’s try another example:
 
-```text
+```python
 text_2 = (
     "Hey, just wanted to check if we're still on"
     " for dinner tonight? Let me know!"
@@ -6581,7 +6581,7 @@ Before we move on to setting up the PyTorch data loaders in the next section, le
 
 **Listing 7.3** Partitioning the dataset
 
-```text
+```python
 # Use 10% for testing
 train_portion = int(len(data) * 0.85)
 # Use 85% of the data for training
@@ -8288,7 +8288,7 @@ class NeuralNetwork(torch.nn.Module):
 
 We can then instantiate a new neural network object as follows:
 
-```text
+```python
 model = NeuralNetwork(50, 3)
 ```
 
@@ -8300,7 +8300,7 @@ print(model)
 
 This prints
 
-```text
+```python
 NeuralNetwork(
   (layers): Sequential(
     (0): Linear(in_features=50, out_features=30, bias=True)
@@ -8568,7 +8568,7 @@ In practice, having a substantially smaller batch as the last batch in a trainin
 
 **Listing A.8** A training loader that drops the last batch
 
-```text
+```python
 train_loader = DataLoader(
     dataset=train_ds,
     batch_size=2,
@@ -9618,7 +9618,7 @@ This returns
 
 The code for the data loader with `max_length=2 and stride=2`:
 
-```text
+```python
 dataloader = create_dataloader(
     raw_text, batch_size=4, max_length=2, stride=2
 )
@@ -9635,7 +9635,7 @@ tensor([[  40,  367],
 
 The code of the second data loader with `max_length=8 and stride=2`:
 
-```text
+```python
 dataloader = create_dataloader(
     raw_text, batch_size=4, max_length=8, stride=2
 )
@@ -9667,7 +9667,7 @@ sa_v1.W_value = torch.nn.Parameter(sa_v2.W_value.weight.T)
 
 To achieve an output dimension of 2, similar to what we had in single-head attention, we need to change the projection dimension `d_out` to 1.
 
-```text
+```python
 d_out = 1
 mha = MultiHeadAttentionWrapper(d_in, d_out, block_size, 0.0, num_heads=2)
 ```
@@ -9676,7 +9676,7 @@ mha = MultiHeadAttentionWrapper(d_in, d_out, block_size, 0.0, num_heads=2)
 
 The initialization for the smallest GPT-2 model is
 
-```text
+```python
 block_size = 1024
 d_in, d_out = 768, 768
 num_heads = 12
@@ -9690,7 +9690,7 @@ mha = MultiHeadAttention(d_in, d_out, block_size, 0.0, num_heads)
 
 We can calculate the number of parameters in the feed forward and attention modules as follows:
 
-```text
+```python
 block = TransformerBlock(GPT_CONFIG_124M)
 total_params = sum(p.numel() for p in block.ff.parameters())
 print(f"Total number of parameters in feed forward module: {total_params:,}")
@@ -9709,7 +9709,7 @@ Total number of parameters in attention module: 2,360,064
 
 To instantiate the other GPT model sizes, we can modify the configuration dictionary as follows (here shown for GPT-2 XL):
 
-```text
+```python
 GPT_CONFIG = GPT_CONFIG_124M.copy()
 GPT_CONFIG["emb_dim"] = 1600
 GPT_CONFIG["n_layers"] = 48
@@ -9732,7 +9732,7 @@ There are three distinct places in chapter 4 where we used dropout layers: the e
 
 The modified configuration is as follows:
 
-```text
+```python
 GPT_CONFIG_124M = {
     "vocab_size": 50257,
     "context_length": 1024,
@@ -9859,7 +9859,7 @@ Then, call the `train_simple_function` with `num_epochs=1` to train the model fo
 
 We can use the following code to calculate the training and validation set losses of the GPT model:
 
-```text
+```python
 train_loss = calc_loss_loader(train_loader, gpt, device)
 val_loss = calc_loss_loader(val_loader, gpt, device)
 ```
@@ -9899,7 +9899,7 @@ model_name = "gpt2-xl (1558M)"
 
 We can pad the inputs to the maximum number of tokens the model supports by setting the max length to `max_length = 1024` when initializing the datasets:
 
-```text
+```python
 train_dataset = SpamDataset(..., max_length=1024, ...)
 val_dataset = SpamDataset(..., max_length=1024, ...)
 test_dataset = SpamDataset(..., max_length=1024, ...)
@@ -9911,7 +9911,7 @@ However, the additional padding results in a substantially worse test accuracy o
 
 Instead of fine-tuning just the final transformer block, we can fine-tune the entire model by removing the following lines from the code:
 
-```text
+```python
 for param in model.parameters():
     param.requires_grad = False
 ```
@@ -9951,7 +9951,7 @@ def format_input(entry):
 
 Lastly, we also have to update the way we extract the generated response when we collect the test set responses:
 
-```text
+```python
 for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
     input_text = format_input(entry)
     tokenizer=tokenizer
@@ -10052,14 +10052,14 @@ When evaluating a model fine-tuned with this instruction masking method, it perf
 
 To fine-tune the model on the original Stanford Alpaca dataset (https://github.com/tatsu-lab/stanford_alpaca), we just have to change the file URL from
 
-```text
+```python
 url = "https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/main/ch07/
 01_main-chapter-code/instruction-data.json"
 ```
 
 to
 
-```text
+```python
 url = "https://raw.githubusercontent.com/tatsu-lab/stanford_alpaca/main/
 alpaca_data.json"
 ```
@@ -10302,7 +10302,7 @@ Implementing a learning rate warmup can stabilize the training of complex models
 
 Suppose we plan to train an LLM for 15 epochs, starting with an initial learning rate of 0.0001 and increasing it to a maximum learning rate of 0.01:
 
-```text
+```python
 n_epochs = 15
 initial_lr = 0.0001
 peak_lr = 0.01
@@ -10956,7 +10956,7 @@ print(model)
 
 The output is
 
-```text
+```python
 GPTModel(
   (tok_emb): Embedding(50257, 768)
   (pos_emb): Embedding(1024, 768)
@@ -11108,7 +11108,7 @@ Figure E.5 plots the results.
 
 In addition to evaluating the model based on the loss curves, let’s also calculate the accuracies on the full training, validation, and test set (during the training, we approximated the training and validation set accuracies from five batches via the `eval_iter=5` setting):
 
-```text
+```python
 train_accuracy = calc_accuracy_loader(train_loader, model, device)
 val_accuracy = calc_accuracy_loader(val_loader, model, device)
 test_accuracy = calc_accuracy_loader(test_loader, model, device)

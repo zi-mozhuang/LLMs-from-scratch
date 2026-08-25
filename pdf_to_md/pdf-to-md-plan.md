@@ -59,7 +59,7 @@ assert links <= anchors                          # TOC 全部可跳转
 | 规则 | 参数 |
 |------|------|
 | 页眉/页脚剔除（span 级） | 字体∈HEADER_FONTS 且 top<35pt 或 bottom>页高-75pt 且字号<10.5；图注块整体豁免 |
-| 代码块 | block 内 Courier 占比 ≥75% → 围栏（保留缩进）；正文 Courier 片段包行内反引号 |
+| 代码块 | block 内 Courier 占比 ≥75% → 围栏（保留缩进）；语言判定 `PY_HINT_RE`（全文信号）+ `PY_HINT_FIRST_RE`（首行锚定：with/赋值/控制流/注释头/大写构造调用）；正文 Courier 片段包行内反引号 |
 | 标题 | PDF TOC（NFKC 归一化匹配）为唯一真相源；级别映射 ##/###/#### |
 | 段落合并 | 块内折行并一段；跨块按终止标点/开放词守卫（`_should_merge_prose`），允许跨页 |
 | 代码清单合并 | 连续 code run 合并，图片/绘图不打断（fenced 828→605） |

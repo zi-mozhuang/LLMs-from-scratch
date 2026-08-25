@@ -29,6 +29,9 @@ EXPECTED_FIGURE_COUNT = 161  # manifest 148（正文128+附录20）+ 行首引�
 EXPECTED_CONCEPT_BOX = (100, 120)  # golden 基准 111 概念框块数
 EXPECTED_OL_ITEMS = 6  # merge_numbered_lists 4 项（Exercise 5.3/5.5 答）
                       # + llama 饲料清单 2 处 prose 原生 "1. " 行
+EXPECTED_TEXT_FENCES = 204  # _detect_code_lang 首行信号后剩余 text 围栏
+                           # （真输出/日志/showcase 截图重建；44 块误标已翻
+                           # python；另 1 处 "> ```text" 为框内代码引用围栏不计）
 ALLOWED_TOC_GAP = 2
 # 同矩形引用块碎片：结构性修复后必须为 0（跨页截断框属已知遗留，
 # 由 audit_quote_fragmentation 的 STACKED/UNMATCHED 类目跟踪，不计入此断言）
@@ -242,6 +245,12 @@ def main(md_path: Path = MD_PATH, pages: list = None, blocks: list = None,
     print(f"[verify] 有序列表项数={n_ol}  基准={EXPECTED_OL_ITEMS}")
     print(f"         -> {'PASS' if ol_ok else 'FAIL'}")
     all_ok = all_ok and ol_ok
+    # 14) 代码围栏语言对账：text 围栏数（防 PY_HINT 信号回退或误扩）
+    n_text = sum(1 for l in lines if l.strip() == "```text")
+    text_ok = n_text == EXPECTED_TEXT_FENCES
+    print(f"[verify] text 围栏数={n_text}  基准={EXPECTED_TEXT_FENCES}")
+    print(f"         -> {'PASS' if text_ok else 'FAIL'}")
+    all_ok = all_ok and text_ok
     print(f"\n[verify] 总体: {'ALL PASS' if all_ok else 'FAIL'}")
     return 0 if all_ok else 1
 
